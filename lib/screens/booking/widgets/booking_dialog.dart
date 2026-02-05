@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/config/supabase_config.dart';
 import '../../../providers/booking_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/address_provider.dart';
 import '../../../providers/rewards_provider.dart';
 import '../../../models/reward.dart';
-import 'dart:math';
+import '../../../models/redeemed_voucher.dart';
+import '../../../services/redeemed_voucher_service.dart';
 
 class BookingDialog extends ConsumerStatefulWidget {
   final bool isEmergency;
@@ -38,6 +40,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
   // Step 3: Promo code
   final TextEditingController _promoCodeController = TextEditingController();
   String? _appliedPromoCode;
+  String? _appliedVoucherId; // ID of the redeemed voucher being used
   double _discountAmount = 0;
   String _discountType = 'none'; // 'percentage' or 'fixed'
 
@@ -77,6 +80,154 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     {'name': 'GizmoDoc', 'distance': '0.98km'},
   ];
 
+  // Brand and model data for device selection with images
+  final Map<String, Map<String, List<Map<String, String>>>> _deviceBrands = {
+    'Mobile Phone': {
+      'Apple': [
+        {'name': 'iPhone 15 Pro Max', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-pro-max.jpg'},
+        {'name': 'iPhone 15 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-pro.jpg'},
+        {'name': 'iPhone 15', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15.jpg'},
+        {'name': 'iPhone 14 Pro Max', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14-pro-max.jpg'},
+        {'name': 'iPhone 14 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14-pro.jpg'},
+        {'name': 'iPhone 14', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-14.jpg'},
+        {'name': 'iPhone 13', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-13.jpg'},
+        {'name': 'iPhone 12', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-12.jpg'},
+        {'name': 'iPhone SE', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-se-2022.jpg'},
+      ],
+      'Samsung': [
+        {'name': 'Galaxy S24 Ultra', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24-ultra-5g.jpg'},
+        {'name': 'Galaxy S24+', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24+.jpg'},
+        {'name': 'Galaxy S24', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24.jpg'},
+        {'name': 'Galaxy S23 Ultra', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s23-ultra-5g.jpg'},
+        {'name': 'Galaxy S23', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s23.jpg'},
+        {'name': 'Galaxy Z Fold 5', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-z-fold5.jpg'},
+        {'name': 'Galaxy Z Flip 5', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-z-flip5.jpg'},
+        {'name': 'Galaxy A54', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a54.jpg'},
+        {'name': 'Galaxy A34', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-a34.jpg'},
+      ],
+      'Xiaomi': [
+        {'name': '14 Ultra', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-14-ultra.jpg'},
+        {'name': '14 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-14-pro.jpg'},
+        {'name': '14', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-14.jpg'},
+        {'name': 'Redmi Note 13 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-redmi-note-13-pro-5g.jpg'},
+        {'name': 'Redmi Note 13', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-redmi-note-13-5g.jpg'},
+        {'name': 'Redmi 13C', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-redmi-13c.jpg'},
+        {'name': 'POCO X6 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-poco-x6-pro.jpg'},
+        {'name': 'POCO F5', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/xiaomi-poco-f5.jpg'},
+      ],
+      'OPPO': [
+        {'name': 'Find X7 Ultra', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-find-x7-ultra.jpg'},
+        {'name': 'Find X7', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-find-x7.jpg'},
+        {'name': 'Reno 11 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-reno11-pro.jpg'},
+        {'name': 'Reno 11', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-reno11.jpg'},
+        {'name': 'A98', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-a98-5g.jpg'},
+        {'name': 'A78', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-a78-5g.jpg'},
+        {'name': 'A58', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oppo-a58.jpg'},
+      ],
+      'Vivo': [
+        {'name': 'X100 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-x100-pro.jpg'},
+        {'name': 'X100', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-x100.jpg'},
+        {'name': 'V30 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-v30-pro.jpg'},
+        {'name': 'V30', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-v30.jpg'},
+        {'name': 'Y100', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-y100.jpg'},
+        {'name': 'Y36', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/vivo-y36.jpg'},
+      ],
+      'Realme': [
+        {'name': 'GT 5 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-gt5-pro.jpg'},
+        {'name': 'GT Neo 5', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-gt-neo5.jpg'},
+        {'name': '12 Pro+', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-12-proplus.jpg'},
+        {'name': '12 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-12-pro.jpg'},
+        {'name': 'C67', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-c67.jpg'},
+        {'name': 'C55', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/realme-c55.jpg'},
+      ],
+      'Huawei': [
+        {'name': 'P60 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/huawei-p60-pro.jpg'},
+        {'name': 'P60', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/huawei-p60.jpg'},
+        {'name': 'Mate 60 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/huawei-mate-60-pro.jpg'},
+        {'name': 'Nova 12', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/huawei-nova-12.jpg'},
+        {'name': 'Nova 11', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/huawei-nova-11.jpg'},
+      ],
+      'Google': [
+        {'name': 'Pixel 8 Pro', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/google-pixel-8-pro.jpg'},
+        {'name': 'Pixel 8', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/google-pixel-8.jpg'},
+        {'name': 'Pixel 7a', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/google-pixel-7a.jpg'},
+        {'name': 'Pixel 7', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/google-pixel-7.jpg'},
+        {'name': 'Pixel 6a', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/google-pixel-6a.jpg'},
+      ],
+      'OnePlus': [
+        {'name': '12', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oneplus-12.jpg'},
+        {'name': '12R', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oneplus-12r.jpg'},
+        {'name': 'Open', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oneplus-open.jpg'},
+        {'name': 'Nord 3', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oneplus-nord-3.jpg'},
+        {'name': 'Nord CE 3', 'image': 'https://fdn2.gsmarena.com/vv/bigpic/oneplus-nord-ce-3.jpg'},
+      ],
+    },
+    'Laptop': {
+      'Apple': [
+        {'name': 'MacBook Pro 16" M3', 'image': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mbp16-spacegray-select-202310?wid=400&hei=400&fmt=jpeg'},
+        {'name': 'MacBook Pro 14" M3', 'image': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mbp14-spacegray-select-202310?wid=400&hei=400&fmt=jpeg'},
+        {'name': 'MacBook Air 15" M3', 'image': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mba15-midnight-select-202306?wid=400&hei=400&fmt=jpeg'},
+        {'name': 'MacBook Air 13" M3', 'image': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mba13-midnight-select-202402?wid=400&hei=400&fmt=jpeg'},
+        {'name': 'MacBook Air M2', 'image': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/macbook-air-midnight-select-20220606?wid=400&hei=400&fmt=jpeg'},
+      ],
+      'ASUS': [
+        {'name': 'ROG Zephyrus G16', 'image': 'https://dlcdnwebimgs.asus.com/gain/D8E3F7A9-5B3E-4B1C-8B3A-1C5F3A9E3F7A/w400'},
+        {'name': 'ROG Strix G16', 'image': 'https://dlcdnwebimgs.asus.com/gain/A1B2C3D4-5E6F-7A8B-9C0D-1E2F3A4B5C6D/w400'},
+        {'name': 'TUF Gaming A15', 'image': 'https://dlcdnwebimgs.asus.com/gain/B2C3D4E5-6F7A-8B9C-0D1E-2F3A4B5C6D7E/w400'},
+        {'name': 'ZenBook 14', 'image': 'https://dlcdnwebimgs.asus.com/gain/C3D4E5F6-7A8B-9C0D-1E2F-3A4B5C6D7E8F/w400'},
+        {'name': 'VivoBook 15', 'image': 'https://dlcdnwebimgs.asus.com/gain/D4E5F6A7-8B9C-0D1E-2F3A-4B5C6D7E8F9A/w400'},
+      ],
+      'Lenovo': [
+        {'name': 'ThinkPad X1 Carbon', 'image': 'https://p1-ofp.static.pub/medias/bWFzdGVyfHJvb3R8MjE0NzQ4fGltYWdlL3BuZ3xoYzUvaDc0LzE0MDY0MzQ3MjMzMzEwLnBuZ3w/w400'},
+        {'name': 'ThinkPad T14', 'image': 'https://p2-ofp.static.pub/medias/bWFzdGVyfHJvb3R8MTc4NjIzfGltYWdlL3BuZ3xoYzgvaDAwLzE0MDY0MzY3MjU1NTgyLnBuZ3w/w400'},
+        {'name': 'Legion Pro 7i', 'image': 'https://p3-ofp.static.pub/medias/bWFzdGVyfHJvb3R8MTU2NzgyfGltYWdlL3BuZ3xoNjgvaDZjLzE0MDY0Mzg3MjI4NzAyLnBuZ3w/w400'},
+        {'name': 'Legion 5', 'image': 'https://p4-ofp.static.pub/medias/bWFzdGVyfHJvb3R8MTM0NTY3fGltYWdlL3BuZ3xoNTQvaDk4LzE0MDY0NDA3MjAyODMwLnBuZ3w/w400'},
+        {'name': 'IdeaPad Slim 5', 'image': 'https://p1-ofp.static.pub/medias/bWFzdGVyfHJvb3R8MTIzNDU2fGltYWdlL3BuZ3xoMTIvaDM0LzE0MDY0NDI3MTc1OTU4LnBuZ3w/w400'},
+      ],
+      'HP': [
+        {'name': 'Spectre x360', 'image': 'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/lowres/c08441542.png'},
+        {'name': 'Envy x360', 'image': 'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/lowres/c08441543.png'},
+        {'name': 'Pavilion 15', 'image': 'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/lowres/c08441544.png'},
+        {'name': 'Omen 16', 'image': 'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/lowres/c08441545.png'},
+        {'name': 'Victus 15', 'image': 'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/lowres/c08441546.png'},
+      ],
+      'Dell': [
+        {'name': 'XPS 15', 'image': 'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/xps-notebooks/xps-15-9530/media-gallery/black/notebook-xps-15-9530-black-gallery-1.psd?wid=400'},
+        {'name': 'XPS 13', 'image': 'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/xps-notebooks/xps-13-9340/media-gallery/notebook-xps-13-9340-gallery-1.psd?wid=400'},
+        {'name': 'Inspiron 15', 'image': 'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/inspiron-notebooks/15-3520/media-gallery/notebook-inspiron-15-3520-gallery-1.psd?wid=400'},
+        {'name': 'Alienware m16', 'image': 'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/alienware-notebooks/alienware-m16-r2-intel/media-gallery/notebook-alienware-m16-r2-gallery-1.psd?wid=400'},
+        {'name': 'Latitude 5540', 'image': 'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/latitude-notebooks/latitude-15-5540/media-gallery/notebook-latitude-5540-gray-gallery-1.psd?wid=400'},
+      ],
+      'Acer': [
+        {'name': 'Swift X 14', 'image': 'https://static.acer.com/up/Resource/Acer/Laptops/Swift_X/Images/20230209/acer-swift-x-sfx14-71g-702r.png'},
+        {'name': 'Swift Go 14', 'image': 'https://static.acer.com/up/Resource/Acer/Laptops/Swift_Go/Images/20230209/acer-swift-go-sfg14-71-51dq.png'},
+        {'name': 'Aspire 5', 'image': 'https://static.acer.com/up/Resource/Acer/Laptops/Aspire_5/Images/20230209/acer-aspire-5-a515-57-74q9.png'},
+        {'name': 'Nitro 5', 'image': 'https://static.acer.com/up/Resource/Acer/Laptops/Nitro_5/Images/20230209/acer-nitro-5-an515-58.png'},
+        {'name': 'Predator Helios 16', 'image': 'https://static.acer.com/up/Resource/Acer/Laptops/Predator_Helios/Images/20230209/acer-predator-helios-16.png'},
+      ],
+      'MSI': [
+        {'name': 'Stealth 16', 'image': 'https://storage-asset.msi.com/global/picture/image/feature/nb/Stealth/Stealth-16-Studio/images/kv-nb.png'},
+        {'name': 'Raider GE78', 'image': 'https://storage-asset.msi.com/global/picture/image/feature/nb/Raider/GE78-HX/images/kv-nb.png'},
+        {'name': 'Katana 15', 'image': 'https://storage-asset.msi.com/global/picture/image/feature/nb/Katana/Katana-15/images/kv-nb.png'},
+        {'name': 'Creator Z16', 'image': 'https://storage-asset.msi.com/global/picture/image/feature/nb/Creator/Creator-Z16/images/kv-nb.png'},
+        {'name': 'Prestige 14', 'image': 'https://storage-asset.msi.com/global/picture/image/feature/nb/Prestige/Prestige-14/images/kv-nb.png'},
+      ],
+      'Samsung': [
+        {'name': 'Galaxy Book 4 Pro', 'image': 'https://images.samsung.com/is/image/samsung/p6pim/ph/feature/164206622/ph-feature-galaxy-book4-pro-534940939?wid=400'},
+        {'name': 'Galaxy Book 4', 'image': 'https://images.samsung.com/is/image/samsung/p6pim/ph/feature/164206623/ph-feature-galaxy-book4-534940940?wid=400'},
+        {'name': 'Galaxy Book 3 Ultra', 'image': 'https://images.samsung.com/is/image/samsung/p6pim/ph/feature/164206624/ph-feature-galaxy-book3-ultra-534940941?wid=400'},
+        {'name': 'Galaxy Book Go', 'image': 'https://images.samsung.com/is/image/samsung/p6pim/ph/feature/164206625/ph-feature-galaxy-book-go-534940942?wid=400'},
+      ],
+      'Huawei': [
+        {'name': 'MateBook X Pro', 'image': 'https://consumer.huawei.com/content/dam/huawei-cbg-site/common/mkt/pdp/pc/matebook-x-pro-2023/img/huawei-matebook-x-pro-2023-kv.png'},
+        {'name': 'MateBook 14', 'image': 'https://consumer.huawei.com/content/dam/huawei-cbg-site/common/mkt/pdp/pc/matebook-14-2023/img/huawei-matebook-14-2023-kv.png'},
+        {'name': 'MateBook D16', 'image': 'https://consumer.huawei.com/content/dam/huawei-cbg-site/common/mkt/pdp/pc/matebook-d16-2023/img/huawei-matebook-d16-2023-kv.png'},
+      ],
+    },
+  };
+
+  String? _selectedBrand;
+
   @override
   void initState() {
     super.initState();
@@ -90,17 +241,21 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     // Load default address from address provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
-        final addresses = ref.read(addressProvider);
-        final defaultAddress = addresses.firstWhere(
-          (address) => address.isDefault,
-          orElse: () => addresses.isNotEmpty ? addresses.first : throw Exception('No addresses'),
-        );
+        final addressesAsync = ref.read(userAddressesProvider);
+        addressesAsync.whenData((addresses) {
+          if (addresses.isNotEmpty) {
+            final defaultAddress = addresses.firstWhere(
+              (address) => address.isDefault,
+              orElse: () => addresses.first,
+            );
 
-        if (mounted) {
-          setState(() {
-            _addressController.text = '${defaultAddress.street}, ${defaultAddress.city}, ${defaultAddress.neighborhood}';
-          });
-        }
+            if (mounted) {
+              setState(() {
+                _addressController.text = defaultAddress.address;
+              });
+            }
+          }
+        });
       } catch (e) {
         // If there's an error or no addresses, just skip auto-fill
         debugPrint('Error loading default address: $e');
@@ -124,23 +279,30 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
 
   void _applyPromoCode() {
     final code = _promoCodeController.text.trim().toUpperCase();
-    final redeemedVouchers = ref.read(redeemedVouchersProvider);
+    final redeemedVouchersAsync = ref.read(redeemedVouchersProvider);
 
-    // Check if it's a redeemed voucher
-    final voucher = redeemedVouchers.cast<RewardVoucher?>().firstWhere(
-      (v) => v != null && code == 'VOUCHER${v.id.toUpperCase()}',
-      orElse: () => null,
-    );
+    // Check if it's a redeemed voucher (only unused ones)
+    RedeemedVoucher? foundRedeemedVoucher;
+    redeemedVouchersAsync.whenData((redeemedVouchers) {
+      try {
+        foundRedeemedVoucher = redeemedVouchers.firstWhere(
+          (v) => !v.isUsed && code == 'VOUCHER${v.voucherId.toUpperCase()}',
+        );
+      } catch (e) {
+        // No matching voucher found
+      }
+    });
 
-    if (voucher != null) {
+    if (foundRedeemedVoucher != null) {
       setState(() {
         _appliedPromoCode = code;
-        _discountAmount = voucher.discountAmount.toDouble();
-        _discountType = voucher.discountType;
+        _appliedVoucherId = foundRedeemedVoucher!.id; // Store voucher ID for marking as used later
+        _discountAmount = foundRedeemedVoucher!.discountAmount;
+        _discountType = foundRedeemedVoucher!.discountType;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${voucher.title} applied successfully!'),
+          content: Text('${foundRedeemedVoucher!.voucherTitle} applied successfully!'),
           backgroundColor: AppTheme.successColor,
         ),
       );
@@ -159,6 +321,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       final promo = promoCodes[code]!;
       setState(() {
         _appliedPromoCode = code;
+        _appliedVoucherId = null; // No voucher ID for standard promo codes
         _discountAmount = promo['amount'].toDouble();
         _discountType = promo['type'];
       });
@@ -181,6 +344,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
   void _removePromoCode() {
     setState(() {
       _appliedPromoCode = null;
+      _appliedVoucherId = null;
       _discountAmount = 0;
       _discountType = 'none';
       _promoCodeController.clear();
@@ -266,124 +430,252 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
   }
 
   void _confirmAppointment() async {
-    // Generate random booking ID
-    final random = Random();
-    final bookingId = '#FX${(random.nextInt(900) + 100).toString().padLeft(3, '0')}';
+    try {
+      // Get actual user details from profile
+      final user = await ref.read(currentUserProvider.future);
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
 
-    // Get actual user details from profile
-    final user = await ref.read(currentUserProvider.future);
-    final customerName = user?.fullName ?? 'Guest User';
-    final customerPhone = user?.contactNumber ?? '09000000000';
+      // Calculate final total with any applied discount
+      final finalTotal = _calculateTotal();
 
-    // Set priority based on booking type
-    String priority;
-    if (widget.isEmergency) {
-      priority = 'high'; // Emergency repair = High priority
-    } else if (widget.isWeekBooking) {
-      priority = 'low'; // Week booking = Low priority
-    } else {
-      priority = 'medium'; // Same day booking = Medium priority
-    }
+      // Combine date and time into scheduledDate
+      DateTime scheduledDateTime;
+      if (widget.isEmergency) {
+        // Emergency: schedule for as soon as possible (now + 20 minutes)
+        scheduledDateTime = DateTime.now().add(const Duration(minutes: 20));
+      } else {
+        // Regular booking: use selected date and time
+        scheduledDateTime = DateTime(
+          (_selectedDate ?? DateTime.now()).year,
+          (_selectedDate ?? DateTime.now()).month,
+          (_selectedDate ?? DateTime.now()).day,
+          _selectedTime.hour,
+          _selectedTime.minute,
+        );
+      }
 
-    // Calculate time based on emergency or regular booking
-    String timeSlot;
-    if (widget.isEmergency) {
-      // For emergency: technician arrives in 15-20 mins, no specific time slot
-      timeSlot = 'ASAP (15-20 mins)';
-    } else {
-      // For regular booking: use selected time
-      timeSlot = _selectedTime.format(context);
-    }
+      // Create booking details text
+      final basePrice = _getBasePrice();
+      final bookingDetails = [
+        'Device: ${_selectedDeviceType ?? "N/A"}',
+        'Model: ${_modelController.text.trim()}',
+        'Problem: ${_selectedProblem ?? "N/A"}',
+        'Technician: ${_selectedTechnician ?? "TBD"}',
+        if (_detailsController.text.trim().isNotEmpty) 'Details: ${_detailsController.text.trim()}',
+        if (_appliedPromoCode != null) ...[
+          'Promo Code: $_appliedPromoCode',
+          'Original Price: ₱${basePrice.toStringAsFixed(2)}',
+          'Discount: ${_discountType == "percentage" ? "$_discountAmount%" : "₱$_discountAmount"}',
+        ],
+        if (widget.isEmergency) 'Priority: EMERGENCY',
+        if (widget.isWeekBooking) 'Priority: Week booking',
+      ].join('\n');
 
-    // Calculate final total with any applied discount
-    final basePrice = _getBasePrice();
-    final finalTotal = _calculateTotal();
+      // Get all users to find a technician
+      final supabase = SupabaseConfig.client;
+      
+      // Try to find a technician user
+      String technicianId;
+      try {
+        // First, try to find technician with email fixittechnician@gmail.com (Ethan)
+        var techResponse = await supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('email', 'fixittechnician@gmail.com')
+            .maybeSingle();
+        
+        // If Ethan not found, try any technician
+        if (techResponse == null) {
+          print('Ethan not found, looking for any technician...');
+          techResponse = await supabase
+              .from('users')
+              .select('id, email, full_name, role')
+              .eq('role', 'technician')
+              .limit(1)
+              .maybeSingle();
+        }
+        
+        if (techResponse != null) {
+          technicianId = techResponse['id'] as String;
+          print('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
+        } else {
+          print('❌ No technicians found in database');
+          throw Exception('No technicians available. Please ensure Ethan Estino (fixittechnician@gmail.com) has role="technician" in the users table.');
+        }
+      } catch (e) {
+        print('❌ Error fetching technician: $e');
+        if (e is Exception && e.toString().contains('technician')) {
+          rethrow;
+        }
+        throw Exception('Unable to find technicians. Please check database setup.');
+      }
 
-    // Calculate discount amount for display
-    String? discountAmountStr;
-    if (_appliedPromoCode != null) {
-      final discount = basePrice - finalTotal;
-      discountAmountStr = '₱${discount.toStringAsFixed(0)}';
-    }
+      // Get or create a service ID
+      String serviceId;
+      try {
+        // First, try to find an existing service for this technician
+        var serviceResponse = await supabase
+            .from('services')
+            .select('id, technician_id, service_name')
+            .eq('technician_id', technicianId)
+            .limit(1)
+            .maybeSingle();
+        
+        // If no service for this technician, try to find any service
+        if (serviceResponse == null) {
+          print('No service found for technician $technicianId, checking for any service...');
+          serviceResponse = await supabase
+              .from('services')
+              .select('id, technician_id, service_name')
+              .limit(1)
+              .maybeSingle();
+        }
+        
+        if (serviceResponse != null) {
+          serviceId = serviceResponse['id'] as String;
+          print('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
+        } else {
+          // No service exists at all - this needs manual creation due to RLS
+          print('❌ No services found in database');
+          throw Exception(
+            'No services available. Please create a service for Ethan Estino first.\n\n'
+            'Run this SQL in Supabase:\n'
+            'INSERT INTO public.services (technician_id, service_name, description, category, estimated_duration, is_active)\n'
+            'VALUES (\'$technicianId\', \'General Repair\', \'Device repair service\', \'Repair\', 60, true);'
+          );
+        }
+      } catch (e) {
+        print('❌ Error with service: $e');
+        if (e is Exception) {
+          rethrow;
+        }
+        throw Exception('Unable to access services. Please check database setup.');
+      }
 
-    // Create and save the booking
-    final newBooking = LocalBooking(
-      id: bookingId,
-      icon: _selectedDeviceType == 'Mobile Phone' ? '📱' : '💻',
-      status: 'Scheduled',
-      deviceName: _modelController.text,
-      serviceName: _selectedProblem ?? 'Quick Fix',
-      date: DateFormat('MMM dd, yyyy').format(_selectedDate ?? DateTime.now()),
-      time: timeSlot,
-      location: _addressController.text,
-      technician: _selectedTechnician ?? 'TBD',
-      total: '₱${finalTotal.toStringAsFixed(0)}',
-      customerName: customerName,
-      customerPhone: customerPhone,
-      priority: priority,
-      moreDetails: _detailsController.text,
-      promoCode: _appliedPromoCode,
-      discountAmount: discountAmountStr,
-      originalPrice: _appliedPromoCode != null ? '₱${basePrice.toStringAsFixed(0)}' : null,
-    );
+      // Create booking in Supabase using BookingService
+      final bookingService = ref.read(bookingServiceProvider);
+      
+      final createdBooking = await bookingService.createBooking(
+        customerId: user.id,
+        technicianId: technicianId,
+        serviceId: serviceId,
+        scheduledDate: scheduledDateTime,
+        customerAddress: _addressController.text.trim(),
+        customerLatitude: null,
+        customerLongitude: null,
+        estimatedCost: finalTotal,
+      );
 
-    await ref.read(localBookingsProvider.notifier).addBooking(newBooking);
+      // Update diagnostic notes with booking details
+      await bookingService.updateDiagnosticNotes(
+        bookingId: createdBooking.id,
+        notes: bookingDetails,
+        finalCost: finalTotal,
+      );
 
-    // Show success dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: const BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check, size: 60, color: Colors.white),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Request Successful!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close success dialog
-                    Navigator.of(context).pop(); // Close booking dialog
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.deepBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+      // If a voucher was applied, mark it as used
+      if (_appliedVoucherId != null) {
+        final voucherService = ref.read(redeemedVoucherServiceProvider);
+        await voucherService.markVoucherAsUsed(
+          voucherId: _appliedVoucherId!,
+          bookingId: createdBooking.id,
+        );
+        // Refresh voucher providers
+        ref.invalidate(redeemedVouchersProvider);
+        ref.invalidate(unusedVouchersProvider);
+      }
+
+      // Force refresh the customer bookings provider to show the new booking immediately
+      ref.invalidate(customerBookingsProvider);
+
+      // Show success dialog
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: const BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check, size: 60, color: Colors.white),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Request Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close success dialog
+                        Navigator.of(context).pop(); // Close booking dialog
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.deepBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      print('Error creating booking: $e');
+      if (context.mounted) {
+        // Show user-friendly error message
+        String errorMessage = 'Error creating booking';
+        if (e.toString().contains('technician')) {
+          errorMessage = 'No technicians available. Please contact support.';
+        } else if (e.toString().contains('service')) {
+          errorMessage = 'Service setup incomplete. Please contact support.';
+        } else if (e.toString().contains('PostgrestException')) {
+          errorMessage = 'Database error. Please ensure all setup is complete.';
+        } else {
+          errorMessage = e.toString().replaceAll('Exception: ', '');
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -515,7 +807,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                 icon: Icons.smartphone,
                 label: 'Mobile Phone',
                 isSelected: _selectedDeviceType == 'Mobile Phone',
-                onTap: () => setState(() => _selectedDeviceType = 'Mobile Phone'),
+                onTap: () => setState(() {
+                  _selectedDeviceType = 'Mobile Phone';
+                  _selectedBrand = null; // Reset brand when device type changes
+                }),
               ),
             ),
             const SizedBox(width: 12),
@@ -524,7 +819,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                 icon: Icons.laptop,
                 label: 'Laptop',
                 isSelected: _selectedDeviceType == 'Laptop',
-                onTap: () => setState(() => _selectedDeviceType = 'Laptop'),
+                onTap: () => setState(() {
+                  _selectedDeviceType = 'Laptop';
+                  _selectedBrand = null; // Reset brand when device type changes
+                }),
               ),
             ),
           ],
@@ -534,14 +832,37 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           'Model',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textSecondaryColor),
         ),
+        const SizedBox(height: 8),
+        Text(
+          'Type your model or select from popular devices below',
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
         const SizedBox(height: 12),
         TextField(
           controller: _modelController,
+          onChanged: (value) {
+            // Clear brand selection when typing manually
+            if (_selectedBrand != null && value.isNotEmpty) {
+              setState(() => _selectedBrand = null);
+            }
+          },
           decoration: InputDecoration(
             hintText: 'ex. iPhone 14 Pro, MacBook Air M2',
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
             filled: true,
             fillColor: Colors.grey[50],
+            prefixIcon: Icon(Icons.edit, color: Colors.grey[400], size: 20),
+            suffixIcon: _modelController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey[400], size: 20),
+                    onPressed: () {
+                      setState(() {
+                        _modelController.clear();
+                        _selectedBrand = null;
+                      });
+                    },
+                  )
+                : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey.shade200),
@@ -557,6 +878,195 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
+        // Show brand/model selector when device type is selected
+        if (_selectedDeviceType != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.help_outline, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Don't know your model? Browse by brand:",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Brand selector - horizontal scroll
+                SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _deviceBrands[_selectedDeviceType]?.keys.length ?? 0,
+                    separatorBuilder: (context, index) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final brand = _deviceBrands[_selectedDeviceType]!.keys.elementAt(index);
+                      final isSelected = _selectedBrand == brand;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (_selectedBrand == brand) {
+                              _selectedBrand = null; // Deselect if already selected
+                            } else {
+                              _selectedBrand = brand;
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.deepBlue : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: isSelected ? AppTheme.deepBlue : Colors.grey.shade300,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            brand,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              color: isSelected ? Colors.white : AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // Model selector - show when brand is selected
+                if (_selectedBrand != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '$_selectedBrand Models:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _deviceBrands[_selectedDeviceType]?[_selectedBrand]?.length ?? 0,
+                      separatorBuilder: (context, index) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        final modelData = _deviceBrands[_selectedDeviceType]![_selectedBrand]![index];
+                        final modelName = modelData['name']!;
+                        final modelImage = modelData['image']!;
+                        final displayName = _selectedDeviceType == 'Mobile Phone'
+                            ? '$_selectedBrand $modelName'
+                            : modelName; // Laptops usually have full names
+                        final isSelected = _modelController.text == displayName;
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _modelController.text = displayName;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 100,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.1) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? AppTheme.deepBlue : Colors.grey.shade300,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Device image
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    modelImage,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Icon(
+                                          _selectedDeviceType == 'Mobile Phone' ? Icons.smartphone : Icons.laptop,
+                                          size: 30,
+                                          color: Colors.grey[500],
+                                        ),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  modelName,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                    color: isSelected ? AppTheme.deepBlue : AppTheme.textPrimaryColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         const Text(
           'What\'s the problem?',

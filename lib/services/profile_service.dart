@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
 import 'storage_service.dart';
+import 'technician_specialty_service.dart';
 
 class ProfileService {
   // Get current user ID for user-specific profile data
@@ -128,20 +129,39 @@ class ProfileService {
     );
   }
 
+  // Note: Specialties are now managed via TechnicianSpecialtyService and Supabase
   Future<void> updateSpecialties(List<String> specialties) async {
-    if (_userId == null) return;
-    final data = json.encode(specialties);
-    await StorageService.saveData('specialties', data);
+    if (_userId == null) {
+      print('ProfileService: Cannot update specialties - user ID is null');
+      return;
+    }
+
+    // Use TechnicianSpecialtyService to save to Supabase
+    final specialtyService = TechnicianSpecialtyService();
+    await specialtyService.setSpecialties(
+      technicianId: _userId!,
+      specialtyNames: specialties,
+    );
+    print('ProfileService: Specialties updated via TechnicianSpecialtyService');
   }
 
   Future<List<String>> loadSpecialties() async {
-    try {
-      final data = await StorageService.loadData('specialties');
-      if (data != null) {
-        final decoded = json.decode(data) as List<dynamic>;
-        return decoded.map((e) => e.toString()).toList();
-      }
+    if (_userId == null) {
+      print('ProfileService: Cannot load specialties - user ID is null');
       return <String>[];
+    }
+
+    try {
+      // Use TechnicianSpecialtyService to load from Supabase
+      final specialtyService = TechnicianSpecialtyService();
+      final specialties = await specialtyService.getTechnicianSpecialties(_userId!);
+
+      // Convert TechnicianSpecialty objects to specialty name strings
+      final specialtyNames = specialties.map((s) => s.specialtyName).toList();
+
+      print('ProfileService: Loaded ${specialtyNames.length} specialties for user $_userId: $specialtyNames');
+
+      return specialtyNames;
     } catch (e) {
       print('ProfileService: Error loading specialties - $e');
       return <String>[];

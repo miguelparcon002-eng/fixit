@@ -11,7 +11,7 @@ class AdminAppointmentsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookings = ref.watch(localBookingsProvider);
+    final bookingsAsync = ref.watch(customerBookingsProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -146,8 +146,12 @@ class AdminAppointmentsScreen extends ConsumerWidget {
               child: Container(
                 color: AppTheme.primaryCyan,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: bookings.isEmpty
-                    ? Center(
+                child: bookingsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Center(child: Text('Error: $e')),
+                  data: (bookings) {
+                    if (bookings.isEmpty) {
+                      return Center(
                         child: Container(
                           margin: const EdgeInsets.all(24),
                           padding: const EdgeInsets.all(32),
@@ -163,73 +167,101 @@ class AdminAppointmentsScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: bookings.length,
-                        itemBuilder: (context, index) {
-                          final booking = bookings[index];
+                      );
+                    }
 
-                          Color priorityColor;
-                          switch (booking.priority) {
-                            case 'high':
-                              priorityColor = const Color(0xFFFF6B6B);
-                              break;
-                            case 'medium':
-                              priorityColor = Colors.yellow.shade700;
-                              break;
-                            case 'low':
-                              priorityColor = Colors.green;
-                              break;
-                            default:
-                              priorityColor = Colors.grey;
-                          }
+                    return ListView.builder(
+                      itemCount: bookings.length,
+                      itemBuilder: (context, index) {
+                        final booking = bookings[index];
 
-                          Color statusColor;
-                          String statusText = booking.status.toLowerCase();
-                          String displayStatus = statusText;
-                          switch (statusText) {
-                            case 'scheduled':
-                              statusColor = const Color(0xFFFF9800);
-                              displayStatus = 'requesting';
-                              break;
-                            case 'in progress':
-                              statusColor = AppTheme.lightBlue;
-                              break;
-                            case 'completed':
-                              statusColor = Colors.green;
-                              break;
-                            default:
-                              statusColor = Colors.grey;
-                          }
+                        Color statusColor;
+                        switch (booking.status.toLowerCase()) {
+                          case 'pending':
+                          case 'requested':
+                            statusColor = const Color(0xFFFF9800);
+                            break;
+                          case 'in_progress':
+                          case 'ongoing':
+                            statusColor = AppTheme.lightBlue;
+                            break;
+                          case 'completed':
+                            statusColor = Colors.green;
+                            break;
+                          default:
+                            statusColor = Colors.grey;
+                        }
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _AppointmentDetailCard(
-                              jobId: booking.id,
-                              priority: booking.priority,
-                              priorityColor: priorityColor,
-                              status: displayStatus,
-                              statusColor: statusColor,
-                              customerName: booking.customerName,
-                              phone: booking.customerPhone,
-                              device: booking.deviceName,
-                              service: booking.serviceName,
-                              technician: 'Technician: ${booking.technician}',
-                              date: booking.date,
-                              time: booking.time,
-                              location: booking.location,
-                              price: booking.total,
-                              moreDetails: booking.moreDetails ?? '',
-                              technicianNotes: booking.technicianNotes,
-                              promoCode: booking.promoCode,
-                              discountAmount: booking.discountAmount,
-                              originalPrice: booking.originalPrice,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          );
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: statusColor,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        booking.status.toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Booking ID: ${booking.id.substring(0, 8)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Customer: ${booking.customerId}',
+                                  style: const TextStyle(fontSize: 14, color: AppTheme.textSecondaryColor),
+                                ),
+                                Text(
+                                  'Technician: ${booking.technicianId}',
+                                  style: const TextStyle(fontSize: 14, color: AppTheme.textSecondaryColor),
+                                ),
+                                Text(
+                                  'Service: ${booking.serviceId}',
+                                  style: const TextStyle(fontSize: 14, color: AppTheme.textSecondaryColor),
+                                ),
+                                if (booking.estimatedCost != null)
+                                  Text(
+                                    'Cost: ₱${booking.estimatedCost!.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.deepBlue,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
                         },
-                      ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),

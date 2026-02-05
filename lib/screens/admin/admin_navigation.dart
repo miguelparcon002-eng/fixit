@@ -44,7 +44,7 @@ class _AdminNavigationState extends State<AdminNavigation> {
                   },
                 ),
                 _NavItem(
-                  icon: Icons.map,
+                  icon: Icons.calendar_today,
                   label: 'Appointment',
                   isSelected: _currentIndex == 1,
                   onTap: () {
@@ -54,7 +54,7 @@ class _AdminNavigationState extends State<AdminNavigation> {
                 ),
                 _NavItem(
                   icon: Icons.engineering,
-                  label: 'Technicians',
+                  label: 'Technician',
                   isSelected: _currentIndex == 2,
                   onTap: () {
                     setState(() => _currentIndex = 2);
@@ -62,20 +62,11 @@ class _AdminNavigationState extends State<AdminNavigation> {
                   },
                 ),
                 _NavItem(
-                  icon: Icons.star,
-                  label: 'Reviews',
+                  icon: Icons.bar_chart,
+                  label: 'Report',
                   isSelected: _currentIndex == 3,
                   onTap: () {
                     setState(() => _currentIndex = 3);
-                    context.go('/admin-reviews');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.bar_chart,
-                  label: 'Report',
-                  isSelected: _currentIndex == 4,
-                  onTap: () {
-                    setState(() => _currentIndex = 4);
                     context.go('/admin-reports');
                   },
                 ),

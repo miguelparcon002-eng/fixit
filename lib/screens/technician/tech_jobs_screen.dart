@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/booking_model.dart';
 
 class TechJobsScreen extends ConsumerStatefulWidget {
   const TechJobsScreen({super.key});
@@ -16,28 +17,6 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
-  // Helper to check if booking belongs to this technician
-  bool _isBookingForTechnician(String bookingTechnician, String userName) {
-    // Match if:
-    // 1. Exact match (booking.technician == userName)
-    // 2. Booking technician is contained in user's full name (e.g., "Estino" in "Ethan Estino")
-    // 3. User's last name matches booking technician
-    final userNameLower = userName.toLowerCase();
-    final bookingTechLower = bookingTechnician.toLowerCase();
-
-    if (bookingTechLower == userNameLower) return true;
-    if (userNameLower.contains(bookingTechLower)) return true;
-
-    // Check if last name matches
-    final nameParts = userName.split(' ');
-    if (nameParts.length > 1) {
-      final lastName = nameParts.last.toLowerCase();
-      if (lastName == bookingTechLower) return true;
-    }
-
-    return false;
-  }
 
   @override
   void initState() {
@@ -253,170 +232,197 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
   }
 
   Widget _buildRequestJobsList() {
-    final localBookings = ref.watch(localBookingsProvider);
-    final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+    final bookingsAsync = ref.watch(technicianBookingsProvider);
 
-    // Filter bookings for this technician only with "Scheduled" status
-    final techBookings = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'Scheduled'
-    ).toList();
+    return bookingsAsync.when(
+      data: (bookings) {
+        // Filter bookings with "Scheduled" status
+        final techBookings = bookings.where((booking) =>
+          booking.status == 'Scheduled'
+        ).toList();
 
-    if (techBookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'No job requests at the moment',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+        if (techBookings.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No job requests at the moment',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: techBookings.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final booking = techBookings[index];
-        return _RequestJobCard(booking: booking);
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          itemCount: techBookings.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            final booking = techBookings[index];
+            return _RequestJobCard(booking: booking);
+          },
+        );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error loading bookings: $error'),
+      ),
     );
   }
 
   Widget _buildActiveJobsList() {
-    final localBookings = ref.watch(localBookingsProvider);
-    final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+    final bookingsAsync = ref.watch(technicianBookingsProvider);
 
-    // Filter bookings for this technician only with "In Progress" status
-    final activeBookings = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'In Progress'
-    ).toList();
+    return bookingsAsync.when(
+      data: (bookings) {
+        // DEBUG: Print booking data
+        print('🔍 ACTIVE JOBS: Found ${bookings.length} total bookings from Supabase');
+        for (var booking in bookings) {
+          print('  - Booking ${booking.id}: ${booking.status}');
+          print('    Promo: ${booking.promoCode}, Discount: ${booking.discountAmount}');
+          print('    Original: ${booking.originalPrice}, Final: ${booking.finalCost}');
+        }
 
-    if (activeBookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'No active jobs at the moment',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+        // Filter bookings with "In Progress" status
+        final activeBookings = bookings.where((booking) =>
+          booking.status == 'In Progress'
+        ).toList();
+
+        if (activeBookings.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No active jobs at the moment',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: activeBookings.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final booking = activeBookings[index];
-        return _ActiveJobCard(booking: booking);
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          itemCount: activeBookings.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            final booking = activeBookings[index];
+            return _ActiveJobCard(booking: booking);
+          },
+        );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error loading bookings: $error'),
+      ),
     );
   }
 
   Widget _buildCompletedJobsList() {
-    final localBookings = ref.watch(localBookingsProvider);
-    final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+    final bookingsAsync = ref.watch(technicianBookingsProvider);
 
-    // Filter bookings for this technician only with "Completed" status
-    final completedBookings = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'Completed'
-    ).toList();
+    return bookingsAsync.when(
+      data: (bookings) {
+        // Filter bookings with "Completed" status
+        final completedBookings = bookings.where((booking) =>
+          booking.status == 'Completed'
+        ).toList();
 
-    if (completedBookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'No completed jobs yet',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+        if (completedBookings.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No completed jobs yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+          );
+        }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: completedBookings.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final booking = completedBookings[index];
-        return _CompletedJobCard(booking: booking);
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          itemCount: completedBookings.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            final booking = completedBookings[index];
+            return _CompletedJobCard(booking: booking);
+          },
+        );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error loading bookings: $error'),
+      ),
     );
   }
 
   Widget _buildAllJobsList() {
-    final localBookings = ref.watch(localBookingsProvider);
-    final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+    final bookingsAsync = ref.watch(technicianBookingsProvider);
 
-    // Filter all bookings for this technician
-    final allBookings = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName)
-    ).toList();
-
-    if (allBookings.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'No jobs at the moment',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+    return bookingsAsync.when(
+      data: (bookings) {
+        if (bookings.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No jobs at the moment',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: allBookings.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final booking = allBookings[index];
-        // Show different card based on status
-        if (booking.status == 'Scheduled') {
-          return _RequestJobCard(booking: booking);
-        } else if (booking.status == 'In Progress') {
-          return _ActiveJobCard(booking: booking);
-        } else if (booking.status == 'Completed') {
-          return _CompletedJobCard(booking: booking);
+          );
         }
-        // Default fallback
-        return _RequestJobCard(booking: booking);
+
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          itemCount: bookings.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            final booking = bookings[index];
+            // Show different card based on status
+            if (booking.status == 'Scheduled') {
+              return _RequestJobCard(booking: booking);
+            } else if (booking.status == 'In Progress') {
+              return _ActiveJobCard(booking: booking);
+            } else if (booking.status == 'Completed') {
+              return _CompletedJobCard(booking: booking);
+            }
+            // Default fallback
+            return _RequestJobCard(booking: booking);
+          },
+        );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Text('Error loading bookings: $error'),
+      ),
     );
   }
 
 }
 
 class _RequestJobCard extends ConsumerWidget {
-  final LocalBooking booking;
+  final BookingModel booking;
 
   const _RequestJobCard({required this.booking});
 
@@ -737,16 +743,32 @@ class _RequestJobCard extends ConsumerWidget {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             // Accept the booking - change status to "In Progress"
-                            ref.read(localBookingsProvider.notifier).updateBookingStatus(booking.id, 'In Progress');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Booking ${booking.id} accepted!'),
-                                backgroundColor: Colors.green,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                            final bookingService = ref.read(bookingServiceProvider);
+                            try {
+                              await bookingService.updateBookingStatus(
+                                bookingId: booking.id,
+                                status: 'In Progress',
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Booking ${booking.id} accepted!'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error accepting booking: $e'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.all(10),
@@ -763,16 +785,33 @@ class _RequestJobCard extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () {
-                            // Decline the booking - remove it from the list
-                            ref.read(localBookingsProvider.notifier).removeBooking(booking.id);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Booking ${booking.id} declined'),
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
+                          onTap: () async {
+                            // Decline the booking - change status to "Cancelled"
+                            final bookingService = ref.read(bookingServiceProvider);
+                            try {
+                              await bookingService.updateBookingStatus(
+                                bookingId: booking.id,
+                                status: 'Cancelled',
+                                cancellationReason: 'Declined by technician',
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Booking ${booking.id} declined'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error declining booking: $e'),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.all(10),
@@ -801,7 +840,7 @@ class _RequestJobCard extends ConsumerWidget {
 }
 
 class _ActiveJobCard extends ConsumerWidget {
-  final LocalBooking booking;
+  final BookingModel booking;
 
   const _ActiveJobCard({required this.booking});
 
@@ -1170,17 +1209,34 @@ class _ActiveJobCard extends ConsumerWidget {
                                       child: const Text('Cancel'),
                                     ),
                                     ElevatedButton(
-                                      onPressed: () {
+                                      onPressed: () async {
                                         // Mark booking as completed
-                                        ref.read(localBookingsProvider.notifier).updateBookingStatus(booking.id, 'Completed');
+                                        final bookingService = ref.read(bookingServiceProvider);
                                         Navigator.of(dialogContext).pop();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Booking ${booking.id} marked as complete!'),
-                                            backgroundColor: Colors.green,
-                                            duration: const Duration(seconds: 2),
-                                          ),
-                                        );
+
+                                        try {
+                                          await bookingService.updateBookingStatus(
+                                            bookingId: booking.id,
+                                            status: 'Completed',
+                                          );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Booking ${booking.id} marked as complete!'),
+                                              backgroundColor: Colors.green,
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error completing booking: $e'),
+                                              backgroundColor: Colors.red,
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
@@ -1223,7 +1279,7 @@ class _ActiveJobCard extends ConsumerWidget {
 }
 
 class _CompletedJobCard extends StatelessWidget {
-  final LocalBooking booking;
+  final BookingModel booking;
 
   const _CompletedJobCard({required this.booking});
 
@@ -1605,8 +1661,22 @@ class _CompletedJobCard extends StatelessWidget {
   }
 }
 
-void _showEditBookingDialog(BuildContext context, WidgetRef ref, LocalBooking booking) {
-  final TextEditingController additionalNotesController = TextEditingController(text: booking.technicianNotes ?? '');
+void _showEditBookingDialog(BuildContext context, WidgetRef ref, BookingModel booking) {
+  // DEBUG: Print booking details when dialog opens
+  print('🔍 EDIT DIALOG OPENED:');
+  print('  Booking ID: ${booking.id}');
+  print('  Status: ${booking.status}');
+  print('  Diagnostic Notes: ${booking.diagnosticNotes}');
+  print('  Customer Details: ${booking.moreDetails}');
+  print('  Technician Notes: ${booking.technicianNotes}');
+  print('  Promo Code: ${booking.promoCode}');
+  print('  Discount: ${booking.discountAmount}');
+  print('  Original Price: ${booking.originalPrice}');
+  print('  Final Cost: ${booking.finalCost}');
+  print('  Estimated Cost: ${booking.estimatedCost}');
+
+  // Start with empty notes - technician adds NEW notes each time
+  final TextEditingController additionalNotesController = TextEditingController(text: '');
   final TextEditingController additionalChargeController = TextEditingController();
 
   showDialog(
@@ -1775,84 +1845,14 @@ void _showEditBookingDialog(BuildContext context, WidgetRef ref, LocalBooking bo
           ),
           ElevatedButton(
             onPressed: () async {
-              // Get notifier reference BEFORE any async operations
-              final bookingNotifier = ref.read(localBookingsProvider.notifier);
-
-              // Parse current total (final price after any discount)
-              final currentTotalStr = booking.total.replaceAll('₱', '').replaceAll(',', '').trim();
-              final currentTotal = double.tryParse(currentTotalStr) ?? 0.0;
+              // Get booking service
+              final bookingService = ref.read(bookingServiceProvider);
 
               // Parse additional charge
               final additionalCharge = double.tryParse(additionalChargeController.text.trim()) ?? 0.0;
 
-              // Calculate new base price (before discount)
-              // If there's a promo code, we need to calculate the new original price
-              double newOriginalPrice = currentTotal + additionalCharge;
-              double newFinalTotal = currentTotal + additionalCharge;
-              String? newDiscountAmount = booking.discountAmount;
-
-              if (booking.promoCode != null && booking.originalPrice != null) {
-                // Parse original price
-                final originalPriceStr = booking.originalPrice!.replaceAll('₱', '').replaceAll(',', '').trim();
-                final originalPrice = double.tryParse(originalPriceStr) ?? 0.0;
-
-                // Calculate discount percentage/amount from original booking
-                final discountAmountStr = booking.discountAmount?.replaceAll('₱', '').replaceAll(',', '').trim() ?? '0';
-                final discountAmount = double.tryParse(discountAmountStr) ?? 0.0;
-
-                // New original price = old original price + additional charge
-                newOriginalPrice = originalPrice + additionalCharge;
-
-                // Apply the same discount to the new original price
-                // Check if it's percentage or fixed discount
-                if (discountAmount > 0) {
-                  // Calculate if discount was percentage-based (discount / original ~= percentage)
-                  final discountRatio = discountAmount / originalPrice;
-
-                  if (discountRatio > 0 && discountRatio < 1) {
-                    // Apply same discount ratio
-                    final newDiscount = newOriginalPrice * discountRatio;
-                    newFinalTotal = newOriginalPrice - newDiscount;
-                    newDiscountAmount = '₱${newDiscount.toStringAsFixed(0)}';
-                  } else {
-                    // Fixed discount - keep same discount amount
-                    newFinalTotal = newOriginalPrice - discountAmount;
-                    newDiscountAmount = booking.discountAmount;
-                  }
-                }
-              }
-
-              // Update technician notes
-              String updatedTechnicianNotes = additionalNotesController.text.trim();
-              if (updatedTechnicianNotes.isNotEmpty && additionalCharge != 0) {
-                if (additionalCharge > 0) {
-                  updatedTechnicianNotes += '\n\n[Additional charge: ₱${additionalCharge.toStringAsFixed(0)} for extra repairs]';
-                } else {
-                  updatedTechnicianNotes += '\n\n[Price reduced by ₱${(-additionalCharge).toStringAsFixed(0)} as compensation]';
-                }
-              }
-
-              // Create updated booking - keep customer's moreDetails separate
-              final updatedBooking = LocalBooking(
-                id: booking.id,
-                icon: booking.icon,
-                status: booking.status,
-                deviceName: booking.deviceName,
-                serviceName: booking.serviceName,
-                date: booking.date,
-                time: booking.time,
-                location: booking.location,
-                technician: booking.technician,
-                total: '₱${newFinalTotal.toStringAsFixed(0)}',
-                customerName: booking.customerName,
-                customerPhone: booking.customerPhone,
-                priority: booking.priority,
-                moreDetails: booking.moreDetails, // Keep customer's original notes
-                technicianNotes: updatedTechnicianNotes.isNotEmpty ? updatedTechnicianNotes : booking.technicianNotes, // Technician's notes separate
-                promoCode: booking.promoCode,
-                discountAmount: newDiscountAmount,
-                originalPrice: booking.promoCode != null ? '₱${newOriginalPrice.toStringAsFixed(0)}' : null,
-              );
+              // Get technician notes
+              final technicianNotes = additionalNotesController.text.trim();
 
               // Store message for later
               final message = additionalCharge > 0
@@ -1866,21 +1866,43 @@ void _showEditBookingDialog(BuildContext context, WidgetRef ref, LocalBooking bo
               additionalChargeController.dispose();
 
               // Close dialog first
-              if (!context.mounted) return;
               Navigator.of(dialogContext).pop();
 
-              // Update the booking after dialog is closed
-              await bookingNotifier.updateBooking(updatedBooking);
+              // Update the booking using BookingService
+              try {
+                print('💾 SAVING BOOKING UPDATE:');
+                print('  Booking ID: ${booking.id}');
+                print('  Technician Notes: $technicianNotes');
+                print('  Price Adjustment: $additionalCharge');
 
-              // Show success message
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(message),
-                  backgroundColor: Colors.green,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
+                await bookingService.addTechnicianNotes(
+                  bookingId: booking.id,
+                  technicianNotes: technicianNotes,
+                  priceAdjustment: additionalCharge != 0.0 ? additionalCharge : null,
+                );
+
+                print('✅ BOOKING SAVED SUCCESSFULLY');
+
+                // Show success message
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              } catch (e) {
+                // Show error message
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error updating booking: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.deepBlue,

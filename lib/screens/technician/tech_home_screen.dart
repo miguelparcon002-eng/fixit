@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/earnings_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -41,22 +43,18 @@ class TechHomeScreen extends ConsumerWidget {
                   const Text(
                     'Notifications',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimaryColor,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  TextButton(
+                    onPressed: () {},
                     child: const Text(
-                      '2 New',
+                      'Mark all as read',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
+                        fontSize: 13,
+                        color: AppTheme.lightBlue,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -64,51 +62,41 @@ class TechHomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            // Notifications list
+            const Divider(height: 1),
+            // Notifications List
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
+                padding: const EdgeInsets.all(20),
+                children: const [
                   _NotificationItem(
-                    icon: Icons.assignment_outlined,
+                    icon: Icons.assignment,
                     iconColor: AppTheme.lightBlue,
-                    iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.1),
-                    title: 'New Job Assignment',
-                    message: 'You have been assigned to repair an iPhone 15 Pro for John Smith. Service needed: Screen Replacement.',
-                    time: '5 min ago',
+                    iconBgColor: Color(0xFFE3F2FD),
+                    title: 'New Job Request',
+                    message: 'You have a new job request from John Doe for iPhone screen repair.',
+                    time: '5 mins ago',
                     isNew: true,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   _NotificationItem(
-                    icon: Icons.schedule,
-                    iconColor: Colors.orange,
-                    iconBgColor: Colors.orange.withValues(alpha: 0.1),
-                    title: 'Upcoming Job Reminder',
-                    message: 'You have a job scheduled at 2:30 PM today. Don\'t forget to check the job details and prepare accordingly.',
-                    time: '30 min ago',
-                    isNew: true,
-                  ),
-                  const SizedBox(height: 12),
-                  _NotificationItem(
-                    icon: Icons.check_circle_outline,
+                    icon: Icons.check_circle,
                     iconColor: Colors.green,
-                    iconBgColor: Colors.green.withValues(alpha: 0.1),
-                    title: 'Job Completed',
-                    message: 'Great work! MacBook Pro screen repair has been marked as completed. Payment of ₱299 has been processed.',
-                    time: '2 hours ago',
-                    isNew: false,
-                  ),
-                  const SizedBox(height: 12),
-                  _NotificationItem(
-                    icon: Icons.account_balance_wallet,
-                    iconColor: AppTheme.deepBlue,
-                    iconBgColor: AppTheme.deepBlue.withValues(alpha: 0.1),
+                    iconBgColor: Color(0xFFE8F5E9),
                     title: 'Payment Received',
-                    message: 'Payment of ₱189 for Samsung Galaxy S23 Screen repair has been deposited to your account.',
-                    time: 'Yesterday',
+                    message: 'Payment of ₱1,500 has been received for Job #12345.',
+                    time: '1 hour ago',
+                    isNew: true,
+                  ),
+                  SizedBox(height: 12),
+                  _NotificationItem(
+                    icon: Icons.star,
+                    iconColor: Colors.orange,
+                    iconBgColor: Color(0xFFFFF3E0),
+                    title: 'New Review',
+                    message: 'Sarah left you a 5-star review!',
+                    time: '3 hours ago',
                     isNew: false,
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -118,28 +106,6 @@ class TechHomeScreen extends ConsumerWidget {
     );
   }
 
-  // Helper to check if booking belongs to this technician
-  static bool _isBookingForTechnician(String bookingTechnician, String userName) {
-    // Match if:
-    // 1. Exact match (booking.technician == userName)
-    // 2. Booking technician is contained in user's full name (e.g., "Estino" in "Ethan Estino")
-    // 3. User's last name matches booking technician
-    final userNameLower = userName.toLowerCase();
-    final bookingTechLower = bookingTechnician.toLowerCase();
-
-    if (bookingTechLower == userNameLower) return true;
-    if (userNameLower.contains(bookingTechLower)) return true;
-
-    // Check if last name matches
-    final nameParts = userName.split(' ');
-    if (nameParts.length > 1) {
-      final lastName = nameParts.last.toLowerCase();
-      if (lastName == bookingTechLower) return true;
-    }
-
-    return false;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get current user data
@@ -147,150 +113,182 @@ class TechHomeScreen extends ConsumerWidget {
     final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
     final userAddress = userAsync.whenOrNull(data: (user) => user?.address) ?? '';
 
-    // Get bookings and filter for this technician
-    final localBookings = ref.watch(localBookingsProvider);
-    final techScheduledCount = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'Scheduled'
-    ).length;
-    final techActiveCount = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'In Progress'
-    ).length;
-    final techCompletedCount = localBookings.where((booking) =>
-      _isBookingForTechnician(booking.technician, userName) && booking.status == 'Completed'
-    ).length;
+    // Use Supabase bookings instead of local bookings
+    final bookingsAsync = ref.watch(technicianBookingsProvider);
+
+    // Get today's date for filtering
+    final today = DateTime.now();
+    final todayStart = DateTime(today.year, today.month, today.day);
+    final todayEnd = todayStart.add(const Duration(days: 1));
 
     return Scaffold(
       backgroundColor: AppTheme.deepBlue,
-      body: Column(
-        children: [
-          // Profile Header
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.deepBlue, AppTheme.lightBlue],
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 12),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: bookingsAsync.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        error: (error, stack) => Center(
+          child: Text(
+            'Error loading bookings',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+        data: (allBookings) {
+          // Filter bookings for today
+          final todayBookings = allBookings.where((booking) {
+            if (booking.scheduledDate == null) return false;
+            final bookingDate = booking.scheduledDate!;
+            return bookingDate.isAfter(todayStart) && bookingDate.isBefore(todayEnd);
+          }).toList();
+
+          // Calculate today's stats using Supabase statuses
+          final techScheduledCount = todayBookings.where((booking) =>
+            booking.status == 'requested' || booking.status == 'accepted'
+          ).length;
+          final techActiveCount = todayBookings.where((booking) =>
+            booking.status == 'in_progress'
+          ).length;
+          final techCompletedCount = todayBookings.where((booking) =>
+            booking.status == 'completed'
+          ).length;
+
+          // Get active bookings for display
+          final activeBookings = allBookings.where((booking) =>
+            booking.status == 'in_progress'
+          ).toList();
+
+          return Column(
+            children: [
+              // Profile Header
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppTheme.deepBlue, AppTheme.lightBlue],
+                  ),
+                ),
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 12),
+                child: Column(
                   children: [
-                    Column(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'FixIT Technician',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Stack(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
+                              onPressed: () => _showNotifications(context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 18,
+                                  minHeight: 18,
+                                ),
+                                child: const Text(
+                                  '2',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.white, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          userAddress.isNotEmpty ? userAddress : 'Location not set',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Main Content Area
+              Expanded(
+                child: Container(
+                  color: AppTheme.primaryCyan,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.zero,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'FixIT Technician',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          userName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Stack(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                          onPressed: () => _showNotifications(context),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 18,
-                              minHeight: 18,
-                            ),
-                            child: const Text(
-                              '2',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
+                          // Stats Grid
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                            child: GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 1.15,
+                            children: [
+                              _StatCard(
+                                icon: Icons.work_outline,
+                                iconColor: Colors.white,
+                                bgColor: const Color(0xFF4F7CFF),
+                                value: '$techActiveCount',
+                                label: 'Today\'s Jobs',
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Colors.white, size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      userAddress.isNotEmpty ? userAddress : 'Location not set',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Main Content Area
-          Expanded(
-            child: Container(
-              color: AppTheme.primaryCyan,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                      // Stats Grid
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                        child: GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1.15,
-                        children: [
-                          _StatCard(
-                            icon: Icons.work_outline,
-                            iconColor: Colors.white,
-                            bgColor: const Color(0xFF4F7CFF),
-                            value: '$techActiveCount',
-                            label: 'Today\'s Jobs',
-                          ),
-                          _StatCard(
-                            icon: Icons.check_circle_outline,
-                            iconColor: Colors.white,
-                            bgColor: const Color(0xFF00C853),
-                            value: '$techCompletedCount',
-                            label: 'Completed',
-                          ),
-                          _StatCard(
-                            icon: Icons.assignment_outlined,
-                            iconColor: Colors.white,
-                            bgColor: const Color(0xFFFF6B35),
-                            value: '$techScheduledCount',
-                            label: 'Today\'s Job Request',
-                          ),
+                              _StatCard(
+                                icon: Icons.check_circle_outline,
+                                iconColor: Colors.white,
+                                bgColor: const Color(0xFF00C853),
+                                value: '$techCompletedCount',
+                                label: 'Completed',
+                              ),
+                              _StatCard(
+                                icon: Icons.assignment_outlined,
+                                iconColor: Colors.white,
+                                bgColor: const Color(0xFFFF6B35),
+                                value: '$techScheduledCount',
+                                label: 'Today\'s Job Request',
+                              ),
                           Consumer(
                             builder: (context, ref, child) {
                               final todayEarningsAsync = ref.watch(todayEarningsProvider);
@@ -330,180 +328,149 @@ class TechHomeScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickActionButton(
-                              icon: Icons.navigation,
-                              iconColor: AppTheme.lightBlue,
-                              iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.15),
-                              label: 'Start\nNavigation',
-                              onTap: () {},
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _QuickActionButton(
-                              icon: Icons.location_on,
-                              iconColor: Colors.green,
-                              iconBgColor: Colors.green.withValues(alpha: 0.15),
-                              label: 'Mark\nAvailable',
-                              onTap: () {},
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickActionButton(
-                              icon: Icons.star,
-                              iconColor: Colors.pink,
-                              iconBgColor: Colors.pink.withValues(alpha: 0.15),
-                              label: 'View\nRating',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const TechRatingsScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _QuickActionButton(
-                              icon: Icons.access_time,
-                              iconColor: Colors.orange,
-                              iconBgColor: Colors.orange.withValues(alpha: 0.15),
-                              label: 'Time\nOff Request',
-                              onTap: () {},
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Today's Schedule
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Today\'s Schedule',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppTheme.lightBlue,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.lightBlue.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Text(
-                              '$techActiveCount Active',
-                              style: const TextStyle(
-                                fontSize: 14,
+                              'Quick Actions',
+                              style: TextStyle(
+                                fontSize: 20,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AppTheme.textPrimaryColor,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Dynamic Job Cards - Show active bookings
-                      ...localBookings.where((booking) =>
-                        _isBookingForTechnician(booking.technician, userName) && booking.status == 'In Progress'
-                      ).map((booking) {
-                        // Map priority to color
-                        Color priorityColor;
-                        String priorityText;
-                        switch (booking.priority.toLowerCase()) {
-                          case 'high':
-                            priorityColor = Colors.red;
-                            priorityText = 'HIGH';
-                            break;
-                          case 'medium':
-                            priorityColor = Colors.orange;
-                            priorityText = 'MEDIUM';
-                            break;
-                          case 'low':
-                            priorityColor = Colors.green;
-                            priorityText = 'LOW';
-                            break;
-                          default:
-                            priorityColor = Colors.grey;
-                            priorityText = 'NORMAL';
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _JobCard(
-                            customerName: booking.customerName,
-                            priority: priorityText,
-                            priorityColor: priorityColor,
-                            device: booking.deviceName,
-                            service: booking.serviceName,
-                            time: booking.time,
-                            duration: '45 mins',
-                            address: booking.location,
-                            price: booking.total,
-                            status: 'IN PROGRESS',
-                            statusColor: AppTheme.lightBlue,
-                          ),
-                        );
-                      }),
-                      // Show message if no active bookings
-                      if (techActiveCount == 0)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
+                            const SizedBox(height: 12),
+                            Row(
                               children: [
-                                Icon(Icons.work_outline, size: 64, color: Colors.grey.shade400),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No active jobs at the moment',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: _QuickActionButton(
+                                    icon: Icons.navigation,
+                                    iconColor: AppTheme.lightBlue,
+                                    iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.15),
+                                    label: 'Start\nNavigation',
+                                    onTap: () {},
                                   ),
-                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _QuickActionButton(
+                                    icon: Icons.location_on,
+                                    iconColor: Colors.green,
+                                    iconBgColor: Colors.green.withValues(alpha: 0.15),
+                                    label: 'Mark\nAvailable',
+                                    onTap: () {},
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _QuickActionButton(
+                                    icon: Icons.star,
+                                    iconColor: Colors.pink,
+                                    iconBgColor: Colors.pink.withValues(alpha: 0.15),
+                                    label: 'View\nRating',
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const TechRatingsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _QuickActionButton(
+                                    icon: Icons.access_time,
+                                    iconColor: Colors.orange,
+                                    iconBgColor: Colors.orange.withValues(alpha: 0.15),
+                                    label: 'Time\nOff Request',
+                                    onTap: () {},
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Today's Schedule
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Today\'s Schedule',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimaryColor,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.lightBlue,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.lightBlue.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '$techActiveCount Active',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // Dynamic Job Cards - Show active bookings from Supabase
+                            ...activeBookings.map((booking) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _SimpleJobCard(
+                                  booking: booking,
+                                ),
+                              );
+                            }),
+                            // Show message if no active bookings
+                            if (activeBookings.isEmpty)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(32),
+                                  child: Column(
+                                    children: [
+                                      Icon(Icons.work_outline, size: 64, color: Colors.grey.shade400),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'No active jobs at the moment',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-        ),
-      ],
-    ),
+          ],
+        );
+        },
+      ),
     );
   }
 }
@@ -569,244 +536,6 @@ class _QuickActionButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _JobCard extends StatelessWidget {
-  final String customerName;
-  final String priority;
-  final Color priorityColor;
-  final String device;
-  final String service;
-  final String time;
-  final String duration;
-  final String address;
-  final String price;
-  final String status;
-  final Color statusColor;
-
-  const _JobCard({
-    required this.customerName,
-    required this.priority,
-    required this.priorityColor,
-    required this.device,
-    required this.service,
-    required this.time,
-    required this.duration,
-    required this.address,
-    required this.price,
-    required this.status,
-    required this.statusColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.person, color: statusColor, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      customerName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: priorityColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    priority,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.lightBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.phone_android,
-                        color: AppTheme.lightBlue,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            device,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                          Text(
-                            service,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$time • $duration',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              address,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textPrimaryColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      price,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.green,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.lightBlue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.phone,
-                            color: AppTheme.lightBlue,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.deepBlue,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'View Details',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -978,6 +707,159 @@ class _NotificationItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SimpleJobCard extends StatelessWidget {
+  final BookingModel booking;
+
+  const _SimpleJobCard({
+    required this.booking,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.build, color: AppTheme.lightBlue, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Job #${booking.id.substring(0, 8)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF9C27B0),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'IN PROGRESS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  if (booking.scheduledDate != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Text(
+                          DateFormat('MMM dd, hh:mm a').format(booking.scheduledDate!),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (booking.scheduledDate != null && booking.customerAddress != null)
+                    const SizedBox(height: 6),
+                  if (booking.customerAddress != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            booking.customerAddress!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Price and actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '₱${booking.finalCost ?? booking.estimatedCost ?? 0}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.green,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.deepBlue,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'View Details',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

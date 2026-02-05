@@ -4,14 +4,30 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/technician_stats_provider.dart';
 import '../../services/user_session_service.dart';
 
-class TechProfileScreen extends ConsumerWidget {
+class TechProfileScreen extends ConsumerStatefulWidget {
   const TechProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TechProfileScreen> createState() => _TechProfileScreenState();
+}
+
+class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Reload stats when screen is opened
+    Future.microtask(() {
+      ref.read(technicianStatsProvider.notifier).reload();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
+    final statsAsync = ref.watch(technicianStatsProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -27,13 +43,18 @@ class TechProfileScreen extends ConsumerWidget {
                   children: [
                       // Profile header card
                       userAsync.when(
-                        data: (user) => _buildProfileHeader(user?.fullName ?? 'Technician', user?.verified ?? false),
-                        loading: () => _buildProfileHeader('Loading...', false),
-                        error: (_, __) => _buildProfileHeader('Technician', false),
+                        data: (user) => _buildProfileHeader(
+                          user?.fullName ?? 'Technician',
+                          user?.verified ?? false,
+                          statsAsync.value?.averageRating ?? 0.0,
+                          statsAsync.value?.completedJobs ?? 0,
+                        ),
+                        loading: () => _buildProfileHeader('Loading...', false, 0.0, 0),
+                        error: (_, __) => _buildProfileHeader('Technician', false, 0.0, 0),
                       ),
                       const SizedBox(height: 24),
-                      // Stats cards - these will be 0 for new technicians
-                      const _StatsCards(),
+                      // Stats cards - now using real data
+                      _StatsCards(stats: statsAsync.value),
                       const SizedBox(height: 24),
                       // Personal Information
                       const _PersonalInfoCard(),
@@ -163,7 +184,7 @@ class TechProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileHeader(String name, bool isVerified) {
+  Widget _buildProfileHeader(String name, bool isVerified, double rating, int jobsDone) {
     // Get initials from name
     final initials = name.split(' ')
         .where((s) => s.isNotEmpty)
@@ -247,13 +268,13 @@ class TechProfileScreen extends ConsumerWidget {
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.star, color: Colors.amber, size: 20),
-                    SizedBox(width: 6),
+                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                    const SizedBox(width: 6),
                     Text(
-                      '0.0',
-                      style: TextStyle(
+                      rating.toStringAsFixed(1),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -269,13 +290,13 @@ class TechProfileScreen extends ConsumerWidget {
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.work, color: Colors.white, size: 18),
-                    SizedBox(width: 6),
+                    const Icon(Icons.work, color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
                     Text(
-                      '0 jobs',
-                      style: TextStyle(
+                      '$jobsDone jobs',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -293,10 +314,16 @@ class TechProfileScreen extends ConsumerWidget {
 }
 
 class _StatsCards extends StatelessWidget {
-  const _StatsCards();
+  final TechnicianStats? stats;
+
+  const _StatsCards({this.stats});
 
   @override
   Widget build(BuildContext context) {
+    final experience = stats?.experience ?? 'New';
+    final rating = stats?.averageRating ?? 0.0;
+    final jobsDone = stats?.completedJobs ?? 0;
+
     return IntrinsicHeight(
       child: Row(
         children: [
@@ -305,7 +332,7 @@ class _StatsCards extends StatelessWidget {
               icon: Icons.trending_up,
               iconColor: Colors.pink,
               label: 'Experience',
-              value: 'New',
+              value: experience,
             ),
           ),
           const SizedBox(width: 12),
@@ -314,7 +341,7 @@ class _StatsCards extends StatelessWidget {
               icon: Icons.star,
               iconColor: Colors.green,
               label: 'Rating',
-              value: '0.0',
+              value: rating.toStringAsFixed(1),
             ),
           ),
           const SizedBox(width: 12),
@@ -323,7 +350,7 @@ class _StatsCards extends StatelessWidget {
               icon: Icons.bookmark,
               iconColor: AppTheme.lightBlue,
               label: 'Jobs Done',
-              value: '0',
+              value: '$jobsDone',
             ),
           ),
         ],

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../../models/address.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/voucher_provider.dart';
+import '../../services/address_service.dart';
 import '../../services/voucher_service.dart';
 
 class ProfileSetupDialog extends ConsumerStatefulWidget {
@@ -63,18 +64,24 @@ class _ProfileSetupDialogState extends ConsumerState<ProfileSetupDialog>
     setState(() => _isLoading = true);
 
     try {
+      // Get current user
+      final user = ref.read(currentUserProvider).value;
+      if (user == null) {
+        throw Exception('User not logged in');
+      }
+
       // Save phone number
       await ref.read(profileProvider.notifier).updatePhone(_phoneController.text.trim());
 
-      // Save address with fixed city
-      final address = Address(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        street: _streetController.text.trim(),
-        city: 'San Francisco, Agusan del Sur',
-        neighborhood: _barangayController.text.trim(),
+      // Save address using addressService
+      final addressService = ref.read(addressServiceProvider);
+      final fullAddress = '${_streetController.text.trim()}, ${_barangayController.text.trim()}, San Francisco, Agusan del Sur';
+      await addressService.addAddress(
+        userId: user.id,
+        label: 'Home',
+        address: fullAddress,
         isDefault: true,
       );
-      await ref.read(addressProvider.notifier).addAddress(address);
 
       // Mark setup as complete
       final voucherService = ref.read(voucherServiceProvider);

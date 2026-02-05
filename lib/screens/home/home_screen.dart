@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/voucher_provider.dart';
+import '../../models/booking_model.dart';
 import '../../services/voucher_service.dart' show Voucher;
 import '../booking/widgets/booking_dialog.dart';
 import '../services/services_list_screen.dart';
@@ -32,8 +34,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Check for profile setup after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkProfileSetup();
+      // Reward points are automatically calculated from Supabase bookings
     });
   }
+
+  // Reward points are now automatically calculated from Supabase bookings
+  // No need to manually sync
 
   Future<void> _checkProfileSetup() async {
     // Don't show dialog if already shown this session
@@ -183,14 +189,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final savedAddressCount = ref.watch(savedAddressCountProvider);
-    final rewardPoints = ref.watch(rewardPointsProvider);
-    final allBookings = ref.watch(localBookingsProvider);
+    final rewardPointsAsync = ref.watch(rewardPointsProvider);
+    // Use proper Supabase bookings table
+    final bookingsAsync = ref.watch(customerBookingsProvider);
     final validVouchersAsync = ref.watch(validVouchersProvider);
 
     // Count active orders (only In Progress)
-    final activeOrdersCount = allBookings.where((booking) {
-      return booking.status == 'In Progress';
-    }).length;
+    final activeOrdersCount = bookingsAsync.maybeWhen(
+      data: (bookings) => bookings.where((booking) => booking.status == 'in_progress').length,
+      orElse: () => 0,
+    );
 
     // Check if there are valid vouchers to display
     final validVouchers = validVouchersAsync.valueOrNull ?? [];
@@ -468,7 +476,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       ),
                                       const SizedBox(height: 12),
                                       Text(
-                                        '$rewardPoints',
+                                        '${rewardPointsAsync.valueOrNull ?? 0}',
                                         style: const TextStyle(
                                           fontSize: 24,
                                           fontWeight: FontWeight.bold,
@@ -563,83 +571,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Featured Services
+                        // Featured Shops
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Featured Services',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.storefront_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Featured Shops',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const ServicesListScreen()),
-                                );
-                              },
-                              child: const Text(
-                                'View All',
-                                style: TextStyle(color: Colors.black),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'San Francisco',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
 
-                        // Featured Service Cards (Horizontal Scroll)
+                        // Featured Shop Cards (Horizontal Scroll)
                         SizedBox(
-                          height: 300,
+                          height: 215,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             children: [
-                              _FeaturedServiceCard(
-                                icon: Icons.phone_android,
-                                title: 'Mobile Phone Repair',
-                                description: 'Screen, battery, camera, and water damage repairs for all smartphone brands',
-                                price: '₱350',
-                                duration: '30-60 mins',
-                                badge: 'Popular',
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(),
-                                  );
-                                },
+                              const _FeaturedShopCard(
+                                shopName: 'TechFix Hub',
+                                ownerName: 'Juan Dela Cruz',
+                                rating: 4.8,
+                                reviewCount: 156,
+                                services: ['Laptops', 'Phones', 'Tablets'],
+                                distance: '0.5 km',
+                                isOpen: true,
+                                openTime: '8 AM - 8 PM',
+                                gradientColors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                isFeatured: true,
                               ),
                               const SizedBox(width: 16),
-                              _FeaturedServiceCard(
-                                icon: Icons.laptop,
-                                title: 'Laptop Repair',
-                                description: 'Hardware repairs, software troubleshooting, and performance optimization',
-                                price: '₱500',
-                                duration: '60-90 mins',
-                                badge: null,
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(),
-                                  );
-                                },
+                              const _FeaturedShopCard(
+                                shopName: 'Mobile Masters',
+                                ownerName: 'Maria Santos',
+                                rating: 4.6,
+                                reviewCount: 98,
+                                services: ['Phones', 'Accessories'],
+                                distance: '1.2 km',
+                                isOpen: true,
+                                openTime: '9 AM - 7 PM',
+                                gradientColors: [Color(0xFF11998e), Color(0xFF38ef7d)],
+                                isFeatured: false,
                               ),
                               const SizedBox(width: 16),
-                              _FeaturedServiceCard(
-                                icon: Icons.tablet_android,
-                                title: 'Tablet Repair',
-                                description: 'Screen replacement, battery issues, charging port, and software updates for all tablets',
-                                price: '₱500',
-                                duration: '45-75 mins',
-                                badge: null,
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(),
-                                  );
-                                },
+                              const _FeaturedShopCard(
+                                shopName: 'Gadget Care Pro',
+                                ownerName: 'Pedro Reyes',
+                                rating: 4.9,
+                                reviewCount: 203,
+                                services: ['Laptops', 'Phones', 'Gaming'],
+                                distance: '2.0 km',
+                                isOpen: false,
+                                openTime: 'Opens 9 AM',
+                                gradientColors: [Color(0xFFf093fb), Color(0xFFf5576c)],
+                                isFeatured: true,
+                              ),
+                              const SizedBox(width: 16),
+                              const _FeaturedShopCard(
+                                shopName: 'QuickFix Station',
+                                ownerName: 'Ana Gonzales',
+                                rating: 4.5,
+                                reviewCount: 67,
+                                services: ['Phones', 'Tablets'],
+                                distance: '2.8 km',
+                                isOpen: true,
+                                openTime: '10 AM - 6 PM',
+                                gradientColors: [Color(0xFFfc4a1a), Color(0xFFf7b733)],
+                                isFeatured: false,
                               ),
                             ],
                           ),
@@ -647,41 +702,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(height: 24),
 
                         // Quick Actions
-                        const Text(
-                          'Quick Actions',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF4ECDC4), Color(0xFF44A08D)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.flash_on_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Quick Actions',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
-                              child: _QuickActionButton(
-                                icon: Icons.chat_bubble_outline,
-                                label: 'Live Chat',
-                                color: AppTheme.deepBlue,
-                                onTap: () => context.push('/live-chat'),
+                              child: _ModernQuickActionCard(
+                                icon: Icons.build_circle_rounded,
+                                label: 'Book Repair',
+                                subtitle: 'Schedule now',
+                                gradientColors: const [Color(0xFF667eea), Color(0xFF764ba2)],
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => const BookingDialog(),
+                                  );
+                                },
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _QuickActionButton(
-                                icon: Icons.help_outline,
-                                label: 'Help Center',
-                                color: AppTheme.accentPurple,
-                                onTap: () => context.push('/help-support'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _QuickActionButton(
-                                icon: Icons.history,
-                                label: 'History',
-                                color: AppTheme.textSecondaryColor,
+                              child: _ModernQuickActionCard(
+                                icon: Icons.track_changes_rounded,
+                                label: 'Track Order',
+                                subtitle: 'View status',
+                                gradientColors: const [Color(0xFF11998e), Color(0xFF38ef7d)],
                                 onTap: () => context.push('/bookings'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _ModernQuickActionCard(
+                                icon: Icons.support_agent_rounded,
+                                label: 'Support',
+                                subtitle: 'Get help',
+                                gradientColors: const [Color(0xFFf093fb), Color(0xFFf5576c)],
+                                onTap: () => context.push('/help-support'),
                               ),
                             ),
                           ],
@@ -750,7 +832,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         const SizedBox(height: 16),
                         // Recent Orders List
-                        _buildRecentOrders(ref),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: 100,
+                            maxHeight: 600,
+                          ),
+                          child: _buildRecentOrders(ref),
+                        ),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -765,26 +853,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildRecentOrders(WidgetRef ref) {
-    final allBookings = ref.watch(localBookingsProvider);
+    // Use proper Supabase bookings table
+    final bookingsAsync = ref.watch(customerBookingsProvider);
 
+    return bookingsAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+      ),
+      error: (error, stack) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'Error loading bookings',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ),
+      data: (allBookings) => _buildRecentOrdersContent(allBookings),
+    );
+  }
+
+  Widget _buildRecentOrdersContent(List<BookingModel> allBookings) {
     if (allBookings.isEmpty) {
-      return Center(
-        child: Column(
-          children: [
-            Icon(
-              Icons.shopping_bag_outlined,
-              size: 80,
-              color: Colors.white.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No orders yet',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white.withValues(alpha: 0.5),
+      return SizedBox(
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.shopping_bag_outlined,
+                size: 80,
+                color: Colors.white.withValues(alpha: 0.3),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                'No orders yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -793,21 +912,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final recentBookings = allBookings.take(3).toList();
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: recentBookings.map((booking) {
         Color statusColor;
         String displayStatus;
         switch (booking.status) {
-          case 'Scheduled':
+          case 'requested':
+          case 'accepted':
+          case 'scheduled':
             statusColor = const Color(0xFFFF9800); // Orange
-            displayStatus = 'Requesting';
+            displayStatus = 'Scheduled';
             break;
-          case 'In Progress':
+          case 'in_progress':
             statusColor = AppTheme.lightBlue;
             displayStatus = 'In Progress';
             break;
-          case 'Completed':
+          case 'completed':
             statusColor = Colors.green;
             displayStatus = 'Completed';
+            break;
+          case 'cancelled':
+            statusColor = Colors.red;
+            displayStatus = 'Cancelled';
             break;
           default:
             statusColor = Colors.grey;
@@ -817,6 +943,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Container(
+            constraints: const BoxConstraints(
+              minHeight: 150,
+            ),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -824,27 +953,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               border: Border.all(color: Colors.black, width: 2),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          booking.id,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimaryColor,
+                    Flexible(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              booking.id,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimaryColor,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          booking.icon,
-                          style: const TextStyle(fontSize: 18),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          const Text(
+                            '📱',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ],
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -864,18 +999,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  booking.deviceName,
-                  style: const TextStyle(
+                const Text(
+                  'Service',
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.textPrimaryColor,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  booking.serviceName,
-                  style: const TextStyle(
+                const Text(
+                  'Repair Service',
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppTheme.textSecondaryColor,
                   ),
@@ -885,14 +1020,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      booking.date,
+                      booking.scheduledDate != null 
+                          ? '${booking.scheduledDate!.month}/${booking.scheduledDate!.day}/${booking.scheduledDate!.year}'
+                          : 'TBD',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppTheme.textSecondaryColor,
                       ),
                     ),
                     Text(
-                      booking.total,
+                      '₱${booking.finalCost?.toStringAsFixed(2) ?? booking.estimatedCost?.toStringAsFixed(2) ?? '0.00'}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -980,159 +1117,258 @@ class _CategoryCard extends StatelessWidget {
   }
 }
 
-// Featured Service Card Widget
-class _FeaturedServiceCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-  final String price;
-  final String duration;
-  final String? badge;
-  final VoidCallback onTap;
+// Featured Shop Card Widget
+class _FeaturedShopCard extends StatelessWidget {
+  final String shopName;
+  final String ownerName;
+  final double rating;
+  final int reviewCount;
+  final List<String> services;
+  final String distance;
+  final bool isOpen;
+  final String openTime;
+  final List<Color> gradientColors;
+  final bool isFeatured;
 
-  const _FeaturedServiceCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.price,
-    required this.duration,
-    this.badge,
-    required this.onTap,
+  const _FeaturedShopCard({
+    required this.shopName,
+    required this.ownerName,
+    required this.rating,
+    required this.reviewCount,
+    required this.services,
+    required this.distance,
+    required this.isOpen,
+    required this.openTime,
+    required this.gradientColors,
+    required this.isFeatured,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 300,
+      width: 240,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors[0].withValues(alpha: 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Icon and Badge Section
-          Stack(
-            children: [
-              Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    icon,
-                    size: 50,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-              if (badge != null)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      badge!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Content Section
-          Padding(
+          // Header with gradient
+          Container(
             padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade700,
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                    // Shop icon
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.storefront_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    // Status badge
+                    Row(
                       children: [
-                        Text(
-                          'Starting at',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
+                        if (isFeatured) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.star_rounded, color: Colors.white, size: 10),
+                                SizedBox(width: 2),
+                                Text(
+                                  'Top',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text(
-                          price,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(width: 4),
+                        ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isOpen
+                                ? const Color(0xFF4CAF50)
+                                : Colors.white.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            isOpen ? 'Open' : 'Closed',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
                     ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  shopName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person_outline_rounded,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      duration,
+                      ownerName,
                       style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade600,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: onTap,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+              ],
+            ),
+          ),
+          // Content section
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Rating and reviews
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                          const SizedBox(width: 3),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: const Text(
-                      'Book Now',
+                    const SizedBox(width: 6),
+                    Text(
+                      '($reviewCount)',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade600,
+                        fontSize: 11,
                       ),
                     ),
-                  ),
+                    const Spacer(),
+                    Icon(Icons.location_on_outlined, color: Colors.grey.shade500, size: 12),
+                    const SizedBox(width: 2),
+                    Text(
+                      distance,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Services tags
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: services.map((service) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: gradientColors[0].withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: gradientColors[0].withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        service,
+                        style: TextStyle(
+                          color: gradientColors[0],
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 6),
+                // Operating hours
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time_rounded,
+                      color: Colors.grey.shade500,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      openTime,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1143,36 +1379,36 @@ class _FeaturedServiceCard extends StatelessWidget {
   }
 }
 
-// Quick Action Button Widget
-class _QuickActionButton extends StatelessWidget {
+// Modern Quick Action Card Widget
+class _ModernQuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
+  final String subtitle;
+  final List<Color> gradientColors;
   final VoidCallback onTap;
 
-  const _QuickActionButton({
+  const _ModernQuickActionCard({
     required this.icon,
     required this.label,
-    required this.color,
+    required this.subtitle,
+    required this.gradientColors,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: gradientColors[0].withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1180,20 +1416,34 @@ class _QuickActionButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                gradient: LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade500,
               ),
               textAlign: TextAlign.center,
             ),

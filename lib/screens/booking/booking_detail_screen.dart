@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
+import '../../models/booking_model.dart';
 
 class BookingDetailScreen extends ConsumerWidget {
   final String bookingId;
@@ -10,36 +12,98 @@ class BookingDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookings = ref.watch(localBookingsProvider);
-    final booking = bookings.firstWhere(
-      (b) => b.id == bookingId,
-      orElse: () => LocalBooking(
-        id: bookingId,
-        icon: '📱',
-        status: 'Not Found',
-        deviceName: 'Unknown',
-        serviceName: 'Unknown',
-        date: '',
-        time: '',
-        location: '',
-        technician: '',
-        total: '',
-        customerName: '',
-        customerPhone: '',
-        priority: 'low',
-        moreDetails: '',
-        promoCode: null,
-        discountAmount: null,
-        originalPrice: null,
-      ),
-    );
+    // Watch customer bookings from Supabase
+    final bookingsAsync = ref.watch(customerBookingsProvider);
 
+    return bookingsAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: AppTheme.primaryCyan,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryCyan,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text(
+            'Booking Details',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        backgroundColor: AppTheme.primaryCyan,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryCyan,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text(
+            'Booking Details',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        body: Center(child: Text('Error: $error')),
+      ),
+      data: (bookings) {
+        final booking = bookings.where((b) => b.id == bookingId).firstOrNull;
+
+        if (booking == null) {
+          return Scaffold(
+            backgroundColor: AppTheme.primaryCyan,
+            appBar: AppBar(
+              backgroundColor: AppTheme.primaryCyan,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () => context.pop(),
+              ),
+              title: const Text(
+                'Booking Not Found',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            body: const Center(child: Text('Booking not found')),
+          );
+        }
+
+        return _BookingDetailView(booking: booking);
+      },
+    );
+  }
+}
+
+class _BookingDetailView extends StatelessWidget {
+  final BookingModel booking;
+
+  const _BookingDetailView({required this.booking});
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine colors based on booking status
     Color statusColor;
     switch (booking.status.toLowerCase()) {
       case 'scheduled':
+      case 'pending':
         statusColor = const Color(0xFFFF6B6B);
         break;
-      case 'in progress':
+      case 'in_progress':
+      case 'ongoing':
         statusColor = AppTheme.lightBlue;
         break;
       case 'completed':
@@ -49,20 +113,22 @@ class BookingDetailScreen extends ConsumerWidget {
         statusColor = Colors.grey;
     }
 
-    Color priorityColor;
-    switch (booking.priority) {
-      case 'high':
-        priorityColor = const Color(0xFFFF6B6B);
-        break;
-      case 'medium':
-        priorityColor = Colors.yellow.shade700;
-        break;
-      case 'low':
-        priorityColor = Colors.green;
-        break;
-      default:
-        priorityColor = Colors.grey;
-    }
+    // Format dates
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final timeFormat = DateFormat('h:mm a');
+    final bookingDate = booking.scheduledDate != null
+        ? dateFormat.format(booking.scheduledDate!)
+        : 'Not scheduled';
+    final bookingTime = booking.scheduledDate != null
+        ? timeFormat.format(booking.scheduledDate!)
+        : 'Not scheduled';
+
+    // Get location
+    final location = booking.customerAddress ?? 'No address provided';
+
+    // Calculate final amount
+    final estimatedCost = booking.estimatedCost ?? 0.0;
+    final finalCost = booking.finalCost ?? estimatedCost;
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -74,7 +140,7 @@ class BookingDetailScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          booking.id,
+          'Booking #${booking.id.substring(0, 8)}',
           style: const TextStyle(
             color: Colors.black,
             fontSize: 20,
@@ -129,125 +195,59 @@ class BookingDetailScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status Cards
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        booking.status,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+            // Status Card
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  booking.status.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: priorityColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${booking.priority.toUpperCase()} PRIORITY',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 24),
 
-            // Customer Information
+            // Service Information
             _SectionCard(
-              title: 'Customer Information',
+              title: 'Service Information',
               children: [
-                _InfoRow(
-                  icon: Icons.person,
-                  label: 'Name',
-                  value: booking.customerName,
-                ),
-                const SizedBox(height: 12),
-                _InfoRow(
-                  icon: Icons.phone,
-                  label: 'Phone',
-                  value: booking.customerPhone,
-                ),
-                const SizedBox(height: 12),
-                _InfoRow(
-                  icon: Icons.location_on,
-                  label: 'Location',
-                  value: booking.location,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Service Details
-            _SectionCard(
-              title: 'Service Details',
-              children: [
-                _InfoRow(
-                  icon: Icons.devices,
-                  label: 'Device',
-                  value: booking.deviceName,
-                ),
-                const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.build,
-                  label: 'Service',
-                  value: booking.serviceName,
+                  label: 'Service ID',
+                  value: booking.serviceId,
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.calendar_today,
                   label: 'Date',
-                  value: booking.date,
+                  value: bookingDate,
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.access_time,
                   label: 'Time',
-                  value: booking.time,
+                  value: bookingTime,
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.location_on,
+                  label: 'Location',
+                  value: location,
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Additional Details (if provided)
-            if (booking.moreDetails != null && booking.moreDetails!.isNotEmpty) ...[
-              _SectionCard(
-                title: 'Customer Notes',
-                children: [
-                  _InfoRow(
-                    icon: Icons.notes,
-                    label: 'Your Notes',
-                    value: booking.moreDetails!,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Technician Notes (if provided and booking is completed or in progress)
-            if (booking.technicianNotes != null && booking.technicianNotes!.isNotEmpty) ...[
+            // Technician Notes (if provided)
+            if (booking.diagnosticNotes != null && booking.diagnosticNotes!.isNotEmpty) ...[
               _SectionCard(
                 title: 'Technician Notes',
                 children: [
@@ -264,14 +264,14 @@ class BookingDetailScreen extends ConsumerWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Additional Issues Found',
+                                'Additional Information',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -280,7 +280,7 @@ class BookingDetailScreen extends ConsumerWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                booking.technicianNotes!,
+                                booking.diagnosticNotes!,
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey[700],
@@ -303,8 +303,8 @@ class BookingDetailScreen extends ConsumerWidget {
               children: [
                 _InfoRow(
                   icon: Icons.engineering,
-                  label: 'Assigned To',
-                  value: booking.technician,
+                  label: 'Technician ID',
+                  value: booking.technicianId,
                 ),
               ],
             ),
@@ -314,53 +314,8 @@ class BookingDetailScreen extends ConsumerWidget {
             _SectionCard(
               title: 'Payment',
               children: [
-                if (booking.promoCode != null) ...[
-                  // Show promo code applied
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.successColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppTheme.successColor.withValues(alpha: 0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.local_offer, color: AppTheme.successColor, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Promo Code Applied',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.textSecondaryColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                booking.promoCode!,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.textPrimaryColor,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.check_circle, color: AppTheme.successColor, size: 20),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Original price (crossed out)
+                if (finalCost != estimatedCost && estimatedCost > 0) ...[
+                  // Show price adjustment
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -372,7 +327,7 @@ class BookingDetailScreen extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        booking.originalPrice ?? '',
+                        '₱${estimatedCost.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
@@ -382,23 +337,22 @@ class BookingDetailScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Discount amount
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Discount',
+                      Text(
+                        finalCost > estimatedCost ? 'Price Increase' : 'Discount',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.successColor,
+                          color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
-                        '- ${booking.discountAmount ?? ''}',
-                        style: const TextStyle(
+                        '${finalCost > estimatedCost ? '+' : '-'} ₱${(finalCost - estimatedCost).abs().toStringAsFixed(2)}',
+                        style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.successColor,
+                          color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -410,8 +364,8 @@ class BookingDetailScreen extends ConsumerWidget {
                 ],
                 _InfoRow(
                   icon: Icons.payments,
-                  label: booking.promoCode != null ? 'Final Amount' : 'Total Amount',
-                  value: booking.total,
+                  label: 'Total Amount',
+                  value: '₱${finalCost.toStringAsFixed(2)}',
                   valueStyle: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
@@ -429,11 +383,11 @@ class BookingDetailScreen extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Calling ${booking.customerName}...')),
+                        SnackBar(content: Text('Calling technician...')),
                       );
                     },
                     icon: const Icon(Icons.phone),
-                    label: const Text('Call Customer'),
+                    label: const Text('Call Technician'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.deepBlue,
                       side: const BorderSide(color: AppTheme.deepBlue, width: 2),

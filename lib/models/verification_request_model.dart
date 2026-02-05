@@ -7,6 +7,15 @@ class VerificationRequestModel {
   final DateTime submittedAt;
   final DateTime? reviewedAt;
   final String? reviewedBy;
+  
+  // Technician information fields
+  final String? fullName;
+  final String? contactNumber;
+  final String? address;
+  final int? yearsExperience;
+  final String? shopName;
+  final String? bio;
+  final List<String>? specialties;
 
   VerificationRequestModel({
     required this.id,
@@ -17,6 +26,13 @@ class VerificationRequestModel {
     required this.submittedAt,
     this.reviewedAt,
     this.reviewedBy,
+    this.fullName,
+    this.contactNumber,
+    this.address,
+    this.yearsExperience,
+    this.shopName,
+    this.bio,
+    this.specialties,
   });
 
   factory VerificationRequestModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +47,15 @@ class VerificationRequestModel {
           ? DateTime.parse(json['reviewed_at'] as String)
           : null,
       reviewedBy: json['reviewed_by'] as String?,
+      fullName: json['full_name'] as String?,
+      contactNumber: json['contact_number'] as String?,
+      address: json['address'] as String?,
+      yearsExperience: json['years_experience'] as int?,
+      shopName: json['shop_name'] as String?,
+      bio: json['bio'] as String?,
+      specialties: json['specialties'] != null 
+          ? List<String>.from(json['specialties'] as List)
+          : null,
     );
   }
 
@@ -44,6 +69,13 @@ class VerificationRequestModel {
       'submitted_at': submittedAt.toIso8601String(),
       'reviewed_at': reviewedAt?.toIso8601String(),
       'reviewed_by': reviewedBy,
+      'full_name': fullName,
+      'contact_number': contactNumber,
+      'address': address,
+      'years_experience': yearsExperience,
+      'shop_name': shopName,
+      'bio': bio,
+      'specialties': specialties,
     };
   }
 }

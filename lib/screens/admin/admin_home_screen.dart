@@ -7,6 +7,8 @@ import '../../providers/booking_provider.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../providers/customer_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/ratings_provider.dart';
+import '../../providers/verification_provider.dart';
 import '../../services/user_session_service.dart';
 import 'widgets/admin_notifications_dialog.dart';
 
@@ -15,9 +17,12 @@ class AdminHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookings = ref.watch(localBookingsProvider);
+    final customerBookingsAsync = ref.watch(customerBookingsProvider);
+    final techBookingsAsync = ref.watch(technicianBookingsProvider);
     final openTicketsCount = ref.watch(openTicketsCountProvider);
     final activeCustomersCount = ref.watch(activeCustomersCountProvider);
+    final ratingsAsync = ref.watch(ratingsProvider);
+    final pendingVerificationsAsync = ref.watch(pendingVerificationsProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -173,12 +178,28 @@ class AdminHomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _QuickActionCard(
-                            icon: Icons.verified_user,
-                            label: 'Verifications',
-                            badge: '2',
-                            badgeColor: Colors.orange,
-                            onTap: () => context.push('/verification-review'),
+                          child: pendingVerificationsAsync.when(
+                            data: (verifications) => _QuickActionCard(
+                              icon: Icons.verified_user,
+                              label: 'Verifications',
+                              badge: verifications.isNotEmpty ? '${verifications.length}' : null,
+                              badgeColor: Colors.orange,
+                              onTap: () => context.push('/verification-review'),
+                            ),
+                            loading: () => _QuickActionCard(
+                              icon: Icons.verified_user,
+                              label: 'Verifications',
+                              badge: null,
+                              badgeColor: Colors.orange,
+                              onTap: () => context.push('/verification-review'),
+                            ),
+                            error: (_, __) => _QuickActionCard(
+                              icon: Icons.verified_user,
+                              label: 'Verifications',
+                              badge: null,
+                              badgeColor: Colors.orange,
+                              onTap: () => context.push('/verification-review'),
+                            ),
                           ),
                         ),
                       ],
@@ -196,7 +217,39 @@ class AdminHomeScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(child: SizedBox()),
+                        Expanded(
+                          child: ratingsAsync.when(
+                            data: (ratings) => _QuickActionCard(
+                              icon: Icons.star,
+                              label: 'Reviews',
+                              badge: ratings.isNotEmpty ? '${ratings.length}' : null,
+                              badgeColor: Colors.amber,
+                              onTap: () {
+                                // Show reviews dialog
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) => const _ReviewsBottomSheet(),
+                                );
+                              },
+                            ),
+                            loading: () => _QuickActionCard(
+                              icon: Icons.star,
+                              label: 'Reviews',
+                              badge: null,
+                              badgeColor: Colors.amber,
+                              onTap: () {},
+                            ),
+                            error: (_, __) => _QuickActionCard(
+                              icon: Icons.star,
+                              label: 'Reviews',
+                              badge: null,
+                              badgeColor: Colors.amber,
+                              onTap: () {},
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -210,73 +263,98 @@ class AdminHomeScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ...bookings.map((booking) {
-                      Color priorityColor;
-                      switch (booking.priority) {
-                        case 'high':
-                          priorityColor = const Color(0xFFFF6B6B);
-                          break;
-                        case 'medium':
-                          priorityColor = Colors.yellow.shade700;
-                          break;
-                        case 'low':
-                          priorityColor = Colors.green;
-                          break;
-                        default:
-                          priorityColor = Colors.grey;
-                      }
-
-                      Color statusColor;
-                      String statusText = booking.status.toLowerCase();
-                      String displayStatus = statusText;
-                      switch (statusText) {
-                        case 'scheduled':
-                          statusColor = const Color(0xFFFF9800);
-                          displayStatus = 'requesting';
-                          break;
-                        case 'in progress':
-                          statusColor = AppTheme.lightBlue;
-                          break;
-                        case 'completed':
-                          statusColor = Colors.green;
-                          break;
-                        default:
-                          statusColor = Colors.grey;
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _AppointmentCard(
-                          jobId: booking.id,
-                          priority: booking.priority,
-                          priorityColor: priorityColor,
-                          status: displayStatus,
-                          statusColor: statusColor,
-                          customerName: booking.customerName,
-                          device: '${booking.deviceName} - ${booking.serviceName}',
-                          technician: 'Technician: ${booking.technician}',
-                          time: 'Time: ${booking.time}',
-                        ),
-                      );
-                    }),
-                    if (bookings.isEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'No appointments yet',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondaryColor,
+                    // Show bookings from both customer and technician providers
+                    customerBookingsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, s) => Text('Error loading bookings: $e'),
+                      data: (bookings) {
+                        if (bookings.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        ),
-                      ),
-                    ],
+                            child: const Center(
+                              child: Text(
+                                'No appointments yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppTheme.textSecondaryColor,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: bookings.take(5).map((booking) {
+                            Color statusColor;
+                            switch (booking.status.toLowerCase()) {
+                              case 'pending':
+                              case 'requested':
+                                statusColor = const Color(0xFFFF9800);
+                                break;
+                              case 'in_progress':
+                              case 'ongoing':
+                                statusColor = AppTheme.lightBlue;
+                                break;
+                              case 'completed':
+                                statusColor = Colors.green;
+                                break;
+                              default:
+                                statusColor = Colors.grey;
+                            }
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 4,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        color: statusColor,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Booking #${booking.id.substring(0, 8)}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Status: ${booking.status}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -595,6 +673,315 @@ class _QuickActionCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReviewsBottomSheet extends ConsumerWidget {
+  const _ReviewsBottomSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ratingsAsync = ref.watch(ratingsProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 28),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Customer Reviews',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Content
+              Expanded(
+                child: ratingsAsync.when(
+                  data: (ratings) {
+                    if (ratings.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.star_outline, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No reviews yet',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Reviews will appear here',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Calculate stats
+                    final totalReviews = ratings.length;
+                    final averageRating = ratings.map((r) => r.rating).reduce((a, b) => a + b) / totalReviews;
+
+                    return ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        // Statistics
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  const Icon(Icons.star, color: Colors.amber, size: 32),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    averageRating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimaryColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Avg Rating',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                width: 1,
+                                height: 60,
+                                color: Colors.grey[300],
+                              ),
+                              Column(
+                                children: [
+                                  const Icon(Icons.rate_review, color: AppTheme.lightBlue, size: 32),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '$totalReviews',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimaryColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Total Reviews',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Recent Reviews',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Reviews list
+                        ...ratings.map((rating) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ReviewCard(rating: rating),
+                        )),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(color: AppTheme.deepBlue),
+                  ),
+                  error: (error, stack) => Center(
+                    child: Text(
+                      'Error loading reviews',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final dynamic rating;
+
+  const _ReviewCard({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.lightBlue.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person, color: AppTheme.lightBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rating.customerName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    Row(
+                      children: List.generate(5, (index) {
+                        return Icon(
+                          index < rating.rating ? Icons.star : Icons.star_border,
+                          color: Colors.amber,
+                          size: 16,
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                rating.date,
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.deepBlue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.engineering, size: 16, color: AppTheme.deepBlue),
+                const SizedBox(width: 8),
+                Text(
+                  rating.technician,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${rating.device} • ${rating.service}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondaryColor,
+            ),
+          ),
+          if (rating.review.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              rating.review,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[800],
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

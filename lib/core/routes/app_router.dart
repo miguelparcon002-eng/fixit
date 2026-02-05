@@ -25,7 +25,7 @@ import '../../screens/technician/service_management_screen.dart';
 import '../../screens/technician/verification_submission_screen.dart';
 import '../../screens/technician/tech_navigation.dart';
 import '../../screens/technician/tech_home_screen.dart';
-import '../../screens/technician/tech_jobs_screen.dart';
+import '../../screens/technician/tech_jobs_screen_new.dart';
 import '../../screens/technician/tech_earnings_screen.dart';
 import '../../screens/technician/tech_profile_screen.dart';
 import '../../screens/technician/tech_edit_profile_screen.dart';
@@ -184,7 +184,7 @@ class AppRouter {
           GoRoute(
             path: '/tech-jobs',
             name: 'techJobs',
-            builder: (context, state) => const TechJobsScreen(),
+            builder: (context, state) => const TechJobsScreenNew(),
           ),
           GoRoute(
             path: '/tech-earnings',

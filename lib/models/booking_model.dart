@@ -120,4 +120,77 @@ class BookingModel {
       'updated_at': updatedAt?.toIso8601String(),
     };
   }
+
+  // Helper getters for UI compatibility (matching LocalBooking fields)
+  String get icon => '📱'; // Default icon
+  
+  String get deviceName => 'Service'; // Will be replaced when we fetch service details
+  
+  String get serviceName => 'Repair Service'; // Will be replaced when we fetch service details
+  
+  String get date {
+    if (scheduledDate == null) return 'TBD';
+    final date = scheduledDate!;
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+  
+  String get time {
+    if (scheduledDate == null) return 'TBD';
+    final date = scheduledDate!;
+    final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
+  }
+  
+  String get location => customerAddress ?? 'N/A';
+  
+  String get technician => 'Technician'; // Will be replaced when we fetch technician details
+  
+  String get total => '₱${finalCost?.toStringAsFixed(2) ?? estimatedCost?.toStringAsFixed(2) ?? '0.00'}';
+  
+  String get customerName => 'Customer'; // Will be replaced when we fetch customer details
+  
+  String get customerPhone => 'No phone'; // Will be replaced when we fetch customer details
+  
+  String get priority => 'Normal';
+  
+  String? get moreDetails {
+    // Extract only the customer's original booking details (before "---TECHNICIAN NOTES---")
+    if (diagnosticNotes == null) return null;
+    final parts = diagnosticNotes!.split('---TECHNICIAN NOTES---');
+    return parts[0].trim();
+  }
+
+  String? get technicianNotes {
+    // Extract only technician's notes (after "---TECHNICIAN NOTES---")
+    if (diagnosticNotes == null) return null;
+    final parts = diagnosticNotes!.split('---TECHNICIAN NOTES---');
+    if (parts.length > 1) {
+      return parts[1].trim();
+    }
+    return null;
+  }
+
+  String? get promoCode {
+    if (diagnosticNotes == null) return null;
+    final match = RegExp(r'Promo Code: ([A-Z0-9]+)').firstMatch(diagnosticNotes!);
+    return match?.group(1);
+  }
+
+  String? get discountAmount {
+    if (diagnosticNotes == null) return null;
+    final match = RegExp(r'Discount: ([\d.]+%|₱[\d.]+)').firstMatch(diagnosticNotes!);
+    return match?.group(1);
+  }
+
+  String? get originalPrice {
+    if (diagnosticNotes == null) return null;
+    final match = RegExp(r'Original Price: ₱([\d.]+)').firstMatch(diagnosticNotes!);
+    if (match != null) {
+      return '₱${match.group(1)}';
+    }
+    return null;
+  }
 }

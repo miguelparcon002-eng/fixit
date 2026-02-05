@@ -154,4 +154,75 @@ class EarningsService {
       return 0.0;
     }
   }
+
+  /// Sync earnings from completed bookings that may not have been recorded
+  /// This ensures that all completed jobs are counted in earnings
+  Future<void> syncEarningsFromBookings(List<Map<String, dynamic>> completedBookings) async {
+    if (_userId == null) return;
+
+    try {
+      print('EarningsService: Syncing earnings from ${completedBookings.length} completed bookings...');
+
+      for (final booking in completedBookings) {
+        final bookingId = booking['id'] as String;
+
+        // Check if this booking already has an earnings record
+        final existing = await SupabaseConfig.client
+            .from(_tableName)
+            .select('id')
+            .eq('job_id', bookingId)
+            .maybeSingle();
+
+        if (existing == null) {
+          // No earnings record for this booking, create one
+          final totalStr = (booking['total'] as String? ?? '0')
+              .replaceAll('₱', '')
+              .replaceAll(',', '')
+              .trim();
+          final amount = double.tryParse(totalStr) ?? 0.0;
+
+          if (amount > 0) {
+            final date = booking['date'] as String? ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+            // Try to parse the date from booking format (e.g., "Jan 15, 2026")
+            String formattedDate;
+            try {
+              final months = {
+                'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+              };
+              final parts = date.replaceAll(',', '').split(' ');
+              if (parts.length >= 3) {
+                final month = months[parts[0]] ?? '01';
+                final day = parts[1].padLeft(2, '0');
+                final year = parts[2];
+                formattedDate = '$year-$month-$day';
+              } else {
+                formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+              }
+            } catch (e) {
+              formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+            }
+
+            await SupabaseConfig.client
+                .from(_tableName)
+                .insert({
+                  'technician_id': _userId,
+                  'amount': amount,
+                  'customer_name': booking['customerName'] ?? 'Customer',
+                  'service': booking['serviceName'] ?? 'Service',
+                  'job_id': bookingId,
+                  'date': formattedDate,
+                });
+
+            print('EarningsService: Added earning ₱$amount for booking $bookingId');
+          }
+        }
+      }
+
+      print('EarningsService: Earnings sync completed');
+    } catch (e) {
+      print('EarningsService: Error syncing earnings - $e');
+    }
+  }
 }

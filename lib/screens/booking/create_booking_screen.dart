@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'dart:math';
 import '../../core/theme/app_theme.dart';
+import '../../core/config/supabase_config.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
@@ -88,16 +88,20 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     // Load default address
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
-        final addresses = ref.read(addressProvider);
-        if (addresses.isNotEmpty) {
-          final defaultAddress = addresses.firstWhere(
-            (address) => address.isDefault,
-            orElse: () => addresses.first,
-          );
-          setState(() {
-            _addressController.text = '${defaultAddress.street}, ${defaultAddress.neighborhood}, ${defaultAddress.city}';
-          });
-        }
+        final addressesAsync = ref.read(userAddressesProvider);
+        addressesAsync.whenData((addresses) {
+          if (addresses.isNotEmpty) {
+            final defaultAddress = addresses.firstWhere(
+              (address) => address.isDefault,
+              orElse: () => addresses.first,
+            );
+            if (mounted) {
+              setState(() {
+                _addressController.text = defaultAddress.address;
+              });
+            }
+          }
+        });
       } catch (e) {
         // Address loading failed, user can enter manually
       }
@@ -285,35 +289,128 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       final user = ref.read(currentUserProvider).value;
       if (user == null) throw Exception('User not logged in');
 
-      final basePrice = _calculatePrice();
       final finalPrice = _calculateFinalPrice();
 
-      final booking = LocalBooking(
-        id: 'booking_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}',
-        icon: _selectedDeviceType == 'Mobile Phone' ? 'phone_android' :
-              _selectedDeviceType == 'Laptop' ? 'laptop' : 'tablet',
-        status: 'Requesting',
-        deviceName: _selectedDeviceType!,
-        serviceName: _selectedProblem!,
-        date: DateFormat('MMM dd, yyyy').format(_selectedDate!),
-        time: _selectedTime.format(context),
-        location: _addressController.text.trim(),
-        technician: _selectedTechnician!,
-        total: '₱${finalPrice.toStringAsFixed(0)}',
-        customerName: user.fullName,
-        customerPhone: user.contactNumber ?? 'No phone',
-        priority: 'Normal',
-        moreDetails: _detailsController.text.trim().isNotEmpty
-            ? '${_modelController.text.trim()}\n\n${_detailsController.text.trim()}'
-            : _modelController.text.trim(),
-        promoCode: _appliedPromoCode,
-        discountAmount: _discountAmount > 0
-            ? '₱${(_discountType == 'percentage' ? basePrice * _discountAmount / 100 : _discountAmount).toStringAsFixed(0)}'
-            : null,
-        originalPrice: _appliedPromoCode != null ? '₱${basePrice.toStringAsFixed(0)}' : null,
+      // Combine date and time into scheduledDate
+      final scheduledDateTime = DateTime(
+        _selectedDate!.year,
+        _selectedDate!.month,
+        _selectedDate!.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
       );
 
-      await ref.read(localBookingsProvider.notifier).addBooking(booking);
+      // Create booking details text
+      final bookingDetails = [
+        'Device: $_selectedDeviceType',
+        'Model: ${_modelController.text.trim()}',
+        'Problem: $_selectedProblem',
+        'Technician: $_selectedTechnician',
+        if (_detailsController.text.trim().isNotEmpty) 'Details: ${_detailsController.text.trim()}',
+        if (_appliedPromoCode != null) 'Promo Code: $_appliedPromoCode',
+      ].join('\n');
+
+      // Get all users to find a technician
+      final supabase = SupabaseConfig.client;
+      
+      // Try to find a technician user (any user with role 'technician')
+      String technicianId;
+      try {
+        // First, try to find technician with email fixittechnician@gmail.com (Ethan)
+        var techResponse = await supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('email', 'fixittechnician@gmail.com')
+            .maybeSingle();
+        
+        // If Ethan not found, try any technician
+        if (techResponse == null) {
+          print('Ethan not found, looking for any technician...');
+          techResponse = await supabase
+              .from('users')
+              .select('id, email, full_name, role')
+              .eq('role', 'technician')
+              .limit(1)
+              .maybeSingle();
+        }
+        
+        if (techResponse != null) {
+          technicianId = techResponse['id'] as String;
+          print('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
+        } else {
+          print('❌ No technicians found in database');
+          throw Exception('No technicians available. Please ensure Ethan Estino (fixittechnician@gmail.com) has role="technician" in the users table.');
+        }
+      } catch (e) {
+        print('❌ Error fetching technician: $e');
+        if (e is Exception && e.toString().contains('technician')) {
+          rethrow;
+        }
+        throw Exception('Unable to find technicians. Please check database setup.');
+      }
+
+      // Get or create a service ID
+      String serviceId;
+      try {
+        // First, try to find an existing service for this technician
+        var serviceResponse = await supabase
+            .from('services')
+            .select('id, technician_id, service_name')
+            .eq('technician_id', technicianId)
+            .limit(1)
+            .maybeSingle();
+        
+        // If no service for this technician, try to find any service
+        if (serviceResponse == null) {
+          print('No service found for technician $technicianId, checking for any service...');
+          serviceResponse = await supabase
+              .from('services')
+              .select('id, technician_id, service_name')
+              .limit(1)
+              .maybeSingle();
+        }
+        
+        if (serviceResponse != null) {
+          serviceId = serviceResponse['id'] as String;
+          print('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
+        } else {
+          // No service exists at all - this needs manual creation due to RLS
+          print('❌ No services found in database');
+          throw Exception(
+            'No services available. Please create a service for Ethan Estino first.\n\n'
+            'Run this SQL in Supabase:\n'
+            'INSERT INTO public.services (technician_id, service_name, description, category, estimated_duration, is_active)\n'
+            'VALUES (\'$technicianId\', \'General Repair\', \'Device repair service\', \'Repair\', 60, true);'
+          );
+        }
+      } catch (e) {
+        print('❌ Error with service: $e');
+        if (e is Exception) {
+          rethrow;
+        }
+        throw Exception('Unable to access services. Please check database setup.');
+      }
+
+      // Create booking in Supabase using BookingService
+      final bookingService = ref.read(bookingServiceProvider);
+      
+      final createdBooking = await bookingService.createBooking(
+        customerId: user.id,
+        technicianId: technicianId,
+        serviceId: serviceId,
+        scheduledDate: scheduledDateTime,
+        customerAddress: _addressController.text.trim(),
+        customerLatitude: null, // TODO: Get from address geocoding
+        customerLongitude: null,
+        estimatedCost: finalPrice,
+      );
+
+      // Update diagnostic notes with booking details
+      await bookingService.updateDiagnosticNotes(
+        bookingId: createdBooking.id,
+        notes: bookingDetails,
+        finalCost: finalPrice,
+      );
 
       if (!mounted) return;
 
@@ -341,7 +438,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Close dialog
-                context.go('/'); // Go back to home
+                context.push('/bookings'); // Go to bookings screen
               },
               child: const Text('View Bookings'),
             ),
@@ -366,10 +463,28 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
 
       if (!mounted) return;
 
+      // Show user-friendly error message
+      String errorMessage = 'Error creating booking';
+      if (e.toString().contains('technician')) {
+        errorMessage = 'No technicians available. Please contact support.';
+      } else if (e.toString().contains('service')) {
+        errorMessage = 'Service setup incomplete. Please contact support.';
+      } else if (e.toString().contains('PostgrestException')) {
+        errorMessage = 'Database error. Please ensure all setup is complete.';
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error creating booking: $e'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
         ),
       );
     }

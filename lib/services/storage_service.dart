@@ -116,6 +116,67 @@ class StorageService {
     }
   }
 
+  // ===== USER-SPECIFIC DATA ACCESS (for accessing other user's data) =====
+
+  /// Save data for a specific user (used for cross-user operations like adding reward points)
+  static Future<void> saveDataForUser(String userId, String key, String jsonData) async {
+    final storageKey = '${userId}_$key';
+    try {
+      print('StorageService: Saving to key "$storageKey" for user $userId...');
+
+      final existing = await SupabaseConfig.client
+          .from(_tableName)
+          .select()
+          .eq('key', storageKey)
+          .maybeSingle();
+
+      if (existing != null) {
+        await SupabaseConfig.client
+            .from(_tableName)
+            .update({'value': jsonData, 'updated_at': DateTime.now().toIso8601String()})
+            .eq('key', storageKey);
+        print('StorageService: Updated existing record for "$storageKey"');
+      } else {
+        await SupabaseConfig.client
+            .from(_tableName)
+            .insert({
+              'key': storageKey,
+              'value': jsonData,
+              'updated_at': DateTime.now().toIso8601String()
+            });
+        print('StorageService: Inserted new record for "$storageKey"');
+      }
+    } catch (e) {
+      print('StorageService: Error saving to "$storageKey" - $e');
+    }
+  }
+
+  /// Load data for a specific user (used for cross-user operations)
+  static Future<String?> loadDataForUser(String userId, String key) async {
+    final storageKey = '${userId}_$key';
+    try {
+      print('StorageService: Loading from key "$storageKey" for user $userId...');
+
+      final response = await SupabaseConfig.client
+          .from(_tableName)
+          .select('value')
+          .eq('key', storageKey)
+          .maybeSingle();
+
+      if (response != null && response['value'] != null) {
+        final data = response['value'] as String;
+        print('StorageService: Loaded ${data.length} chars from "$storageKey"');
+        return data;
+      } else {
+        print('StorageService: No data found for "$storageKey"');
+        return null;
+      }
+    } catch (e) {
+      print('StorageService: Error loading from "$storageKey" - $e');
+      return null;
+    }
+  }
+
   // ===== GLOBAL BOOKINGS (shared across all users) =====
 
   // Save global bookings as JSON string (NOT user-specific - shared across all users)

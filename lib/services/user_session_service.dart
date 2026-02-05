@@ -56,23 +56,24 @@ class UserSessionService {
   /// Reload all user-specific data from storage
   Future<void> _reloadAllUserData() async {
     try {
-      // Reload bookings
-      await _ref.read(localBookingsProvider.notifier).reload();
+      // Invalidate bookings (StreamProviders auto-reload)
+      _ref.invalidate(customerBookingsProvider);
+      _ref.invalidate(technicianBookingsProvider);
 
-      // Reload addresses
-      await _ref.read(addressProvider.notifier).reload();
+      // Invalidate addresses (StreamProvider auto-reloads)
+      _ref.invalidate(userAddressesProvider);
 
-      // Reload rewards
-      await _ref.read(rewardPointsProvider.notifier).reload();
-      await _ref.read(redeemedVouchersProvider.notifier).reload();
+      // Reload rewards (points are auto-calculated from Supabase bookings)
+      _ref.invalidate(rewardPointsProvider);
+      _ref.invalidate(redeemedVouchersProvider);
 
       // Reload vouchers
       _ref.invalidate(validVouchersProvider);
       _ref.invalidate(vouchersProvider);
       _ref.invalidate(profileSetupCompleteProvider);
 
-      // Reload earnings (for technicians)
-      await _ref.read(todayEarningsProvider.notifier).reload();
+      // Reload earnings (for technicians) - invalidate to recalculate from bookings
+      _ref.invalidate(todayEarningsProvider);
       _ref.invalidate(totalEarningsProvider);
       _ref.invalidate(weekEarningsProvider);
       _ref.invalidate(monthEarningsProvider);
@@ -93,10 +94,11 @@ class UserSessionService {
     _ref.invalidate(currentUserProvider);
 
     // Invalidate bookings
-    _ref.invalidate(localBookingsProvider);
+    _ref.invalidate(customerBookingsProvider);
+    _ref.invalidate(technicianBookingsProvider);
 
     // Invalidate addresses
-    _ref.invalidate(addressProvider);
+    _ref.invalidate(userAddressesProvider);
 
     // Invalidate rewards
     _ref.invalidate(rewardPointsProvider);

@@ -118,10 +118,21 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
 
     try {
       await _profileService.updateSpecialties(specialties);
-      state = AsyncValue.data(currentData.copyWith(specialties: specialties));
+
+      // Reload specialties from Supabase to ensure they persist
+      final reloadedSpecialties = await _profileService.loadSpecialties();
+      state = AsyncValue.data(currentData.copyWith(specialties: reloadedSpecialties));
+
+      print('ProfileNotifier: Specialties updated and reloaded from Supabase: $reloadedSpecialties');
     } catch (e, stack) {
+      print('ProfileNotifier: Error updating specialties - $e');
       state = AsyncValue.error(e, stack);
     }
+  }
+
+  // Add reload method to force refresh from Supabase
+  Future<void> reload() async {
+    await _loadProfile();
   }
 
   Future<void> updateProfileImage(String imagePath) async {

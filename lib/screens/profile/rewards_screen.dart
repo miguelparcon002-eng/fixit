@@ -3,16 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/rewards_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/reward.dart';
+import '../../models/redeemed_voucher.dart';
 
 class RewardsScreen extends ConsumerWidget {
   const RewardsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final points = ref.watch(rewardPointsProvider);
+    final pointsAsync = ref.watch(rewardPointsProvider);
     final availableVouchers = ref.watch(availableVouchersProvider);
-    final redeemedVouchers = ref.watch(redeemedVouchersProvider);
+    final redeemedVouchersAsync = ref.watch(redeemedVouchersProvider);
+    final points = pointsAsync.valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -173,9 +176,16 @@ class RewardsScreen extends ConsumerWidget {
                             },
                           ),
 
-                          // Redeemed Vouchers
-                          redeemedVouchers.isEmpty
-                              ? Center(
+                          // Redeemed Vouchers (only show unused ones)
+                          redeemedVouchersAsync.when(
+                            loading: () => const Center(child: CircularProgressIndicator()),
+                            error: (error, stack) => Center(child: Text('Error: $error')),
+                            data: (redeemedVouchers) {
+                              // Filter to show only unused vouchers
+                              final unusedVouchers = redeemedVouchers.where((v) => !v.isUsed).toList();
+
+                              if (unusedVouchers.isEmpty) {
+                                return Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -203,15 +213,18 @@ class RewardsScreen extends ConsumerWidget {
                                       ),
                                     ],
                                   ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(20),
-                                  itemCount: redeemedVouchers.length,
-                                  itemBuilder: (context, index) {
-                                    final voucher = redeemedVouchers[index];
-                                    return _RedeemedVoucherCard(voucher: voucher);
-                                  },
-                                ),
+                                );
+                              }
+                              return ListView.builder(
+                                padding: const EdgeInsets.all(20),
+                                itemCount: unusedVouchers.length,
+                                itemBuilder: (context, index) {
+                                  final voucher = unusedVouchers[index];
+                                  return _RedeemedVoucherCard(voucher: voucher);
+                                },
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -316,16 +329,48 @@ class RewardsScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        ref.read(rewardPointsProvider.notifier).redeemPoints(voucher.pointsCost);
-                        ref.read(redeemedVouchersProvider.notifier).addVoucher(voucher);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${voucher.title} voucher redeemed!'),
-                            backgroundColor: AppTheme.successColor,
-                          ),
+                      onPressed: () async {
+                        // Get current user
+                        final user = ref.read(currentUserProvider).value;
+                        if (user == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please log in to redeem vouchers'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        // Redeem voucher using service
+                        final voucherService = ref.read(redeemedVoucherServiceProvider);
+                        final redeemedVoucher = await voucherService.redeemVoucher(
+                          userId: user.id,
+                          voucher: voucher,
                         );
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          if (redeemedVoucher != null) {
+                            // Refresh the redeemed vouchers list and reward points
+                            ref.invalidate(redeemedVouchersProvider);
+                            ref.invalidate(rewardPointsProvider);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${voucher.title} voucher redeemed!'),
+                                backgroundColor: AppTheme.successColor,
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to redeem voucher'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.deepBlue,
@@ -469,13 +514,13 @@ class _VoucherCard extends StatelessWidget {
 }
 
 class _RedeemedVoucherCard extends StatelessWidget {
-  final RewardVoucher voucher;
+  final RedeemedVoucher voucher;
 
   const _RedeemedVoucherCard({required this.voucher});
 
   @override
   Widget build(BuildContext context) {
-    final promoCode = 'VOUCHER${voucher.id.toUpperCase()}';
+    final promoCode = 'VOUCHER${voucher.voucherId.toUpperCase()}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -518,7 +563,7 @@ class _RedeemedVoucherCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            voucher.title,
+                            voucher.voucherTitle,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -527,7 +572,7 @@ class _RedeemedVoucherCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            voucher.description,
+                            voucher.voucherDescription ?? '',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[700],

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/ratings_provider.dart';
 import '../../services/ratings_service.dart';
+import '../../models/booking_model.dart';
 
 class BookingListScreen extends ConsumerStatefulWidget {
   const BookingListScreen({super.key});
@@ -104,11 +106,50 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   }
 
   Widget _buildBookingsList() {
-    final allBookings = ref.watch(localBookingsProvider);
+    // Use proper Supabase bookings table
+    final bookingsAsync = ref.watch(customerBookingsProvider);
 
-    // Upcoming tab - show only bookings with "Scheduled" status
+    return bookingsAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue),
+        ),
+      ),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading bookings',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      data: (allBookings) => _buildBookingsContent(allBookings),
+    );
+  }
+
+  Widget _buildBookingsContent(List<BookingModel> allBookings) {
+    // Upcoming tab - show only bookings with "requested" or "accepted" status
     if (_selectedTab == 0) {
-      final scheduledBookings = allBookings.where((booking) => booking.status == 'Scheduled').toList();
+      final scheduledBookings = allBookings.where((booking) => 
+        booking.status == 'requested' || 
+        booking.status == 'accepted' ||
+        booking.status == 'scheduled'
+      ).toList();
 
       if (scheduledBookings.isEmpty) {
         return Center(
@@ -145,22 +186,26 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
           final booking = scheduledBookings[index];
           return _BookingCard(
             bookingId: booking.id,
-            icon: booking.icon,
-            status: 'Requesting',
+            icon: '📱',
+            status: 'Scheduled',
             statusColor: const Color(0xFFFF9800), // Orange for Scheduled
-            deviceName: booking.deviceName,
-            serviceName: booking.serviceName,
-            date: booking.date,
-            time: booking.time,
-            location: booking.location,
-            technician: booking.technician,
-            total: booking.total,
-            customerName: booking.customerName,
-            moreDetails: booking.moreDetails,
-            technicianNotes: booking.technicianNotes,
-            promoCode: booking.promoCode,
-            discountAmount: booking.discountAmount,
-            originalPrice: booking.originalPrice,
+            deviceName: 'Service',
+            serviceName: 'Repair Service',
+            date: booking.scheduledDate != null 
+                ? '${booking.scheduledDate!.month}/${booking.scheduledDate!.day}/${booking.scheduledDate!.year}'
+                : 'TBD',
+            time: booking.scheduledDate != null
+                ? '${booking.scheduledDate!.hour > 12 ? booking.scheduledDate!.hour - 12 : booking.scheduledDate!.hour}:${booking.scheduledDate!.minute.toString().padLeft(2, '0')} ${booking.scheduledDate!.hour >= 12 ? 'PM' : 'AM'}'
+                : 'TBD',
+            location: booking.customerAddress ?? 'N/A',
+            technician: 'Technician',
+            total: '₱${booking.finalCost?.toStringAsFixed(2) ?? booking.estimatedCost?.toStringAsFixed(2) ?? '0.00'}',
+            customerName: 'Customer',
+            moreDetails: booking.diagnosticNotes,
+            technicianNotes: null,
+            promoCode: null,
+            discountAmount: null,
+            originalPrice: null,
           );
         },
       );
@@ -168,7 +213,7 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
 
     // Active tab - show in progress bookings
     if (_selectedTab == 1) {
-      final activeBookings = allBookings.where((booking) => booking.status == 'In Progress').toList();
+      final activeBookings = allBookings.where((booking) => booking.status == 'in_progress').toList();
 
       // Build list of widgets
       final activeWidgets = <Widget>[];
@@ -178,22 +223,26 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         activeWidgets.add(
           _BookingCard(
             bookingId: booking.id,
-            icon: booking.icon,
-            status: booking.status,
+            icon: '📱',
+            status: 'In Progress',
             statusColor: AppTheme.lightBlue,
-            deviceName: booking.deviceName,
-            serviceName: booking.serviceName,
-            date: booking.date,
-            time: booking.time,
-            location: booking.location,
-            technician: booking.technician,
-            total: booking.total,
-            customerName: booking.customerName,
-            moreDetails: booking.moreDetails,
-            technicianNotes: booking.technicianNotes,
-            promoCode: booking.promoCode,
-            discountAmount: booking.discountAmount,
-            originalPrice: booking.originalPrice,
+            deviceName: 'Service',
+            serviceName: 'Repair Service',
+            date: booking.scheduledDate != null 
+                ? '${booking.scheduledDate!.month}/${booking.scheduledDate!.day}/${booking.scheduledDate!.year}'
+                : 'TBD',
+            time: booking.scheduledDate != null
+                ? '${booking.scheduledDate!.hour > 12 ? booking.scheduledDate!.hour - 12 : booking.scheduledDate!.hour}:${booking.scheduledDate!.minute.toString().padLeft(2, '0')} ${booking.scheduledDate!.hour >= 12 ? 'PM' : 'AM'}'
+                : 'TBD',
+            location: booking.customerAddress ?? 'N/A',
+            technician: 'Technician',
+            total: '₱${booking.finalCost?.toStringAsFixed(2) ?? booking.estimatedCost?.toStringAsFixed(2) ?? '0.00'}',
+            customerName: 'Customer',
+            moreDetails: booking.diagnosticNotes,
+            technicianNotes: null,
+            promoCode: null,
+            discountAmount: null,
+            originalPrice: null,
           ),
         );
         activeWidgets.add(const SizedBox(height: 16));
@@ -237,27 +286,36 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       final completedWidgets = <Widget>[];
 
       // Add completed bookings from provider
-      for (var booking in allBookings.where((b) => b.status == 'Completed')) {
+      for (var booking in allBookings.where((b) => b.status == 'completed')) {
+        // Calculate points earned (1 point per ₱50 spent)
+        final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
+        final points = (amount / 50).floor();
+
         completedWidgets.add(
           _BookingCard(
             bookingId: booking.id,
-            icon: booking.icon,
+            icon: '📱',
             status: 'Completed',
             statusColor: Colors.green,
-            deviceName: booking.deviceName,
-            serviceName: booking.serviceName,
-            date: booking.date,
-            time: booking.time,
-            location: booking.location,
-            technician: booking.technician,
-            total: booking.total,
-            customerName: booking.customerName,
+            deviceName: 'Service',
+            serviceName: 'Repair Service',
+            date: booking.scheduledDate != null 
+                ? '${booking.scheduledDate!.month}/${booking.scheduledDate!.day}/${booking.scheduledDate!.year}'
+                : 'TBD',
+            time: booking.scheduledDate != null
+                ? '${booking.scheduledDate!.hour > 12 ? booking.scheduledDate!.hour - 12 : booking.scheduledDate!.hour}:${booking.scheduledDate!.minute.toString().padLeft(2, '0')} ${booking.scheduledDate!.hour >= 12 ? 'PM' : 'AM'}'
+                : 'TBD',
+            location: booking.customerAddress ?? 'N/A',
+            technician: 'Technician',
+            total: '₱${booking.finalCost?.toStringAsFixed(2) ?? booking.estimatedCost?.toStringAsFixed(2) ?? '0.00'}',
+            customerName: 'Customer',
             showBookAgain: true,
-            moreDetails: booking.moreDetails,
-            technicianNotes: booking.technicianNotes,
-            promoCode: booking.promoCode,
-            discountAmount: booking.discountAmount,
-            originalPrice: booking.originalPrice,
+            moreDetails: booking.diagnosticNotes,
+            technicianNotes: null,
+            promoCode: null,
+            discountAmount: null,
+            originalPrice: null,
+            pointsEarned: points > 0 ? points : null,
           ),
         );
         completedWidgets.add(const SizedBox(height: 16));
@@ -304,17 +362,23 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       Color statusColor;
       String displayStatus;
       switch (booking.status) {
-        case 'Scheduled':
+        case 'requested':
+        case 'accepted':
+        case 'scheduled':
           statusColor = const Color(0xFFFF9800); // Orange
-          displayStatus = 'Requesting';
+          displayStatus = 'Scheduled';
           break;
-        case 'In Progress':
+        case 'in_progress':
           statusColor = AppTheme.lightBlue;
           displayStatus = 'In Progress';
           break;
-        case 'Completed':
+        case 'completed':
           statusColor = Colors.green;
           displayStatus = 'Completed';
+          break;
+        case 'cancelled':
+          statusColor = Colors.red;
+          displayStatus = 'Cancelled';
           break;
         default:
           statusColor = Colors.grey;
@@ -324,22 +388,26 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       allBookingsWidgets.add(
         _BookingCard(
           bookingId: booking.id,
-          icon: booking.icon,
+          icon: '📱',
           status: displayStatus,
           statusColor: statusColor,
-          deviceName: booking.deviceName,
-          serviceName: booking.serviceName,
-          date: booking.date,
-          time: booking.time,
-          location: booking.location,
-          technician: booking.technician,
-          total: booking.total,
-          customerName: booking.customerName,
-          moreDetails: booking.moreDetails,
-          technicianNotes: booking.technicianNotes,
-          promoCode: booking.promoCode,
-          discountAmount: booking.discountAmount,
-          originalPrice: booking.originalPrice,
+          deviceName: 'Service',
+          serviceName: 'Repair Service',
+          date: booking.scheduledDate != null 
+              ? '${booking.scheduledDate!.month}/${booking.scheduledDate!.day}/${booking.scheduledDate!.year}'
+              : 'TBD',
+          time: booking.scheduledDate != null
+              ? '${booking.scheduledDate!.hour > 12 ? booking.scheduledDate!.hour - 12 : booking.scheduledDate!.hour}:${booking.scheduledDate!.minute.toString().padLeft(2, '0')} ${booking.scheduledDate!.hour >= 12 ? 'PM' : 'AM'}'
+              : 'TBD',
+          location: booking.customerAddress ?? 'N/A',
+          technician: 'Technician',
+          total: '₱${booking.finalCost?.toStringAsFixed(2) ?? booking.estimatedCost?.toStringAsFixed(2) ?? '0.00'}',
+          customerName: 'Customer',
+          moreDetails: booking.diagnosticNotes,
+          technicianNotes: null,
+          promoCode: null,
+          discountAmount: null,
+          originalPrice: null,
         ),
       );
       allBookingsWidgets.add(const SizedBox(height: 16));
@@ -407,6 +475,7 @@ class _BookingCard extends ConsumerWidget {
   final String? promoCode;
   final String? discountAmount;
   final String? originalPrice;
+  final int? pointsEarned; // Reward points earned for this booking
 
   const _BookingCard({
     required this.bookingId,
@@ -427,6 +496,7 @@ class _BookingCard extends ConsumerWidget {
     this.promoCode,
     this.discountAmount,
     this.originalPrice,
+    this.pointsEarned,
   });
 
   @override
@@ -639,6 +709,43 @@ class _BookingCard extends ConsumerWidget {
               ),
             ],
           ),
+          // Show points earned for completed bookings
+          if (pointsEarned != null && pointsEarned! > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star, size: 18, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(
+                    '+$pointsEarned Reward Points Earned!',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (showBookAgain) ...[
             const SizedBox(height: 16),
             Row(

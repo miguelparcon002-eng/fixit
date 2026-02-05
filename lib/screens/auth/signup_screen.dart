@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,8 @@ import '../../providers/auth_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/user_session_service.dart';
+import 'terms_conditions_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
@@ -311,24 +314,44 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                         child: Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: RichText(
-                            text: const TextSpan(
-                              style: TextStyle(color: Colors.black, fontSize: 13),
+                            text: TextSpan(
+                              style: const TextStyle(color: Colors.black, fontSize: 13),
                               children: [
-                                TextSpan(text: 'By signing up you have read and agreed to our '),
+                                const TextSpan(text: 'By signing up you have read and agreed to our '),
                                 TextSpan(
-                                  text: 'Terms and Condition',
-                                  style: TextStyle(
+                                  text: 'Terms and Conditions',
+                                  style: const TextStyle(
                                     color: AppTheme.deepBlue,
                                     decoration: TextDecoration.underline,
+                                    fontWeight: FontWeight.w600,
                                   ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const TermsConditionsScreen(),
+                                        ),
+                                      );
+                                    },
                                 ),
-                                TextSpan(text: ' and '),
+                                const TextSpan(text: ' and '),
                                 TextSpan(
-                                  text: 'Privacy and policy',
-                                  style: TextStyle(
+                                  text: 'Privacy Policy',
+                                  style: const TextStyle(
                                     color: AppTheme.deepBlue,
                                     decoration: TextDecoration.underline,
+                                    fontWeight: FontWeight.w600,
                                   ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const PrivacyPolicyScreen(),
+                                        ),
+                                      );
+                                    },
                                 ),
                               ],
                             ),
