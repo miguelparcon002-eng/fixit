@@ -270,12 +270,21 @@ class BookingService {
   }
 
   Stream<List<BookingModel>> watchTechnicianBookings(String technicianId) {
+    print('🔍 BOOKING SERVICE: Starting stream for technician $technicianId');
+
     return _supabase
         .from(DBConstants.bookings)
         .stream(primaryKey: ['id'])
         .eq('technician_id', technicianId)
         .order('created_at', ascending: false)
-        .map((data) => data.map((e) => BookingModel.fromJson(e)).toList());
+        .map((data) {
+          print('🔍 BOOKING SERVICE: Received ${data.length} bookings from Supabase');
+          final bookings = data.map((e) => BookingModel.fromJson(e)).toList();
+          for (var booking in bookings) {
+            print('  📋 Booking ${booking.id}: ${booking.status}');
+          }
+          return bookings;
+        });
   }
 
   Future<void> updatePaymentStatus({

@@ -14,13 +14,26 @@ class LiveChatScreen extends ConsumerStatefulWidget {
 class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [
-    ChatMessage(
-      text: 'Hello! Welcome to FixIt Support. How can I help you today?',
-      isUser: false,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-    ),
+  final List<ChatMessage> _messages = [];
+  bool _isTyping = false;
+  bool _showQuickChats = true;
+
+  final List<String> _quickChats = [
+    'How do I book a repair?',
+    'What are your service hours?',
+    'Track my booking',
+    'Cancel my appointment',
+    'Payment methods',
+    'Technician availability',
+    'Service pricing',
+    'How to use rewards points?',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _addWelcomeMessage();
+  }
 
   @override
   void dispose() {
@@ -29,73 +42,87 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-
+  void _addWelcomeMessage() {
     setState(() {
       _messages.add(ChatMessage(
-        text: _messageController.text,
-        isUser: true,
+        text: 'Hello! Welcome to FixIT Support. How can I help you today?',
+        isUser: false,
         timestamp: DateTime.now(),
       ));
     });
+  }
 
-    final userMessage = _messageController.text;
+  Future<void> _sendMessage(String text) async {
+    if (text.trim().isEmpty) return;
+
+    setState(() {
+      _messages.add(ChatMessage(
+        text: text,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ));
+      _showQuickChats = false;
+      _isTyping = true;
+    });
+
     _messageController.clear();
+    _scrollToBottom();
 
-    // Scroll to bottom
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
+    // Simulate AI response with delay
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final response = _getAIResponse(text);
+
+    if (mounted) {
+      setState(() {
+        _messages.add(ChatMessage(
+          text: response,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        _isTyping = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  String _getAIResponse(String message) {
+    final msg = message.toLowerCase();
+
+    if (msg.contains('book') || msg.contains('appointment') || msg.contains('schedule')) {
+      return 'To book a repair service:\n\n1. Go to the Home screen\n2. Choose your service type (Emergency, Same Day, or Scheduled)\n3. Select your device and issue\n4. Pick a convenient time slot\n5. Confirm your booking\n\nWould you like me to guide you through the booking process?';
+    } else if (msg.contains('hours') || msg.contains('time') || msg.contains('available')) {
+      return 'Our service hours are:\n\n📍 Regular Support: 8:00 AM - 10:00 PM (Daily)\n🚨 Emergency Service: 24/7 Available\n💬 Live Chat: 24/7 Available\n\nIs there anything specific you\'d like to know?';
+    } else if (msg.contains('track') || msg.contains('status') || msg.contains('where')) {
+      return 'To track your booking:\n\n1. Go to "My Appointments" from the bottom navigation\n2. Select your active booking\n3. View real-time status and technician location\n\nYou can also enable push notifications for instant updates. Would you like help with anything else?';
+    } else if (msg.contains('cancel') || msg.contains('reschedule')) {
+      return 'To cancel or reschedule:\n\n1. Go to "My Appointments"\n2. Select the booking\n3. Tap "Cancel" or "Reschedule"\n\n⚠️ Note: Cancellations within 2 hours may incur a fee.\n\nNeed help with a specific booking?';
+    } else if (msg.contains('payment') || msg.contains('pay') || msg.contains('cost')) {
+      return 'We accept:\n\n💳 Credit/Debit Cards (Visa, Mastercard)\n📱 Digital Wallets (GCash, Maya)\n💵 Cash (on-site repairs)\n\nPayment is processed after service completion. You\'ll receive a detailed invoice via email.\n\nAny other questions about payments?';
+    } else if (msg.contains('price') || msg.contains('pricing') || msg.contains('how much')) {
+      return 'Our pricing varies by service:\n\n💡 Diagnostics: ₱300-800\n⚡ Emergency Repair: ₱500+ (depends on issue)\n🔧 Hardware Upgrades: ₱1,500-5,500\n💾 Data Recovery: ₱1,000-3,000\n\nFinal cost is determined after diagnosis. All prices include parts and labor. Would you like specific service pricing?';
+    } else if (msg.contains('reward') || msg.contains('point') || msg.contains('voucher')) {
+      return 'Rewards Program:\n\n⭐ Earn 1 point per ₱50 spent\n🎁 Redeem points for vouchers\n🎉 Welcome bonus: 20% off first service\n\nTo use your rewards:\n1. Go to Rewards section\n2. Redeem points for vouchers\n3. Apply during checkout\n\nCurrent vouchers expire in 30 days. Check your rewards balance in the app!';
+    } else if (msg.contains('technician') || msg.contains('who') || msg.contains('qualified')) {
+      return 'All our technicians are:\n\n✅ Certified professionals\n✅ Background verified\n✅ Rated by customers\n✅ Insured for your protection\n\nYou can view technician profiles, ratings, and reviews before booking. Would you like to know more about our verification process?';
+    } else if (msg.contains('thank') || msg.contains('thanks')) {
+      return 'You\'re welcome! 😊 Is there anything else I can help you with today?';
+    } else if (msg.contains('hi') || msg.contains('hello') || msg.contains('hey')) {
+      return 'Hello! How can I assist you with your repair needs today?';
+    } else {
+      return 'Thank you for your question! I\'m here to help with:\n\n• Booking repairs\n• Tracking appointments\n• Payment inquiries\n• Service pricing\n• Rewards & vouchers\n• Technical support\n\nCould you please provide more details about what you need help with?';
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(const Duration(milliseconds: 100), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      }
-    });
-
-    // Simulate support response
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        _messages.add(ChatMessage(
-          text: _getAutoResponse(userMessage),
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
       });
-
-      // Scroll to bottom after response
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    });
-  }
-
-  String _getAutoResponse(String message) {
-    final lowerMessage = message.toLowerCase();
-
-    if (lowerMessage.contains('book') || lowerMessage.contains('appointment')) {
-      return 'To book an appointment, please go to the home screen and select the service you need. Would you like me to guide you through the process?';
-    } else if (lowerMessage.contains('price') || lowerMessage.contains('cost')) {
-      return 'Our pricing varies depending on the service and device type. Could you tell me what device needs repair?';
-    } else if (lowerMessage.contains('cancel') || lowerMessage.contains('reschedule')) {
-      return 'You can cancel or reschedule your booking from the Bookings screen. Would you like help with that?';
-    } else if (lowerMessage.contains('technician')) {
-      return 'All our technicians are certified professionals with verified ratings. You can view their profiles before booking.';
-    } else if (lowerMessage.contains('payment')) {
-      return 'We accept all major credit cards, debit cards, and digital wallets. You can manage payment methods in your profile settings.';
-    } else if (lowerMessage.contains('hello') || lowerMessage.contains('hi')) {
-      return 'Hello! How can I assist you with your device repair needs today?';
-    } else if (lowerMessage.contains('thank')) {
-      return 'You\'re welcome! Is there anything else I can help you with?';
-    } else {
-      return 'I understand. Let me connect you with a support agent who can better assist you. Please wait a moment...';
     }
   }
 
@@ -199,13 +226,48 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == _messages.length && _isTyping) {
+                  return _buildTypingIndicator();
+                }
                 final message = _messages[index];
                 return _MessageBubble(message: message);
               },
             ),
           ),
+
+          // Quick chat options
+          if (_showQuickChats && _messages.length <= 1)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quick Questions',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _quickChats.map((chat) {
+                      return _QuickChatChip(
+                        label: chat,
+                        onTap: () => _sendMessage(chat),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
           // Input Area
           Container(
             decoration: BoxDecoration(
@@ -322,7 +384,7 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
                         ),
                         maxLines: null,
                         textCapitalization: TextCapitalization.sentences,
-                        onSubmitted: (_) => _sendMessage(),
+                        onSubmitted: (text) => _sendMessage(text),
                       ),
                     ),
                   ),
@@ -337,7 +399,7 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                      onPressed: _sendMessage,
+                      onPressed: () => _sendMessage(_messageController.text),
                       padding: EdgeInsets.zero,
                     ),
                   ),
@@ -346,6 +408,32 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16).copyWith(
+            bottomLeft: const Radius.circular(4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _TypingDot(delay: 0),
+            const SizedBox(width: 4),
+            _TypingDot(delay: 200),
+            const SizedBox(width: 4),
+            _TypingDot(delay: 400),
+          ],
+        ),
       ),
     );
   }
@@ -504,6 +592,93 @@ class _AttachmentOption extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickChatChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickChatChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppTheme.deepBlue, width: 1.5),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.deepBlue,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypingDot extends StatefulWidget {
+  final int delay;
+
+  const _TypingDot({required this.delay});
+
+  @override
+  State<_TypingDot> createState() => _TypingDotState();
+}
+
+class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: Colors.grey[400],
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }

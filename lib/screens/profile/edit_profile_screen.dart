@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../services/image_upload_service.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -21,7 +21,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _phoneController;
 
   bool _isLoading = false;
-  File? _profileImage;
+  String? _webImagePath; // Profile image URL from Supabase
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -51,9 +51,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           if (_emailController.text.isEmpty) _emailController.text = profile.email;
           if (_phoneController.text.isEmpty) _phoneController.text = profile.phone;
 
-          // Load profile image if available
+          // Load profile image URL if available
           if (profile.profileImagePath != null && profile.profileImagePath!.isNotEmpty) {
-            _profileImage = File(profile.profileImagePath!);
+            _webImagePath = profile.profileImagePath;
           }
         });
       });
@@ -78,31 +78,61 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
 
       if (pickedFile != null) {
-        setState(() {
-          _profileImage = File(pickedFile.path);
-        });
+        // Show loading indicator
+        setState(() => _isLoading = true);
 
-        // Save to profile provider
-        await ref.read(profileProvider.notifier).updateProfileImage(pickedFile.path);
+        // Get current user
+        final user = await ref.read(currentUserProvider.future);
+        if (user == null) {
+          throw Exception('User not found');
+        }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile picture updated!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+        // Get old image URL for cleanup
+        final oldImageUrl = user.profilePicture;
+
+        // Upload image to Supabase Storage and update database
+        final newImageUrl = await ImageUploadService.uploadAndSaveProfileImage(
+          userId: user.id,
+          imageFile: pickedFile,
+          oldImageUrl: oldImageUrl,
+        );
+
+        if (newImageUrl != null) {
+          setState(() {
+            _webImagePath = newImageUrl;
+          });
+
+          // Update profile provider with the new URL
+          await ref.read(profileProvider.notifier).updateProfileImage(newImageUrl);
+
+          // Refresh user data to get the updated profile picture
+          ref.invalidate(currentUserProvider);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile picture uploaded successfully!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Failed to upload image');
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error picking image: $e'),
+            content: Text('Error uploading image: $e'),
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -214,24 +244,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         CircleAvatar(
                           radius: 60,
                           backgroundColor: Colors.grey[300],
-                          backgroundImage: _profileImage != null
-                              ? FileImage(_profileImage!)
-                              : null,
-                          child: _profileImage == null
-                              ? Text(
-                                  user.fullName
-                                      .split(' ')
-                                      .map((n) => n[0])
-                                      .take(2)
-                                      .join()
-                                      .toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black,
-                                  ),
-                                )
-                              : null,
+                          child: _buildProfileImage(user),
                         ),
                         Positioned(
                           bottom: 0,
@@ -385,6 +398,51 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
+      ),
+    );
+  }
+
+  Widget _buildProfileImage(dynamic user) {
+    // Get image URL from user profile or local state
+    final imageUrl = _webImagePath ?? user.profilePicture;
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      // Show image from URL (Supabase Storage)
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: 120,
+          height: 120,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return _buildInitials(user.fullName);
+          },
+        ),
+      );
+    } else {
+      // Show initials as fallback
+      return _buildInitials(user.fullName);
+    }
+  }
+
+  Widget _buildInitials(String fullName) {
+    return Text(
+      fullName
+          .split(' ')
+          .map((n) => n.isNotEmpty ? n[0] : '')
+          .take(2)
+          .join()
+          .toUpperCase(),
+      style: const TextStyle(
+        fontSize: 36,
+        fontWeight: FontWeight.w700,
+        color: Colors.black,
       ),
     );
   }

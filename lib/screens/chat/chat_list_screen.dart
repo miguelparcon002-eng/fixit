@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 
@@ -159,10 +160,17 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         subtitle: 'Speak with a technician',
                         statusText: '24/7 Available',
                         statusColor: AppTheme.lightBlue,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Calling support...')),
-                          );
+                        onTap: () async {
+                          final Uri phoneUri = Uri(scheme: 'tel', path: '+639171234567');
+                          if (await canLaunchUrl(phoneUri)) {
+                            await launchUrl(phoneUri);
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not open dialer')),
+                              );
+                            }
+                          }
                         },
                       ),
                     if (_matchesSearch('Call Support') || _matchesSearch('Phone') || _matchesSearch('Call') || _matchesSearch('technician'))
@@ -176,10 +184,36 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         subtitle: 'Send us your questions',
                         statusText: 'Response in 2 hrs',
                         statusColor: Colors.purple,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Opening email...')),
+                        onTap: () async {
+                          final Uri emailUri = Uri(
+                            scheme: 'mailto',
+                            path: 'support@fixit.com',
+                            queryParameters: {'subject': 'FixIT Support Request'},
                           );
+                          if (await canLaunchUrl(emailUri)) {
+                            await launchUrl(emailUri);
+                          } else {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not open email client')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                    if (_matchesSearch('Email Support') || _matchesSearch('Email') || _matchesSearch('questions'))
+                      const SizedBox(height: 12),
+                    if (_matchesSearch('Help Center') || _matchesSearch('Help') || _matchesSearch('FAQs') || _matchesSearch('guides'))
+                      _ContactOption(
+                        icon: Icons.help_center,
+                        iconColor: Colors.orange,
+                        iconBgColor: Colors.orange.withValues(alpha: 0.15),
+                        title: 'Help Center',
+                        subtitle: 'Browse FAQs and guides',
+                        statusText: 'Explore Resources',
+                        statusColor: Colors.orange,
+                        onTap: () {
+                          context.push('/help-support');
                         },
                       ),
                   ],

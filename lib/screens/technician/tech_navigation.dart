@@ -18,8 +18,15 @@ class TechNavigation extends ConsumerStatefulWidget {
 }
 
 class _TechNavigationState extends ConsumerState<TechNavigation> {
-  int _currentIndex = 0;
   bool _dialogShown = false;
+
+  int _getIndexFromRoute(String location) {
+    if (location.startsWith('/tech-home')) return 0;
+    if (location.startsWith('/tech-jobs')) return 1;
+    if (location.startsWith('/tech-earnings')) return 2;
+    if (location.startsWith('/tech-profile')) return 3;
+    return 0;
+  }
 
   void _showVerificationDialog(UserModel user) {
     // Prevent showing multiple dialogs
@@ -134,6 +141,10 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
       }
     });
     
+    // Get current index from route
+    final currentLocation = GoRouterState.of(context).uri.toString();
+    final currentIndex = _getIndexFromRoute(currentLocation);
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
@@ -155,36 +166,32 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                 _NavItem(
                   icon: Icons.dashboard,
                   label: 'Dashboard',
-                  isSelected: _currentIndex == 0,
+                  isSelected: currentIndex == 0,
                   onTap: () {
-                    setState(() => _currentIndex = 0);
                     context.go('/tech-home');
                   },
                 ),
                 _NavItem(
                   icon: Icons.work_outline,
                   label: 'Jobs',
-                  isSelected: _currentIndex == 1,
+                  isSelected: currentIndex == 1,
                   onTap: () {
-                    setState(() => _currentIndex = 1);
                     context.go('/tech-jobs');
                   },
                 ),
                 _NavItem(
                   icon: Icons.attach_money,
                   label: 'Earnings',
-                  isSelected: _currentIndex == 2,
+                  isSelected: currentIndex == 2,
                   onTap: () {
-                    setState(() => _currentIndex = 2);
                     context.go('/tech-earnings');
                   },
                 ),
                 _NavItem(
                   icon: Icons.person_outline,
                   label: 'Profile',
-                  isSelected: _currentIndex == 3,
+                  isSelected: currentIndex == 3,
                   onTap: () {
-                    setState(() => _currentIndex = 3);
                     context.go('/tech-profile');
                   },
                 ),

@@ -29,7 +29,7 @@ void main() async {
 ///
 /// ONE-TIME FIX: Set this to true to clear all old local bookings
 /// After running once with this true, set it back to false
-const bool clearOldLocalStorage = true;
+const bool clearOldLocalStorage = false;
 
 Future<void> _checkAndMigrateBookings() async {
   try {

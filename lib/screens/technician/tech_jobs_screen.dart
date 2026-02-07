@@ -236,9 +236,9 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
 
     return bookingsAsync.when(
       data: (bookings) {
-        // Filter bookings with "Scheduled" status
+        // Filter bookings with "requested" or "accepted" status (these are the job requests)
         final techBookings = bookings.where((booking) =>
-          booking.status == 'Scheduled'
+          booking.status == 'requested' || booking.status == 'accepted'
         ).toList();
 
         if (techBookings.isEmpty) {
@@ -288,9 +288,9 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
           print('    Original: ${booking.originalPrice}, Final: ${booking.finalCost}');
         }
 
-        // Filter bookings with "In Progress" status
+        // Filter bookings with "in_progress" status
         final activeBookings = bookings.where((booking) =>
-          booking.status == 'In Progress'
+          booking.status == 'in_progress'
         ).toList();
 
         if (activeBookings.isEmpty) {
@@ -332,9 +332,9 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
 
     return bookingsAsync.when(
       data: (bookings) {
-        // Filter bookings with "Completed" status
+        // Filter bookings with "completed" status
         final completedBookings = bookings.where((booking) =>
-          booking.status == 'Completed'
+          booking.status == 'completed'
         ).toList();
 
         if (completedBookings.isEmpty) {
@@ -400,11 +400,11 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
           itemBuilder: (context, index) {
             final booking = bookings[index];
             // Show different card based on status
-            if (booking.status == 'Scheduled') {
+            if (booking.status == 'requested' || booking.status == 'accepted') {
               return _RequestJobCard(booking: booking);
-            } else if (booking.status == 'In Progress') {
+            } else if (booking.status == 'in_progress') {
               return _ActiveJobCard(booking: booking);
-            } else if (booking.status == 'Completed') {
+            } else if (booking.status == 'completed') {
               return _CompletedJobCard(booking: booking);
             }
             // Default fallback
@@ -1176,6 +1176,7 @@ class _ActiveJobCard extends ConsumerWidget {
                         GestureDetector(
                           onTap: () {
                             // Show dialog to add additional charges or details
+                            print('🟡 EDIT BUTTON CLICKED for booking: ${booking.id}');
                             _showEditBookingDialog(context, ref, booking);
                           },
                           child: Container(

@@ -66,10 +66,9 @@ class UserSessionService {
       // Reload rewards (points are auto-calculated from Supabase bookings)
       _ref.invalidate(rewardPointsProvider);
       _ref.invalidate(redeemedVouchersProvider);
+      _ref.invalidate(unusedVouchersProvider);
 
-      // Reload vouchers
-      _ref.invalidate(validVouchersProvider);
-      _ref.invalidate(vouchersProvider);
+      // Reload profile setup status
       _ref.invalidate(profileSetupCompleteProvider);
 
       // Reload earnings (for technicians) - invalidate to recalculate from bookings
@@ -103,12 +102,10 @@ class UserSessionService {
     // Invalidate rewards
     _ref.invalidate(rewardPointsProvider);
     _ref.invalidate(redeemedVouchersProvider);
+    _ref.invalidate(unusedVouchersProvider);
 
-    // Invalidate vouchers
-    _ref.invalidate(validVouchersProvider);
-    _ref.invalidate(vouchersProvider);
+    // Invalidate profile setup status
     _ref.invalidate(profileSetupCompleteProvider);
-    _ref.invalidate(voucherNotifierProvider);
 
     // Invalidate earnings
     _ref.invalidate(todayEarningsProvider);

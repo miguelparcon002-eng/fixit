@@ -50,14 +50,14 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
     try {
       final data = await _profileService.loadProfileData();
       final specialties = await _profileService.loadSpecialties();
-      final profileImagePath = await _profileService.loadProfileImagePath();
+      final profileImageUrl = await _profileService.loadProfileImageUrl();
       state = AsyncValue.data(ProfileData(
         email: data['email']!,
         phone: data['phone']!,
         location: data['location']!,
         memberSince: data['memberSince']!,
         specialties: specialties,
-        profileImagePath: profileImagePath,
+        profileImagePath: profileImageUrl,
       ));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -100,18 +100,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
     }
   }
 
-  Future<void> updateMemberSince(String memberSince) async {
-    final currentData = state.value;
-    if (currentData == null) return;
-
-    try {
-      await _profileService.updateMemberSince(memberSince);
-      state = AsyncValue.data(currentData.copyWith(memberSince: memberSince));
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
-    }
-  }
-
   Future<void> updateSpecialties(List<String> specialties) async {
     final currentData = state.value;
     if (currentData == null) return;
@@ -135,13 +123,13 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
     await _loadProfile();
   }
 
-  Future<void> updateProfileImage(String imagePath) async {
+  Future<void> updateProfileImage(String imageUrl) async {
     final currentData = state.value;
     if (currentData == null) return;
 
     try {
-      await _profileService.updateProfileImagePath(imagePath);
-      state = AsyncValue.data(currentData.copyWith(profileImagePath: imagePath));
+      await _profileService.updateProfileImageUrl(imageUrl);
+      state = AsyncValue.data(currentData.copyWith(profileImagePath: imageUrl));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

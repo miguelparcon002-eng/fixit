@@ -4,7 +4,12 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+
+// Provider for the initial tab to show in jobs screen
+// 0 = Request, 1 = Active, 2 = Complete, 3 = All
+final techJobsInitialTabProvider = StateProvider<int>((ref) => 0);
 
 class TechJobsScreenNew extends ConsumerStatefulWidget {
   const TechJobsScreenNew({super.key});
@@ -14,98 +19,207 @@ class TechJobsScreenNew extends ConsumerStatefulWidget {
 }
 
 class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
-  int _selectedTab = 0; // 0 = Requested, 1 = Accepted, 2 = In Progress, 3 = Completed
+  int _selectedTab = 0; // 0 = Request, 1 = Active, 2 = Complete, 3 = All
 
   @override
   Widget build(BuildContext context) {
+    final userAsync = ref.watch(currentUserProvider);
+
+    // Watch the tab provider and update when it changes
+    final providerTab = ref.watch(techJobsInitialTabProvider);
+    if (providerTab != 0 && providerTab != _selectedTab) {
+      // Use post frame callback to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedTab = providerTab;
+          });
+          // Reset the provider after switching
+          ref.read(techJobsInitialTabProvider.notifier).state = 0;
+        }
+      });
+    }
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF667eea).withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+      backgroundColor: AppTheme.deepBlue,
+      body: Column(
+        children: [
+          // Profile Header - Same as tech_home and tech_earnings
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.deepBlue, AppTheme.lightBlue],
+              ),
+            ),
+            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 12),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'FixIT Technician',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        userAsync.when(
+                          data: (user) => Text(
+                            user?.fullName ?? 'Technician',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          loading: () => const Text(
+                            'Loading...',
+                            style: TextStyle(fontSize: 14, color: Colors.white70),
+                          ),
+                          error: (_, __) => const Text(
+                            'Technician',
+                            style: TextStyle(fontSize: 14, color: Colors.white70),
+                          ),
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.work_rounded,
-                      color: Colors.white,
-                      size: 24,
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
+                          onPressed: () {},
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            child: const Text(
+                              '0',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                    userAsync.when(
+                      data: (user) => Text(
+                        user?.address ?? 'Location not set',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                      loading: () => const Text(
+                        'Loading...',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      error: (_, __) => const Text(
+                        'Location not set',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Main Content Area
+          Expanded(
+            child: Container(
+              color: AppTheme.primaryCyan,
+              child: Column(
+                children: [
+                  // Jobs Title Section
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'My Jobs',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'My Jobs',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
+                  // Tabs
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Row(
+                        children: [
+                          _TabButton(
+                            label: 'Request',
+                            isSelected: _selectedTab == 0,
+                            onTap: () => setState(() => _selectedTab = 0),
+                          ),
+                          _TabButton(
+                            label: 'Active',
+                            isSelected: _selectedTab == 1,
+                            onTap: () => setState(() => _selectedTab = 1),
+                          ),
+                          _TabButton(
+                            label: 'Complete',
+                            isSelected: _selectedTab == 2,
+                            onTap: () => setState(() => _selectedTab = 2),
+                          ),
+                          _TabButton(
+                            label: 'All',
+                            isSelected: _selectedTab == 3,
+                            onTap: () => setState(() => _selectedTab = 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Jobs List
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildJobsList(),
                     ),
                   ),
                 ],
               ),
             ),
-            // Tabs
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    _TabButton(
-                      label: 'Request',
-                      isSelected: _selectedTab == 0,
-                      onTap: () => setState(() => _selectedTab = 0),
-                    ),
-                    _TabButton(
-                      label: 'Active',
-                      isSelected: _selectedTab == 1,
-                      onTap: () => setState(() => _selectedTab = 1),
-                    ),
-                    _TabButton(
-                      label: 'Complete',
-                      isSelected: _selectedTab == 2,
-                      onTap: () => setState(() => _selectedTab = 2),
-                    ),
-                    _TabButton(
-                      label: 'All',
-                      isSelected: _selectedTab == 3,
-                      onTap: () => setState(() => _selectedTab = 3),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Jobs List
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildJobsList(),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -444,31 +558,28 @@ class _JobCard extends ConsumerWidget {
         ],
       );
     }
-    // Request tab - For accepted jobs, show Start Job button
-    else if (selectedTab == 0 && booking.status == 'accepted') {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () => _startJob(context, ref, bookingService),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.deepBlue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: const Text(
-            'Start Job',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-        ),
-      );
-    }
-    // Active tab (1) - Call, Edit, Mark Complete buttons
+    // Active tab (1) - Navigate, Call, Edit, Mark Complete buttons
     else if (selectedTab == 1) {
       return Row(
         children: [
+          // Navigate button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.purple.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              onPressed: () {
+                // TODO: Implement map navigation
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Navigation feature coming soon')),
+                );
+              },
+              icon: const Icon(Icons.navigation, color: Colors.purple, size: 24),
+              padding: const EdgeInsets.all(10),
+            ),
+          ),
+          const SizedBox(width: 8),
           // Call button
           Container(
             decoration: BoxDecoration(
@@ -554,18 +665,22 @@ class _JobCard extends ConsumerWidget {
 
   Future<void> _acceptJob(BuildContext context, WidgetRef ref, BookingService bookingService) async {
     try {
+      // Accept and start job immediately (set to in_progress)
       await bookingService.updateBookingStatus(
         bookingId: booking.id,
-        status: 'accepted',
+        status: 'in_progress',
       );
 
       // Force refresh the technician bookings to show updated status immediately
       ref.invalidate(technicianBookingsProvider);
 
+      // Switch to Active tab (index 1)
+      ref.read(techJobsInitialTabProvider.notifier).state = 1;
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Job accepted successfully!'),
+            content: Text('Job accepted and started!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -633,36 +748,6 @@ class _JobCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _startJob(BuildContext context, WidgetRef ref, BookingService bookingService) async {
-    try {
-      await bookingService.updateBookingStatus(
-        bookingId: booking.id,
-        status: 'in_progress',
-      );
-
-      // Force refresh the technician bookings to move job to Active tab immediately
-      ref.invalidate(technicianBookingsProvider);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Job started!'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to start job: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Future<void> _completeJob(BuildContext context, WidgetRef ref, BookingService bookingService) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -715,7 +800,17 @@ class _JobCard extends ConsumerWidget {
   }
 
   Future<void> _editBookingDetails(BuildContext context, WidgetRef ref, BookingService bookingService) async {
-    final notesController = TextEditingController(text: booking.diagnosticNotes ?? '');
+    // DEBUG: Print booking details
+    print('🔍 EDIT DIALOG OPENED (tech_jobs_screen_new.dart):');
+    print('  Booking ID: ${booking.id}');
+    print('  Promo Code: ${booking.promoCode}');
+    print('  Discount: ${booking.discountAmount}');
+    print('  Original Price: ${booking.originalPrice}');
+    print('  Final Cost: ${booking.finalCost}');
+    print('  Customer Details: ${booking.moreDetails}');
+
+    // Start with empty notes - technician adds NEW notes each time
+    final notesController = TextEditingController(text: '');
     final priceController = TextEditingController();
 
     // Get current cost information
@@ -739,6 +834,36 @@ class _JobCard extends ConsumerWidget {
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 12),
+              // Show customer's original notes if they exist
+              if (booking.moreDetails != null && booking.moreDetails!.isNotEmpty) ...[
+                const Text(
+                  'Customer Notes',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryCyan.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.primaryCyan.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: AppTheme.deepBlue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          booking.moreDetails!,
+                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               // Current price info
               Container(
                 padding: const EdgeInsets.all(12),
@@ -860,11 +985,19 @@ class _JobCard extends ConsumerWidget {
       // Only update if there's something to update
       if ((notes != null && notes.isNotEmpty) || priceAdjustment != null) {
         try {
-          await bookingService.updateBookingDetails(
+          print('💾 SAVING BOOKING UPDATE:');
+          print('  Booking ID: ${booking.id}');
+          print('  Technician Notes: $notes');
+          print('  Price Adjustment: $priceAdjustment');
+
+          // Use addTechnicianNotes to preserve customer details and maintain discount
+          await bookingService.addTechnicianNotes(
             bookingId: booking.id,
-            technicianNotes: notes,
+            technicianNotes: notes ?? '',
             priceAdjustment: priceAdjustment,
           );
+
+          print('✅ BOOKING SAVED SUCCESSFULLY');
 
           // Force refresh the technician bookings
           ref.invalidate(technicianBookingsProvider);
@@ -878,6 +1011,7 @@ class _JobCard extends ConsumerWidget {
             );
           }
         } catch (e) {
+          print('❌ SAVE FAILED: $e');
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

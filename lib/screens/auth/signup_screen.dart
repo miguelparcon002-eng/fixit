@@ -92,11 +92,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
               AppTheme.primaryCyan,
               AppTheme.darkCyan,
+              Color(0xFF006B8F),
             ],
           ),
         ),
@@ -108,134 +109,192 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
-                  // Heading
-                  const Text(
-                    'Create an Account',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Sign up to new account',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.black87,
-                    ),
-                  ),
                   const SizedBox(height: 40),
-                  // Role selection
-                  const Text(
-                    'I am a:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
+                  // Heading card
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Column(
+                      children: [
+                        Text(
+                          'Create Account',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Join us today!',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedRole = AppConstants.roleCustomer),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: _selectedRole == AppConstants.roleCustomer ? AppTheme.deepBlue : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _selectedRole == AppConstants.roleCustomer ? AppTheme.deepBlue : Colors.black,
-                                width: 2,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 32,
-                                  color: _selectedRole == AppConstants.roleCustomer ? Colors.white : Colors.black,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Customer',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _selectedRole == AppConstants.roleCustomer ? Colors.white : Colors.black,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  const SizedBox(height: 30),
+                  // Role selection
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'I am a:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedRole = AppConstants.roleTechnician),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: _selectedRole == AppConstants.roleTechnician ? AppTheme.deepBlue : Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _selectedRole == AppConstants.roleTechnician ? AppTheme.deepBlue : Colors.black,
-                                width: 2,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.build,
-                                  size: 32,
-                                  color: _selectedRole == AppConstants.roleTechnician ? Colors.white : Colors.black,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Technician',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _selectedRole == AppConstants.roleTechnician ? Colors.white : Colors.black,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedRole = AppConstants.roleCustomer),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    gradient: _selectedRole == AppConstants.roleCustomer
+                                        ? const LinearGradient(
+                                            colors: [AppTheme.deepBlue, Color(0xFF0D47A1)],
+                                          )
+                                        : null,
+                                    color: _selectedRole == AppConstants.roleCustomer ? null : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _selectedRole == AppConstants.roleCustomer
+                                          ? Colors.transparent
+                                          : Colors.grey[300]!,
+                                      width: 2,
+                                    ),
+                                    boxShadow: _selectedRole == AppConstants.roleCustomer
+                                        ? [
+                                            BoxShadow(
+                                              color: AppTheme.deepBlue.withValues(alpha: 0.4),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.person_rounded,
+                                        size: 36,
+                                        color: _selectedRole == AppConstants.roleCustomer ? Colors.white : Colors.black,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Customer',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedRole == AppConstants.roleCustomer ? Colors.white : Colors.black,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedRole = AppConstants.roleTechnician),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    gradient: _selectedRole == AppConstants.roleTechnician
+                                        ? const LinearGradient(
+                                            colors: [AppTheme.deepBlue, Color(0xFF0D47A1)],
+                                          )
+                                        : null,
+                                    color: _selectedRole == AppConstants.roleTechnician ? null : Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: _selectedRole == AppConstants.roleTechnician
+                                          ? Colors.transparent
+                                          : Colors.grey[300]!,
+                                      width: 2,
+                                    ),
+                                    boxShadow: _selectedRole == AppConstants.roleTechnician
+                                        ? [
+                                            BoxShadow(
+                                              color: AppTheme.deepBlue.withValues(alpha: 0.4),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.build_rounded,
+                                        size: 36,
+                                        color: _selectedRole == AppConstants.roleTechnician ? Colors.white : Colors.black,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Technician',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedRole == AppConstants.roleTechnician ? Colors.white : Colors.black,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   // Username field
                   TextFormField(
                     controller: _fullNameController,
-                    decoration: const InputDecoration(
-                      hintText: 'Username...',
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.person_rounded, color: AppTheme.deepBlue),
+                      hintText: 'Full Name',
                       filled: true,
                       fillColor: Colors.white,
-                      border: OutlineInputBorder(
+                      border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderRadius: const BorderRadius.all(Radius.circular(16)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 2),
                       ),
-                      focusedBorder: OutlineInputBorder(
+                      focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: AppTheme.deepBlue, width: 2.5),
                       ),
-                      errorBorder: OutlineInputBorder(
+                      errorBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: Colors.red, width: 2),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     ),
                     style: const TextStyle(fontSize: 16),
                     validator: (v) => v == null || v.isEmpty ? 'Please enter your name' : null,
@@ -244,27 +303,28 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   // Email field
                   TextFormField(
                     controller: _emailController,
-                    decoration: const InputDecoration(
-                      hintText: 'Email...',
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.email_rounded, color: AppTheme.deepBlue),
+                      hintText: 'Email address',
                       filled: true,
                       fillColor: Colors.white,
-                      border: OutlineInputBorder(
+                      border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderRadius: const BorderRadius.all(Radius.circular(16)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 2),
                       ),
-                      focusedBorder: OutlineInputBorder(
+                      focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: AppTheme.deepBlue, width: 2.5),
                       ),
-                      errorBorder: OutlineInputBorder(
+                      errorBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: Colors.red, width: 2),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(fontSize: 16),
@@ -274,106 +334,138 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   // Password field
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      hintText: 'Password...',
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.deepBlue),
+                      hintText: 'Password',
                       filled: true,
                       fillColor: Colors.white,
-                      border: OutlineInputBorder(
+                      border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        borderSide: BorderSide(color: Colors.black, width: 2),
+                        borderRadius: const BorderRadius.all(Radius.circular(16)),
+                        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 2),
                       ),
-                      focusedBorder: OutlineInputBorder(
+                      focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: AppTheme.deepBlue, width: 2.5),
                       ),
-                      errorBorder: OutlineInputBorder(
+                      errorBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(16)),
                         borderSide: BorderSide(color: Colors.red, width: 2),
                       ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     ),
                     obscureText: true,
                     style: const TextStyle(fontSize: 16),
                     validator: (v) => v == null || v.isEmpty ? 'Enter password' : v.length < 6 ? 'Min 6 chars' : null,
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
                   // Terms checkbox
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Checkbox(
-                        value: true,
-                        onChanged: (v) {},
-                        activeColor: AppTheme.deepBlue,
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 2,
                       ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: RichText(
-                            text: TextSpan(
-                              style: const TextStyle(color: Colors.black, fontSize: 13),
-                              children: [
-                                const TextSpan(text: 'By signing up you have read and agreed to our '),
-                                TextSpan(
-                                  text: 'Terms and Conditions',
-                                  style: const TextStyle(
-                                    color: AppTheme.deepBlue,
-                                    decoration: TextDecoration.underline,
-                                    fontWeight: FontWeight.w600,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Checkbox(
+                            value: true,
+                            onChanged: (v) {},
+                            activeColor: AppTheme.deepBlue,
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 8, top: 12),
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                children: [
+                                  const TextSpan(text: 'By signing up you agree to our '),
+                                  TextSpan(
+                                    text: 'Terms',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      decoration: TextDecoration.underline,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const TermsConditionsScreen(),
+                                          ),
+                                        );
+                                      },
                                   ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const TermsConditionsScreen(),
-                                        ),
-                                      );
-                                    },
-                                ),
-                                const TextSpan(text: ' and '),
-                                TextSpan(
-                                  text: 'Privacy Policy',
-                                  style: const TextStyle(
-                                    color: AppTheme.deepBlue,
-                                    decoration: TextDecoration.underline,
-                                    fontWeight: FontWeight.w600,
+                                  const TextSpan(text: ' and '),
+                                  TextSpan(
+                                    text: 'Privacy Policy',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      decoration: TextDecoration.underline,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const PrivacyPolicyScreen(),
+                                          ),
+                                        );
+                                      },
                                   ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const PrivacyPolicyScreen(),
-                                        ),
-                                      );
-                                    },
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 30),
-                  // Register button
-                  SizedBox(
+                  const SizedBox(height: 24),
+                  // Register button with gradient
+                  Container(
                     width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppTheme.deepBlue, Color(0xFF0D47A1)],
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.deepBlue.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _signUp,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.deepBlue,
+                        backgroundColor: Colors.transparent,
                         foregroundColor: Colors.white,
+                        shadowColor: Colors.transparent,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        elevation: 6,
                       ),
                       child: _isLoading
                           ? const SizedBox(
@@ -384,39 +476,65 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Register',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person_add_rounded, size: 24),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Create Account',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                     ),
                   ),
-                  const SizedBox(height: 30),
-                  // Login link
-                  Column(
-                    children: [
-                      const Text(
-                        'Already have an account?',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                        ),
+                  const SizedBox(height: 24),
+                  // Login link in card
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 2,
                       ),
-                      TextButton(
-                        onPressed: () => context.go('/login'),
-                        child: const Text(
-                          'Login',
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Already have an account?',
                           style: TextStyle(
-                            color: AppTheme.deepBlue,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                    ],
+                        TextButton(
+                          onPressed: () => context.go('/login'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text(
+                            'Login',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                              decorationColor: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

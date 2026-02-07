@@ -18,8 +18,14 @@ final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
   final user = ref.watch(currentUserProvider).value;
 
-  if (user == null) return Stream.value([]);
+  print('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
 
+  if (user == null) {
+    print('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
+    return Stream.value([]);
+  }
+
+  print('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
   return bookingService.watchTechnicianBookings(user.id);
 });
 

@@ -13,6 +13,7 @@ class UserModel {
   final String? neighborhood;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final bool? profileSetupComplete;
 
   UserModel({
     required this.id,
@@ -29,6 +30,7 @@ class UserModel {
     this.neighborhood,
     required this.createdAt,
     this.updatedAt,
+    this.profileSetupComplete,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -49,6 +51,7 @@ class UserModel {
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : null,
+      profileSetupComplete: json['profile_setup_complete'] as bool?,
     );
   }
 
@@ -68,6 +71,7 @@ class UserModel {
       'neighborhood': neighborhood,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'profile_setup_complete': profileSetupComplete,
     };
   }
 
@@ -86,6 +90,7 @@ class UserModel {
     String? neighborhood,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? profileSetupComplete,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -102,6 +107,7 @@ class UserModel {
       neighborhood: neighborhood ?? this.neighborhood,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      profileSetupComplete: profileSetupComplete ?? this.profileSetupComplete,
     );
   }
 }

@@ -14,7 +14,7 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import '../../screens/profile/addresses_screen.dart';
 import '../../screens/profile/payment_method_screen.dart';
-import '../../screens/profile/notifications_screen.dart';
+import '../../screens/profile/notification_settings_screen.dart';
 import '../../screens/profile/privacy_security_screen.dart';
 import '../../screens/profile/help_support_screen.dart';
 import '../../screens/profile/live_chat_screen.dart';
@@ -149,7 +149,7 @@ class AppRouter {
       GoRoute(
         path: '/notifications',
         name: 'notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        builder: (context, state) => const NotificationSettingsScreen(),
       ),
       GoRoute(
         path: '/privacy-security',
