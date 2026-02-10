@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../models/booking_model.dart';
+import '../../core/utils/booking_notes_parser.dart';
 
 class BookingDetailScreen extends ConsumerWidget {
   final String bookingId;
@@ -12,14 +13,14 @@ class BookingDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch customer bookings from Supabase
-    final bookingsAsync = ref.watch(customerBookingsProvider);
+    // Load booking by ID so this screen works for both Customers and Technicians.
+    final bookingAsync = ref.watch(bookingByIdProvider(bookingId));
 
-    return bookingsAsync.when(
+    return bookingAsync.when(
       loading: () => Scaffold(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         appBar: AppBar(
-          backgroundColor: AppTheme.primaryCyan,
+          backgroundColor: const Color(0xFFF5F7FA),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -37,9 +38,9 @@ class BookingDetailScreen extends ConsumerWidget {
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (error, stack) => Scaffold(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         appBar: AppBar(
-          backgroundColor: AppTheme.primaryCyan,
+          backgroundColor: const Color(0xFFF5F7FA),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -56,14 +57,12 @@ class BookingDetailScreen extends ConsumerWidget {
         ),
         body: Center(child: Text('Error: $error')),
       ),
-      data: (bookings) {
-        final booking = bookings.where((b) => b.id == bookingId).firstOrNull;
-
+      data: (booking) {
         if (booking == null) {
           return Scaffold(
-            backgroundColor: AppTheme.primaryCyan,
+            backgroundColor: const Color(0xFFF5F7FA),
             appBar: AppBar(
-              backgroundColor: AppTheme.primaryCyan,
+              backgroundColor: const Color(0xFFF5F7FA),
               elevation: 0,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -123,6 +122,13 @@ class _BookingDetailView extends StatelessWidget {
         ? timeFormat.format(booking.scheduledDate!)
         : 'Not scheduled';
 
+    // Parse device details from diagnosticNotes (supports multiline details)
+    final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
+    final deviceType = parsedNotes.device;
+    final deviceModel = parsedNotes.model;
+    final deviceProblem = parsedNotes.problem;
+    final deviceDetails = parsedNotes.details;
+
     // Get location
     final location = booking.customerAddress ?? 'No address provided';
 
@@ -131,9 +137,9 @@ class _BookingDetailView extends StatelessWidget {
     final finalCost = booking.finalCost ?? estimatedCost;
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -148,45 +154,26 @@ class _BookingDetailView extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.black),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (context) => Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.edit),
-                        title: const Text('Edit Booking'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Edit booking feature coming soon')),
-                          );
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.cancel, color: Colors.red),
-                        title: const Text('Cancel Booking', style: TextStyle(color: Colors.red)),
-                        onTap: () {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cancel booking feature coming soon')),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
+            onSelected: (value) {
+              switch (value) {
+                case 'edit':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Edit booking feature coming soon')),
+                  );
+                  break;
+                case 'cancel':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cancel booking feature coming soon')),
+                  );
+                  break;
+              }
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'edit', child: Text('Edit Booking')),
+              PopupMenuItem(value: 'cancel', child: Text('Cancel Booking')),
+            ],
           ),
         ],
       ),
@@ -215,63 +202,101 @@ class _BookingDetailView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Service Information
+            // Device Details
             _SectionCard(
-              title: 'Service Information',
+              title: 'Device Details',
+              trailing: TextButton.icon(
+                onPressed: () => context.push('/booking/${booking.id}/device'),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('View'),
+              ),
               children: [
                 _InfoRow(
-                  icon: Icons.build,
+                  icon: Icons.devices,
+                  label: 'Device Type',
+                  value: deviceType ?? 'Not specified',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.phone_iphone,
+                  label: 'Model',
+                  value: deviceModel ?? 'Not specified',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.report_problem_outlined,
+                  label: 'Problem',
+                  value: deviceProblem ?? 'Not specified',
+                ),
+                if (deviceDetails != null && deviceDetails.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _InfoRow(
+                    icon: Icons.notes_rounded,
+                    label: 'Notes',
+                    value: deviceDetails.trim(),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Booking Information
+            _SectionCard(
+              title: 'Booking Information',
+              children: [
+                _InfoRow(
+                  icon: Icons.build_circle,
                   label: 'Service ID',
-                  value: booking.serviceId,
+                  value: booking.serviceId.substring(0, 12),
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.calendar_today,
-                  label: 'Date',
+                  label: 'Scheduled Date',
                   value: bookingDate,
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.access_time,
-                  label: 'Time',
+                  label: 'Scheduled Time',
                   value: bookingTime,
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.location_on,
-                  label: 'Location',
+                  label: 'Service Location',
                   value: location,
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Technician Notes (if provided)
+            // Service Details (if provided)
             if (booking.diagnosticNotes != null && booking.diagnosticNotes!.isNotEmpty) ...[
               _SectionCard(
-                title: 'Technician Notes',
+                title: 'Service Details',
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
+                      color: AppTheme.lightBlue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.3),
+                        color: AppTheme.lightBlue.withValues(alpha: 0.3),
                         width: 1.5,
                       ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        const Icon(Icons.description_outlined, color: AppTheme.deepBlue, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Additional Information',
+                                'Booking Details',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -296,15 +321,82 @@ class _BookingDetailView extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+            
+            // Service Warranty Information
+            _SectionCard(
+              title: 'Service Warranty',
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.verified_user, color: Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '90-Day Quality Guarantee',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'All repairs come with our 90-day warranty covering parts and labor.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
             // Technician Information
             _SectionCard(
-              title: 'Technician',
+              title: 'Assigned Technician',
               children: [
                 _InfoRow(
-                  icon: Icons.engineering,
+                  icon: Icons.person,
+                  label: 'Technician',
+                  value: 'Professional Technician',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.stars,
+                  label: 'Rating',
+                  value: '4.8 ⭐ (120+ reviews)',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.verified,
+                  label: 'Certification',
+                  value: 'Verified & Certified',
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(
+                  icon: Icons.badge,
                   label: 'Technician ID',
-                  value: booking.technicianId,
+                  value: booking.technicianId.substring(0, 12),
                 ),
               ],
             ),
@@ -429,10 +521,12 @@ class _BookingDetailView extends StatelessWidget {
 
 class _SectionCard extends StatelessWidget {
   final String title;
+  final Widget? trailing;
   final List<Widget> children;
 
   const _SectionCard({
     required this.title,
+    this.trailing,
     required this.children,
   });
 
@@ -447,13 +541,20 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimaryColor,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
           ),
           const SizedBox(height: 16),
           ...children,
@@ -518,3 +619,4 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
+

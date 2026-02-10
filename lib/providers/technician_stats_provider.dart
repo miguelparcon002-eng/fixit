@@ -4,7 +4,7 @@ import '../services/ratings_service.dart';
 import 'booking_provider.dart';
 import 'auth_provider.dart';
 import 'ratings_provider.dart';
-import 'earnings_provider.dart';
+import '../core/utils/app_logger.dart';
 
 // Re-export Rating class for use in this file
 export '../services/ratings_service.dart' show Rating;
@@ -120,9 +120,9 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
         try {
           final ratingsService = _ref.read(ratingsServiceProvider);
           allRatings = await ratingsService.getAllRatings();
-          print('TechnicianStatsNotifier: Loaded ${allRatings.length} ratings from Supabase');
+          AppLogger.p('TechnicianStatsNotifier: Loaded ${allRatings.length} ratings from Supabase');
         } catch (e) {
-          print('TechnicianStatsNotifier: Could not load ratings from Supabase - $e');
+          AppLogger.p('TechnicianStatsNotifier: Could not load ratings from Supabase - $e');
         }
       }
 
@@ -136,7 +136,7 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
         averageRating = sum / technicianRatings.length;
       }
 
-      print('TechnicianStatsNotifier: Found ${technicianRatings.length} ratings for $_technicianName, average: $averageRating');
+      AppLogger.p('TechnicianStatsNotifier: Found ${technicianRatings.length} ratings for $_technicianName, average: $averageRating');
 
       // 2. Count completed jobs from Supabase bookings
       final bookingsAsync = await _ref.read(technicianBookingsProvider.future);
@@ -148,8 +148,8 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
         totalEarnings += (booking.finalCost ?? booking.estimatedCost ?? 0.0);
       }
 
-      print('TechnicianStatsNotifier: Counted ${completedBookings.length} completed jobs from Supabase');
-      print('TechnicianStatsNotifier: Total earnings: ₱$totalEarnings from Supabase');
+      AppLogger.p('TechnicianStatsNotifier: Counted ${completedBookings.length} completed jobs from Supabase');
+      AppLogger.p('TechnicianStatsNotifier: Total earnings: ₱$totalEarnings from Supabase');
 
       // 4. Calculate experience level
       final experience = TechnicianStats.calculateExperience(completedBookings.length);
@@ -167,9 +167,9 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
       // 5. Persist stats to Supabase
       await _saveStatsToSupabase(stats);
 
-      print('TechnicianStatsNotifier: Loaded stats - Rating: ${stats.averageRating}, Jobs: ${stats.completedJobs}, Earnings: ₱${stats.totalEarnings}');
+      AppLogger.p('TechnicianStatsNotifier: Loaded stats - Rating: ${stats.averageRating}, Jobs: ${stats.completedJobs}, Earnings: ₱${stats.totalEarnings}');
     } catch (e, stack) {
-      print('TechnicianStatsNotifier: Error loading stats - $e');
+      AppLogger.p('TechnicianStatsNotifier: Error loading stats - $e');
       state = AsyncValue.error(e, stack);
     }
   }
@@ -208,10 +208,10 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
             .insert(data);
       }
 
-      print('TechnicianStatsNotifier: Stats saved to Supabase');
+      AppLogger.p('TechnicianStatsNotifier: Stats saved to Supabase');
     } catch (e) {
       // Table might not exist yet, which is okay for now
-      print('TechnicianStatsNotifier: Could not save stats to Supabase (table may not exist) - $e');
+      AppLogger.p('TechnicianStatsNotifier: Could not save stats to Supabase (table may not exist) - $e');
     }
   }
 

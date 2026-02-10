@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/ratings_provider.dart';
 import '../../services/ratings_service.dart';
+import '../../core/widgets/app_logo.dart';
 
 class AdminReviewsScreen extends ConsumerWidget {
   const AdminReviewsScreen({super.key});
@@ -17,7 +18,8 @@ class AdminReviewsScreen extends ConsumerWidget {
         final totalReviews = allRatings.length;
         final averageRating = allRatings.isEmpty
             ? 0.0
-            : allRatings.map((r) => r.rating).reduce((a, b) => a + b) / allRatings.length;
+            : allRatings.map((r) => r.rating).reduce((a, b) => a + b) /
+                  allRatings.length;
 
         // Group ratings by technician
         final Map<String, List<Rating>> ratingsByTechnician = {};
@@ -29,25 +31,32 @@ class AdminReviewsScreen extends ConsumerWidget {
         }
 
         return Scaffold(
-          backgroundColor: AppTheme.primaryCyan,
+          backgroundColor: AppTheme.backgroundColor,
           appBar: AppBar(
             backgroundColor: Colors.white,
             foregroundColor: AppTheme.textPrimaryColor,
             elevation: 0,
-            title: const Text(
-              'Customer Reviews',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimaryColor,
-              ),
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Customer Reviews',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(
-                height: 1,
-                color: Colors.grey.shade200,
-              ),
+              child: Container(height: 1, color: Colors.grey.shade200),
             ),
           ),
           body: Column(
@@ -55,7 +64,10 @@ class AdminReviewsScreen extends ConsumerWidget {
               // Compact Statistics Bar
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
@@ -108,7 +120,11 @@ class AdminReviewsScreen extends ConsumerWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.star_outline, size: 64, color: Colors.grey[400]),
+                            Icon(
+                              Icons.star_outline,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               'No reviews yet',
@@ -130,9 +146,13 @@ class AdminReviewsScreen extends ConsumerWidget {
                         ),
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         itemCount: allRatings.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final rating = allRatings[index];
                           return _ReviewCard(rating: rating);
@@ -144,62 +164,71 @@ class AdminReviewsScreen extends ConsumerWidget {
         );
       },
       loading: () => Scaffold(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           backgroundColor: Colors.white,
           foregroundColor: AppTheme.textPrimaryColor,
           elevation: 0,
-          title: const Text(
-            'Customer Reviews',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimaryColor,
-            ),
+          titleSpacing: 16,
+          title: Row(
+            children: [
+              const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Customer Reviews',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
-            child: Container(
-              height: 1,
-              color: Colors.grey.shade200,
-            ),
+            child: Container(height: 1, color: Colors.grey.shade200),
           ),
         ),
         body: const Center(
-          child: CircularProgressIndicator(
-            color: AppTheme.deepBlue,
-          ),
+          child: CircularProgressIndicator(color: AppTheme.deepBlue),
         ),
       ),
       error: (error, stack) => Scaffold(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           backgroundColor: Colors.white,
           foregroundColor: AppTheme.textPrimaryColor,
           elevation: 0,
-          title: const Text(
-            'Customer Reviews',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimaryColor,
-            ),
+          titleSpacing: 16,
+          title: Row(
+            children: [
+              const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Customer Reviews',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
-            child: Container(
-              height: 1,
-              color: Colors.grey.shade200,
-            ),
+            child: Container(height: 1, color: Colors.grey.shade200),
           ),
         ),
         body: Center(
           child: Text(
             'Error loading reviews',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
         ),
       ),
@@ -310,7 +339,9 @@ class _ReviewCard extends StatelessWidget {
                     Row(
                       children: List.generate(5, (index) {
                         return Icon(
-                          index < rating.rating ? Icons.star : Icons.star_border,
+                          index < rating.rating
+                              ? Icons.star
+                              : Icons.star_border,
                           color: Colors.amber,
                           size: 18,
                         );
@@ -321,10 +352,7 @@ class _ReviewCard extends StatelessWidget {
               ),
               Text(
                 rating.date,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
           ),
@@ -342,7 +370,11 @@ class _ReviewCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.engineering, size: 18, color: AppTheme.deepBlue),
+                const Icon(
+                  Icons.engineering,
+                  size: 18,
+                  color: AppTheme.deepBlue,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Technician: ${rating.technician}',
@@ -365,7 +397,11 @@ class _ReviewCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.phone_android, size: 16, color: AppTheme.lightBlue),
+                const Icon(
+                  Icons.phone_android,
+                  size: 16,
+                  color: AppTheme.lightBlue,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   rating.device,
@@ -378,10 +414,7 @@ class _ReviewCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '•',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[400],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[400]),
                 ),
                 const SizedBox(width: 8),
                 Expanded(

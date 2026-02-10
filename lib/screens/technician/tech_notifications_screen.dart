@@ -180,12 +180,12 @@ class _TechNotificationsScreenState extends State<TechNotificationsScreen> {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
           onPressed: () => context.pop(),
         ),
         title: Column(
@@ -194,18 +194,18 @@ class _TechNotificationsScreenState extends State<TechNotificationsScreen> {
             const Text(
               'Notifications',
               style: TextStyle(
-                color: Colors.black,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimaryColor,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
               ),
             ),
             if (unreadCount > 0)
               Text(
                 '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
                 style: const TextStyle(
-                  color: Colors.black,
+                  color: AppTheme.textSecondaryColor,
                   fontSize: 12,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
           ],
@@ -217,21 +217,22 @@ class _TechNotificationsScreenState extends State<TechNotificationsScreen> {
               child: const Text(
                 'Mark all read',
                 style: TextStyle(
-                  color: Colors.black,
+                  color: AppTheme.deepBlue,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(30),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
           ),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: _notifications.isEmpty
             ? Center(

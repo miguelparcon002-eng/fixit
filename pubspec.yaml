@@ -95,6 +95,19 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # App Launcher Icon
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/logo_square.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#667EEA"
+  adaptive_icon_foreground: "assets/images/logo_square.png"
+  # Disable min_sdk_android to support all Android versions
+  min_sdk_android: 21
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

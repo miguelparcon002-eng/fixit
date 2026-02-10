@@ -7,6 +7,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../services/user_session_service.dart';
 
+// Uses currentUserProvider.user.profilePicture (users.profile_picture) for avatar
+
 class TechProfileScreen extends ConsumerStatefulWidget {
   const TechProfileScreen({super.key});
 
@@ -30,161 +32,193 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
     final statsAsync = ref.watch(technicianStatsProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Edit profile',
+            onPressed: () => context.go('/tech-edit-profile'),
+            icon: const Icon(Icons.edit_rounded, color: AppTheme.deepBlue),
+          ),
+        ],
+      ),
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            // Main Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            children: [
+              // Profile header card
+              userAsync.when(
+                data: (user) => _buildProfileHeader(
+                  name: user?.fullName ?? 'Technician',
+                  isVerified: user?.verified ?? false,
+                  rating: statsAsync.value?.averageRating ?? 0.0,
+                  jobsDone: statsAsync.value?.completedJobs ?? 0,
+                  profileImageUrl: user?.profilePicture,
+                ),
+                loading: () => _buildProfileHeader(
+                  name: 'Loading…',
+                  isVerified: false,
+                  rating: 0.0,
+                  jobsDone: 0,
+                  profileImageUrl: null,
+                ),
+                error: (_, _) => _buildProfileHeader(
+                  name: 'Technician',
+                  isVerified: false,
+                  rating: 0.0,
+                  jobsDone: 0,
+                  profileImageUrl: null,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Stats cards - now using real data
+              _StatsCards(stats: statsAsync.value),
+              const SizedBox(height: 24),
+
+              // Personal Information
+              const _PersonalInfoCard(),
+              const SizedBox(height: 20),
+
+              // Specialties
+              const _SpecialtiesCard(),
+              const SizedBox(height: 20),
+
+              // Settings & Support
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                      // Profile header card
-                      userAsync.when(
-                        data: (user) => _buildProfileHeader(
-                          user?.fullName ?? 'Technician',
-                          user?.verified ?? false,
-                          statsAsync.value?.averageRating ?? 0.0,
-                          statsAsync.value?.completedJobs ?? 0,
-                        ),
-                        loading: () => _buildProfileHeader('Loading...', false, 0.0, 0),
-                        error: (_, __) => _buildProfileHeader('Technician', false, 0.0, 0),
+                    const Text(
+                      'Settings & Support',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimaryColor,
                       ),
-                      const SizedBox(height: 24),
-                      // Stats cards - now using real data
-                      _StatsCards(stats: statsAsync.value),
-                      const SizedBox(height: 24),
-                      // Personal Information
-                      const _PersonalInfoCard(),
-                      const SizedBox(height: 20),
-                      // Specialties
-                      const _SpecialtiesCard(),
-                      const SizedBox(height: 20),
-                      // Settings & Support
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Settings & Support',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _SettingsItem(
-                              icon: Icons.settings,
-                              iconColor: AppTheme.lightBlue,
-                              label: 'Account Settings',
-                              onTap: () => context.go('/tech-account-settings'),
-                            ),
-                            const SizedBox(height: 12),
-                            _SettingsItem(
-                              icon: Icons.notifications,
-                              iconColor: Colors.orange,
-                              label: 'Notifications',
-                              onTap: () => context.go('/tech-notifications'),
-                            ),
-                            const SizedBox(height: 12),
-                            _SettingsItem(
-                              icon: Icons.help_outline,
-                              iconColor: Colors.green,
-                              label: 'Help & Support',
-                              onTap: () => context.go('/tech-help-support'),
-                            ),
-                            const SizedBox(height: 12),
-                            _SettingsItem(
-                              icon: Icons.description,
-                              iconColor: Colors.purple,
-                              label: 'Terms & Policies',
-                              onTap: () => context.go('/tech-terms-policies'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      // Logout Button
-                      Container(
-                        width: double.infinity,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Colors.red, Color(0xFFD32F2F)],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () async {
-                              // Clear session data first
-                              await ref.read(userSessionServiceProvider).onUserLogout();
-                              await ref.read(authServiceProvider).signOut();
-                              if (context.mounted) {
-                                context.go('/login');
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: const Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.logout,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Logout',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    ),
+                    const SizedBox(height: 16),
+                    _SettingsItem(
+                      icon: Icons.settings,
+                      iconColor: AppTheme.lightBlue,
+                      label: 'Account Settings',
+                      onTap: () => context.go('/tech-account-settings'),
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsItem(
+                      icon: Icons.notifications,
+                      iconColor: Colors.orange,
+                      label: 'Notifications',
+                      onTap: () => context.go('/tech-notifications'),
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsItem(
+                      icon: Icons.help_outline,
+                      iconColor: Colors.green,
+                      label: 'Help & Support',
+                      onTap: () => context.go('/tech-help-support'),
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsItem(
+                      icon: Icons.description,
+                      iconColor: Colors.purple,
+                      label: 'Terms & Policies',
+                      onTap: () => context.go('/tech-terms-policies'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Logout Button
+              Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.red, Color(0xFFD32F2F)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      await ref.read(userSessionServiceProvider).onUserLogout();
+                      await ref.read(authServiceProvider).signOut();
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: const Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout, color: Colors.white, size: 24),
+                          SizedBox(width: 12),
+                          Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
                 ),
               ),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(String name, bool isVerified, double rating, int jobsDone) {
+  Widget _buildProfileHeader({
+    required String name,
+    required bool isVerified,
+    required double rating,
+    required int jobsDone,
+    required String? profileImageUrl,
+  }) {
     // Get initials from name
     final initials = name.split(' ')
         .where((s) => s.isNotEmpty)
@@ -223,14 +257,19 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
             child: CircleAvatar(
               radius: 45,
               backgroundColor: AppTheme.primaryCyan,
-              child: Text(
-                initials.isEmpty ? '?' : initials,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.deepBlue,
-                ),
-              ),
+              backgroundImage: (profileImageUrl != null && profileImageUrl.isNotEmpty)
+                  ? NetworkImage(profileImageUrl)
+                  : null,
+              child: (profileImageUrl != null && profileImageUrl.isNotEmpty)
+                  ? null
+                  : Text(
+                      initials.isEmpty ? '?' : initials,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.deepBlue,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 16),

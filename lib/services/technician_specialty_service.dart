@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../models/technician_specialty.dart';
+import '../core/utils/app_logger.dart';
 
 class TechnicianSpecialtyService {
   final _supabase = SupabaseConfig.client;
@@ -17,7 +18,7 @@ class TechnicianSpecialtyService {
           .map((json) => TechnicianSpecialty.fromJson(json))
           .toList();
     } catch (e) {
-      print('TechnicianSpecialtyService: Error loading specialties - $e');
+      AppLogger.p('TechnicianSpecialtyService: Error loading specialties - $e');
       return [];
     }
   }
@@ -37,10 +38,10 @@ class TechnicianSpecialtyService {
           .select()
           .single();
 
-      print('TechnicianSpecialtyService: Specialty added successfully');
+      AppLogger.p('TechnicianSpecialtyService: Specialty added successfully');
       return TechnicianSpecialty.fromJson(response);
     } catch (e) {
-      print('TechnicianSpecialtyService: Error adding specialty - $e');
+      AppLogger.p('TechnicianSpecialtyService: Error adding specialty - $e');
       return null;
     }
   }
@@ -53,10 +54,10 @@ class TechnicianSpecialtyService {
           .delete()
           .eq('id', specialtyId);
 
-      print('TechnicianSpecialtyService: Specialty removed successfully');
+      AppLogger.p('TechnicianSpecialtyService: Specialty removed successfully');
       return true;
     } catch (e) {
-      print('TechnicianSpecialtyService: Error removing specialty - $e');
+      AppLogger.p('TechnicianSpecialtyService: Error removing specialty - $e');
       return false;
     }
   }
@@ -88,12 +89,12 @@ class TechnicianSpecialtyService {
           .insert(inserts)
           .select();
 
-      print('TechnicianSpecialtyService: Specialties updated successfully');
+      AppLogger.p('TechnicianSpecialtyService: Specialties updated successfully');
       return (response as List)
           .map((json) => TechnicianSpecialty.fromJson(json))
           .toList();
     } catch (e) {
-      print('TechnicianSpecialtyService: Error setting specialties - $e');
+      AppLogger.p('TechnicianSpecialtyService: Error setting specialties - $e');
       return [];
     }
   }
@@ -110,7 +111,7 @@ class TechnicianSpecialtyService {
           .map((json) => json['technician_id'] as String)
           .toList();
     } catch (e) {
-      print('TechnicianSpecialtyService: Error searching technicians - $e');
+      AppLogger.p('TechnicianSpecialtyService: Error searching technicians - $e');
       return [];
     }
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 
+// Uses Material 3 NavigationBar for improved UX
+
 class MainNavigation extends StatefulWidget {
   final Widget child;
 
@@ -12,117 +14,68 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  int _locationToTabIndex(String location) {
+    if (location.startsWith('/bookings') || location.startsWith('/booking/')) return 1;
+    if (location.startsWith('/help-support') || location.startsWith('/live-chat')) return 2;
+    if (location.startsWith('/profile') || location.startsWith('/edit-profile') || location.startsWith('/addresses')) return 3;
+    return 0; // home fallback
+  }
+
+  void _onTabSelected(int index) {
+    switch (index) {
+      case 0:
+        context.go('/home');
+        break;
+      case 1:
+        context.go('/bookings');
+        break;
+      case 2:
+        context.go('/help-support');
+        break;
+      case 3:
+        context.go('/profile');
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
+    final currentIndex = _locationToTabIndex(location);
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       body: widget.child,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-                _NavItem(
-                  icon: Icons.home,
-                  label: 'Home',
-                  isSelected: _currentIndex == 0,
-                  onTap: () {
-                    setState(() => _currentIndex = 0);
-                    context.go('/home');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.map,
-                  label: 'Appointment',
-                  isSelected: _currentIndex == 1,
-                  onTap: () {
-                    setState(() => _currentIndex = 1);
-                    context.go('/bookings');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Support',
-                  isSelected: _currentIndex == 2,
-                  onTap: () {
-                    setState(() => _currentIndex = 2);
-                    context.go('/chats');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.person_outline,
-                  label: 'Profile',
-                  isSelected: _currentIndex == 3,
-                  onTap: () {
-                    setState(() => _currentIndex = 3);
-                    context.go('/profile');
-                  },
-                ),
-            ],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: _onTabSelected,
+        indicatorColor: AppTheme.deepBlue.withValues(alpha: 0.12),
+        backgroundColor: Colors.white,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
           ),
-        ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month_rounded),
+            label: 'Appointments',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.support_agent_outlined),
+            selectedIcon: Icon(Icons.support_agent_rounded),
+            label: 'Support',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }
 }
 
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryCyan : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.black : Colors.grey[600],
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected ? Colors.black : Colors.grey[600],
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

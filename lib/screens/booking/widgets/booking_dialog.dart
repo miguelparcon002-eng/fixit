@@ -7,9 +7,8 @@ import '../../../providers/booking_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/address_provider.dart';
 import '../../../providers/rewards_provider.dart';
-import '../../../models/reward.dart';
 import '../../../models/redeemed_voucher.dart';
-import '../../../services/redeemed_voucher_service.dart';
+import '../../../core/utils/app_logger.dart';
 
 class BookingDialog extends ConsumerStatefulWidget {
   final bool isEmergency;
@@ -488,7 +487,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         
         // If Ethan not found, try any technician
         if (techResponse == null) {
-          print('Ethan not found, looking for any technician...');
+          AppLogger.p('Ethan not found, looking for any technician...');
           techResponse = await supabase
               .from('users')
               .select('id, email, full_name, role')
@@ -499,13 +498,13 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         
         if (techResponse != null) {
           technicianId = techResponse['id'] as String;
-          print('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
+          AppLogger.p('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
         } else {
-          print('❌ No technicians found in database');
+          AppLogger.p('❌ No technicians found in database');
           throw Exception('No technicians available. Please ensure Ethan Estino (fixittechnician@gmail.com) has role="technician" in the users table.');
         }
       } catch (e) {
-        print('❌ Error fetching technician: $e');
+        AppLogger.p('❌ Error fetching technician: $e');
         if (e is Exception && e.toString().contains('technician')) {
           rethrow;
         }
@@ -525,7 +524,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         
         // If no service for this technician, try to find any service
         if (serviceResponse == null) {
-          print('No service found for technician $technicianId, checking for any service...');
+          AppLogger.p('No service found for technician $technicianId, checking for any service...');
           serviceResponse = await supabase
               .from('services')
               .select('id, technician_id, service_name')
@@ -535,10 +534,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         
         if (serviceResponse != null) {
           serviceId = serviceResponse['id'] as String;
-          print('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
+          AppLogger.p('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
         } else {
           // No service exists at all - this needs manual creation due to RLS
-          print('❌ No services found in database');
+          AppLogger.p('❌ No services found in database');
           throw Exception(
             'No services available. Please create a service for Ethan Estino first.\n\n'
             'Run this SQL in Supabase:\n'
@@ -547,7 +546,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           );
         }
       } catch (e) {
-        print('❌ Error with service: $e');
+        AppLogger.p('❌ Error with service: $e');
         if (e is Exception) {
           rethrow;
         }
@@ -648,7 +647,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         );
       }
     } catch (e) {
-      print('Error creating booking: $e');
+      AppLogger.p('Error creating booking: $e');
       if (context.mounted) {
         // Show user-friendly error message
         String errorMessage = 'Error creating booking';

@@ -8,6 +8,7 @@ import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/technician_stats_provider.dart';
+import '../../providers/address_provider.dart';
 import 'tech_ratings_screen.dart';
 import 'tech_jobs_screen_new.dart';
 
@@ -18,7 +19,9 @@ final monthlyGoalProvider = StateProvider<double>((ref) => 50000);
 enum TechDateFilter { today, week, month }
 
 // Provider for date filter
-final techDateFilterProvider = StateProvider<TechDateFilter>((ref) => TechDateFilter.today);
+final techDateFilterProvider = StateProvider<TechDateFilter>(
+  (ref) => TechDateFilter.today,
+);
 
 class TechHomeScreen extends ConsumerWidget {
   const TechHomeScreen({super.key});
@@ -85,7 +88,8 @@ class TechHomeScreen extends ConsumerWidget {
                     iconColor: AppTheme.lightBlue,
                     iconBgColor: Color(0xFFE3F2FD),
                     title: 'New Job Request',
-                    message: 'You have a new job request from John Doe for iPhone screen repair.',
+                    message:
+                        'You have a new job request from John Doe for iPhone screen repair.',
                     time: '5 mins ago',
                     isNew: true,
                   ),
@@ -95,7 +99,8 @@ class TechHomeScreen extends ConsumerWidget {
                     iconColor: Colors.green,
                     iconBgColor: Color(0xFFE8F5E9),
                     title: 'Payment Received',
-                    message: 'Payment of ₱1,500 has been received for Job #12345.',
+                    message:
+                        'Payment of ₱1,500 has been received for Job #12345.',
                     time: '1 hour ago',
                     isNew: true,
                   ),
@@ -122,16 +127,33 @@ class TechHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Get current user data
     final userAsync = ref.watch(currentUserProvider);
-    final userName = userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
-    final userAddress = userAsync.whenOrNull(data: (user) => user?.address) ?? '';
+    final userName =
+        userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+
+    // Use saved addresses (same mechanism customers use) so technicians also
+    // see/manage their real "default address".
+    final defaultAddress = ref.watch(defaultAddressProvider);
+    final addressesAsync = ref.watch(userAddressesProvider);
+    final firstSavedAddress = addressesAsync.whenOrNull(
+      data: (addresses) => addresses.isNotEmpty ? addresses.first : null,
+    );
+
+    final profileAddressFallback =
+        userAsync.whenOrNull(data: (user) => user?.address) ?? '';
+    final displayAddress =
+        defaultAddress?.address ??
+        firstSavedAddress?.address ??
+        profileAddressFallback;
 
     // Use Supabase bookings instead of local bookings
     final bookingsAsync = ref.watch(technicianBookingsProvider);
 
     // Get technician stats (for rating)
     final statsAsync = ref.watch(technicianStatsProvider);
-    final technicianRating = statsAsync.whenOrNull(data: (stats) => stats.averageRating) ?? 0.0;
-    final totalReviews = statsAsync.whenOrNull(data: (stats) => stats.totalReviews) ?? 0;
+    final technicianRating =
+        statsAsync.whenOrNull(data: (stats) => stats.averageRating) ?? 0.0;
+    final totalReviews =
+        statsAsync.whenOrNull(data: (stats) => stats.totalReviews) ?? 0;
 
     // Get selected date filter
     final selectedFilter = ref.watch(techDateFilterProvider);
@@ -172,17 +194,43 @@ class TechHomeScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.deepBlue,
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          'Dashboard',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => _showNotifications(context),
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppTheme.deepBlue,
+            ),
+          ),
+        ],
+      ),
       body: bookingsAsync.when(
         loading: () => const Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue),
           ),
         ),
         error: (error, stack) => Center(
           child: Text(
             'Error loading bookings',
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(
+              color: AppTheme.textPrimaryColor,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         data: (allBookings) {
@@ -190,25 +238,34 @@ class TechHomeScreen extends ConsumerWidget {
           final filteredBookings = allBookings.where((booking) {
             if (booking.scheduledDate == null) return false;
             final bookingDate = booking.scheduledDate!;
-            return bookingDate.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
-                   bookingDate.isBefore(endDate);
+            return bookingDate.isAfter(
+                  startDate.subtract(const Duration(seconds: 1)),
+                ) &&
+                bookingDate.isBefore(endDate);
           }).toList();
 
           // Calculate stats based on filtered bookings
-          final techScheduledCount = filteredBookings.where((booking) =>
-            booking.status == 'requested' || booking.status == 'accepted'
-          ).length;
-          final techActiveCount = filteredBookings.where((booking) =>
-            booking.status == 'in_progress'
-          ).length;
-          final techCompletedCount = filteredBookings.where((booking) =>
-            booking.status == 'completed'
-          ).length;
+          final techScheduledCount = filteredBookings
+              .where(
+                (booking) =>
+                    booking.status == 'requested' ||
+                    booking.status == 'accepted',
+              )
+              .length;
+          final techActiveCount = filteredBookings
+              .where((booking) => booking.status == 'in_progress')
+              .length;
+          final techCompletedCount = filteredBookings
+              .where((booking) => booking.status == 'completed')
+              .length;
 
           // Calculate earnings for the period
           final periodEarnings = filteredBookings
               .where((b) => b.status == 'completed')
-              .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
+              .fold<double>(
+                0,
+                (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
+              );
 
           // Calculate previous period for comparison
           final periodDuration = endDate.difference(startDate);
@@ -218,24 +275,35 @@ class TechHomeScreen extends ConsumerWidget {
           final prevFilteredBookings = allBookings.where((booking) {
             if (booking.scheduledDate == null) return false;
             final bookingDate = booking.scheduledDate!;
-            return bookingDate.isAfter(prevStartDate.subtract(const Duration(seconds: 1))) &&
-                   bookingDate.isBefore(prevEndDate);
+            return bookingDate.isAfter(
+                  prevStartDate.subtract(const Duration(seconds: 1)),
+                ) &&
+                bookingDate.isBefore(prevEndDate);
           }).toList();
 
           final prevPeriodEarnings = prevFilteredBookings
               .where((b) => b.status == 'completed')
-              .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
+              .fold<double>(
+                0,
+                (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
+              );
 
-          final prevCompletedCount = prevFilteredBookings.where((booking) =>
-            booking.status == 'completed'
-          ).length;
+          final prevCompletedCount = prevFilteredBookings
+              .where((booking) => booking.status == 'completed')
+              .length;
 
           // Calculate trends
           final earningsTrend = prevPeriodEarnings > 0
-              ? ((periodEarnings - prevPeriodEarnings) / prevPeriodEarnings * 100).toDouble()
+              ? ((periodEarnings - prevPeriodEarnings) /
+                        prevPeriodEarnings *
+                        100)
+                    .toDouble()
               : (periodEarnings > 0 ? 100.0 : 0.0);
           final completedTrend = prevCompletedCount > 0
-              ? ((techCompletedCount - prevCompletedCount) / prevCompletedCount * 100).toDouble()
+              ? ((techCompletedCount - prevCompletedCount) /
+                        prevCompletedCount *
+                        100)
+                    .toDouble()
               : (techCompletedCount > 0 ? 100.0 : 0.0);
 
           // Calculate completion rate
@@ -247,452 +315,578 @@ class TechHomeScreen extends ConsumerWidget {
           // Calculate weekly data for chart (last 7 days)
           final weeklyData = <double>[];
           for (int i = 6; i >= 0; i--) {
-            final dayStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+            final dayStart = DateTime(
+              now.year,
+              now.month,
+              now.day,
+            ).subtract(Duration(days: i));
             final dayEnd = dayStart.add(const Duration(days: 1));
             final dayEarnings = allBookings
-                .where((b) => b.status == 'completed' &&
-                       b.scheduledDate != null &&
-                       b.scheduledDate!.isAfter(dayStart.subtract(const Duration(seconds: 1))) &&
-                       b.scheduledDate!.isBefore(dayEnd))
-                .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
+                .where(
+                  (b) =>
+                      b.status == 'completed' &&
+                      b.scheduledDate != null &&
+                      b.scheduledDate!.isAfter(
+                        dayStart.subtract(const Duration(seconds: 1)),
+                      ) &&
+                      b.scheduledDate!.isBefore(dayEnd),
+                )
+                .fold<double>(
+                  0,
+                  (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
+                );
             weeklyData.add(dayEarnings);
           }
 
           // Job status counts for donut chart
-          final pendingCount = allBookings.where((b) =>
-            b.status == 'requested' || b.status == 'accepted'
-          ).length;
-          final inProgressCount = allBookings.where((b) =>
-            b.status == 'in_progress'
-          ).length;
-          final allCompletedCount = allBookings.where((b) =>
-            b.status == 'completed'
-          ).length;
-          final cancelledCount = allBookings.where((b) =>
-            b.status == 'cancelled'
-          ).length;
+          final pendingCount = allBookings
+              .where((b) => b.status == 'requested' || b.status == 'accepted')
+              .length;
+          final inProgressCount = allBookings
+              .where((b) => b.status == 'in_progress')
+              .length;
+          final allCompletedCount = allBookings
+              .where((b) => b.status == 'completed')
+              .length;
+          final cancelledCount = allBookings
+              .where((b) => b.status == 'cancelled')
+              .length;
 
           // Monthly earnings for goal tracking
           final monthStart = DateTime(now.year, now.month, 1);
           final monthEnd = DateTime(now.year, now.month + 1, 1);
           final monthlyEarnings = allBookings
-              .where((b) => b.status == 'completed' &&
-                     b.scheduledDate != null &&
-                     b.scheduledDate!.isAfter(monthStart.subtract(const Duration(seconds: 1))) &&
-                     b.scheduledDate!.isBefore(monthEnd))
-              .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
+              .where(
+                (b) =>
+                    b.status == 'completed' &&
+                    b.scheduledDate != null &&
+                    b.scheduledDate!.isAfter(
+                      monthStart.subtract(const Duration(seconds: 1)),
+                    ) &&
+                    b.scheduledDate!.isBefore(monthEnd),
+              )
+              .fold<double>(
+                0,
+                (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
+              );
 
           final monthlyGoal = ref.watch(monthlyGoalProvider);
-          final goalProgress = monthlyGoal > 0 ? (monthlyEarnings / monthlyGoal).clamp(0.0, 1.0) : 0.0;
+          final goalProgress = monthlyGoal > 0
+              ? (monthlyEarnings / monthlyGoal).clamp(0.0, 1.0)
+              : 0.0;
 
-          // Get active bookings for display (always show all active, not filtered)
-          final activeBookings = allBookings.where((booking) =>
-            booking.status == 'in_progress'
-          ).toList();
+          // Bookings to show in the "Today's Schedule" area.
+          // Previously this only showed `in_progress`, which hides newly-created
+          // bookings (including emergency) that are still `requested`/`accepted`.
+          //
+          // We show all appointments within the selected date range, prioritizing
+          // emergency bookings first.
+          // "Today's Schedule" should always mean *today* (independent of the
+          // selected filter used for stats/cards above).
+          final todayEnd = todayStart.add(const Duration(days: 1));
 
-          return Column(
-            children: [
-              // Profile Header
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppTheme.deepBlue, AppTheme.lightBlue],
-                  ),
-                ),
-                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 12),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'FixIT Technician',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              userName,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Stack(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                              onPressed: () => _showNotifications(context),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                            Positioned(
-                              right: 0,
-                              top: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 18,
-                                  minHeight: 18,
-                                ),
-                                child: const Text(
-                                  '2',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+          final scheduleBookings = allBookings
+              .where((b) {
+                final sd = b.scheduledDate;
+                if (sd == null) return false;
+
+                final inToday = sd.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+                    sd.isBefore(todayEnd);
+
+                if (!inToday) return false;
+
+                return b.status == 'requested' ||
+                    b.status == 'accepted' ||
+                    b.status == 'scheduled' ||
+                    b.status == 'en_route' ||
+                    b.status == 'in_progress';
+              })
+              .toList();
+
+          scheduleBookings.sort((a, b) {
+            final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
+            if (prio != 0) return prio;
+            final aTime = a.scheduledDate ?? a.createdAt;
+            final bTime = b.scheduledDate ?? b.createdAt;
+            return aTime.compareTo(bTime); // earlier appointments first
+          });
+
+          return Container(
+            color: const Color(0xFFF5F7FA),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Technician summary
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.location_on, color: Colors.white, size: 18),
-                        const SizedBox(width: 6),
-                        Text(
-                          userAddress.isNotEmpty ? userAddress : 'Location not set',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppTheme.deepBlue.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.badge_outlined,
+                            color: AppTheme.deepBlue,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                userName,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.textPrimaryColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              InkWell(
+                                onTap: () => context.push('/addresses'),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on_outlined,
+                                      size: 16,
+                                      color: AppTheme.textSecondaryColor,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        displayAddress.isNotEmpty
+                                            ? displayAddress
+                                            : 'Location not set',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textSecondaryColor,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      size: 18,
+                                      color: AppTheme.textSecondaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  _MiniPill(
+                                    icon: Icons.star,
+                                    label: technicianRating > 0
+                                        ? technicianRating.toStringAsFixed(1)
+                                        : 'N/A',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _MiniPill(
+                                    icon: Icons.reviews_outlined,
+                                    label: '$totalReviews reviews',
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              // Main Content Area
-              Expanded(
-                child: Container(
-                  color: AppTheme.primaryCyan,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Date Filter Tabs
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          _DateFilterTab(
+                            label: 'Today',
+                            isSelected: selectedFilter == TechDateFilter.today,
+                            onTap: () =>
+                                ref
+                                        .read(techDateFilterProvider.notifier)
+                                        .state =
+                                    TechDateFilter.today,
+                          ),
+                          _DateFilterTab(
+                            label: 'This Week',
+                            isSelected: selectedFilter == TechDateFilter.week,
+                            onTap: () =>
+                                ref
+                                        .read(techDateFilterProvider.notifier)
+                                        .state =
+                                    TechDateFilter.week,
+                          ),
+                          _DateFilterTab(
+                            label: 'This Month',
+                            isSelected: selectedFilter == TechDateFilter.month,
+                            onTap: () =>
+                                ref
+                                        .read(techDateFilterProvider.notifier)
+                                        .state =
+                                    TechDateFilter.month,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Stats Grid
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                    child: GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.15,
+                      children: [
+                        _StatCard(
+                          icon: Icons.work_outline,
+                          iconColor: Colors.white,
+                          bgColor: const Color(0xFF4F7CFF),
+                          value: '$techActiveCount',
+                          label: '$filterLabel\'s Jobs',
+                          onTap: () {
+                            // Set tab to Active (1) before navigating
+                            ref
+                                    .read(techJobsInitialTabProvider.notifier)
+                                    .state =
+                                1;
+                            context.go('/tech-jobs');
+                          },
+                        ),
+                        _StatCard(
+                          icon: Icons.check_circle_outline,
+                          iconColor: Colors.white,
+                          bgColor: const Color(0xFF00C853),
+                          value: '$techCompletedCount',
+                          label: 'Completed',
+                          onTap: () {
+                            // Set tab to Complete (2) before navigating
+                            ref
+                                    .read(techJobsInitialTabProvider.notifier)
+                                    .state =
+                                2;
+                            context.go('/tech-jobs');
+                          },
+                        ),
+                        _StatCard(
+                          icon: Icons.assignment_outlined,
+                          iconColor: Colors.white,
+                          bgColor: const Color(0xFFFF6B35),
+                          value: '$techScheduledCount',
+                          label: 'Job Requests',
+                          onTap: () {
+                            // Set tab to Request (0) before navigating
+                            ref
+                                    .read(techJobsInitialTabProvider.notifier)
+                                    .state =
+                                0;
+                            context.go('/tech-jobs');
+                          },
+                        ),
+                        _StatCard(
+                          icon: Icons.attach_money,
+                          iconColor: Colors.white,
+                          bgColor: const Color(0xFFB845F5),
+                          value: '₱${periodEarnings.toStringAsFixed(0)}',
+                          label: 'Earnings',
+                          onTap: () => context.go('/tech-earnings'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Performance Metrics
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                          // Date Filter Tabs
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
+                        const Text(
+                          'Performance Metrics',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _MetricCard(
+                                label: 'Completion Rate',
+                                value: '${completionRate.toStringAsFixed(1)}%',
+                                icon: Icons.check_circle,
+                                color: Colors.green,
+                                subtitle:
+                                    '$techCompletedCount of $totalJobsInPeriod jobs',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _MetricCard(
+                                label: 'Customer Rating',
+                                value: technicianRating > 0
+                                    ? technicianRating.toStringAsFixed(1)
+                                    : 'N/A',
+                                icon: Icons.star,
+                                color: Colors.orange,
+                                subtitle: 'Based on $totalReviews reviews',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Monthly Goal Progress
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _MonthlyGoalCard(
+                      currentEarnings: monthlyEarnings,
+                      goalAmount: monthlyGoal,
+                      progress: goalProgress,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Weekly Performance Chart
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _WeeklyPerformanceChart(
+                      weeklyData: weeklyData,
+                      earningsTrend: earningsTrend,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Job Status Distribution
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _JobStatusChart(
+                      pending: pendingCount,
+                      inProgress: inProgressCount,
+                      completed: allCompletedCount,
+                      cancelled: cancelledCount,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Quick Actions
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Quick Actions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _QuickActionButton(
+                                icon: Icons.star,
+                                iconColor: Colors.pink,
+                                iconBgColor: Colors.pink.withValues(
+                                  alpha: 0.15,
+                                ),
+                                label: 'View\nRating',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const TechRatingsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _QuickActionButton(
+                                icon: Icons.location_on,
+                                iconColor: Colors.green,
+                                iconBgColor: Colors.green.withValues(
+                                  alpha: 0.15,
+                                ),
+                                label: 'Mark\nAvailable',
+                                onTap: () {},
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _QuickActionButton(
+                                icon: Icons.headset_mic,
+                                iconColor: AppTheme.lightBlue,
+                                iconBgColor: AppTheme.lightBlue.withValues(
+                                  alpha: 0.15,
+                                ),
+                                label: 'Contact\nSupport',
+                                onTap: () {
+                                  context.go('/tech-help-support');
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Today's Schedule
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Today\'s Schedule',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimaryColor,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppTheme.lightBlue,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
+                                    color: AppTheme.lightBlue.withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              child: Row(
+                              child: Text(
+                                '${scheduleBookings.length} Scheduled',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Dynamic Job Cards - Show schedule bookings for the selected period
+                        ...scheduleBookings.map((booking) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _SimpleJobCard(booking: booking),
+                          );
+                        }),
+                        // Show message if no bookings in schedule
+                        if (scheduleBookings.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
                                 children: [
-                                  _DateFilterTab(
-                                    label: 'Today',
-                                    isSelected: selectedFilter == TechDateFilter.today,
-                                    onTap: () => ref.read(techDateFilterProvider.notifier).state = TechDateFilter.today,
+                                  Icon(
+                                    Icons.work_outline,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
                                   ),
-                                  _DateFilterTab(
-                                    label: 'This Week',
-                                    isSelected: selectedFilter == TechDateFilter.week,
-                                    onTap: () => ref.read(techDateFilterProvider.notifier).state = TechDateFilter.week,
-                                  ),
-                                  _DateFilterTab(
-                                    label: 'This Month',
-                                    isSelected: selectedFilter == TechDateFilter.month,
-                                    onTap: () => ref.read(techDateFilterProvider.notifier).state = TechDateFilter.month,
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No active jobs at the moment',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
                             ),
                           ),
-                          // Stats Grid
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                            child: GridView.count(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              childAspectRatio: 1.15,
-                            children: [
-                              _StatCard(
-                                icon: Icons.work_outline,
-                                iconColor: Colors.white,
-                                bgColor: const Color(0xFF4F7CFF),
-                                value: '$techActiveCount',
-                                label: '$filterLabel\'s Jobs',
-                                onTap: () {
-                                  // Set tab to Active (1) before navigating
-                                  ref.read(techJobsInitialTabProvider.notifier).state = 1;
-                                  context.go('/tech-jobs');
-                                },
-                              ),
-                              _StatCard(
-                                icon: Icons.check_circle_outline,
-                                iconColor: Colors.white,
-                                bgColor: const Color(0xFF00C853),
-                                value: '$techCompletedCount',
-                                label: 'Completed',
-                                onTap: () {
-                                  // Set tab to Complete (2) before navigating
-                                  ref.read(techJobsInitialTabProvider.notifier).state = 2;
-                                  context.go('/tech-jobs');
-                                },
-                              ),
-                              _StatCard(
-                                icon: Icons.assignment_outlined,
-                                iconColor: Colors.white,
-                                bgColor: const Color(0xFFFF6B35),
-                                value: '$techScheduledCount',
-                                label: 'Job Requests',
-                                onTap: () {
-                                  // Set tab to Request (0) before navigating
-                                  ref.read(techJobsInitialTabProvider.notifier).state = 0;
-                                  context.go('/tech-jobs');
-                                },
-                              ),
-                              _StatCard(
-                                icon: Icons.attach_money,
-                                iconColor: Colors.white,
-                                bgColor: const Color(0xFFB845F5),
-                                value: '₱${periodEarnings.toStringAsFixed(0)}',
-                                label: 'Earnings',
-                                onTap: () => context.go('/tech-earnings'),
-                              ),
-                            ],
-                            ),
-                          ),
-                      const SizedBox(height: 16),
-                      // Performance Metrics
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Performance Metrics',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _MetricCard(
-                                    label: 'Completion Rate',
-                                    value: '${completionRate.toStringAsFixed(1)}%',
-                                    icon: Icons.check_circle,
-                                    color: Colors.green,
-                                    subtitle: '$techCompletedCount of $totalJobsInPeriod jobs',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _MetricCard(
-                                    label: 'Customer Rating',
-                                    value: technicianRating > 0 ? technicianRating.toStringAsFixed(1) : 'N/A',
-                                    icon: Icons.star,
-                                    color: Colors.orange,
-                                    subtitle: 'Based on $totalReviews reviews',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Monthly Goal Progress
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: _MonthlyGoalCard(
-                          currentEarnings: monthlyEarnings,
-                          goalAmount: monthlyGoal,
-                          progress: goalProgress,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Weekly Performance Chart
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: _WeeklyPerformanceChart(
-                          weeklyData: weeklyData,
-                          earningsTrend: earningsTrend,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Job Status Distribution
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: _JobStatusChart(
-                          pending: pendingCount,
-                          inProgress: inProgressCount,
-                          completed: allCompletedCount,
-                          cancelled: cancelledCount,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Quick Actions
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Quick Actions',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _QuickActionButton(
-                                    icon: Icons.star,
-                                    iconColor: Colors.pink,
-                                    iconBgColor: Colors.pink.withValues(alpha: 0.15),
-                                    label: 'View\nRating',
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => const TechRatingsScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _QuickActionButton(
-                                    icon: Icons.location_on,
-                                    iconColor: Colors.green,
-                                    iconBgColor: Colors.green.withValues(alpha: 0.15),
-                                    label: 'Mark\nAvailable',
-                                    onTap: () {},
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _QuickActionButton(
-                                    icon: Icons.headset_mic,
-                                    iconColor: AppTheme.lightBlue,
-                                    iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.15),
-                                    label: 'Contact\nSupport',
-                                    onTap: () {
-                                      context.go('/tech-profile/help-support');
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            // Today's Schedule
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Today\'s Schedule',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textPrimaryColor,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.lightBlue,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.lightBlue.withValues(alpha: 0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Text(
-                                    '$techActiveCount Active',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // Dynamic Job Cards - Show active bookings from Supabase
-                            ...activeBookings.map((booking) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _SimpleJobCard(
-                                  booking: booking,
-                                ),
-                              );
-                            }),
-                            // Show message if no active bookings
-                            if (activeBookings.isEmpty)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(32),
-                                  child: Column(
-                                    children: [
-                                      Icon(Icons.work_outline, size: 64, color: Colors.grey.shade400),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'No active jobs at the moment',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey.shade600,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-          ],
-        );
+          );
         },
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MiniPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Colors.grey.shade800,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -806,7 +1000,11 @@ class _StatCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Icon(icon, color: iconColor, size: 24),
-                Icon(Icons.arrow_forward, color: iconColor.withValues(alpha: 0.5), size: 16),
+                Icon(
+                  Icons.arrow_forward,
+                  color: iconColor.withValues(alpha: 0.5),
+                  size: 16,
+                ),
               ],
             ),
             Column(
@@ -862,10 +1060,14 @@ class _NotificationItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isNew ? AppTheme.primaryCyan.withValues(alpha: 0.1) : Colors.white,
+        color: isNew
+            ? AppTheme.primaryCyan.withValues(alpha: 0.1)
+            : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isNew ? AppTheme.lightBlue.withValues(alpha: 0.3) : Colors.grey.shade200,
+          color: isNew
+              ? AppTheme.lightBlue.withValues(alpha: 0.3)
+              : Colors.grey.shade200,
           width: isNew ? 2 : 1,
         ),
       ),
@@ -920,7 +1122,11 @@ class _NotificationItem extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.access_time, size: 14, color: Colors.grey.shade500),
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: Colors.grey.shade500,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       time,
@@ -943,9 +1149,7 @@ class _NotificationItem extends StatelessWidget {
 class _SimpleJobCard extends ConsumerWidget {
   final BookingModel booking;
 
-  const _SimpleJobCard({
-    required this.booking,
-  });
+  const _SimpleJobCard({required this.booking});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -979,7 +1183,11 @@ class _SimpleJobCard extends ConsumerWidget {
                         color: AppTheme.lightBlue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.build, color: AppTheme.lightBlue, size: 20),
+                      child: const Icon(
+                        Icons.build,
+                        color: AppTheme.lightBlue,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -993,7 +1201,10 @@ class _SimpleJobCard extends ConsumerWidget {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF9C27B0),
                     borderRadius: BorderRadius.circular(6),
@@ -1022,10 +1233,16 @@ class _SimpleJobCard extends ConsumerWidget {
                   if (booking.scheduledDate != null)
                     Row(
                       children: [
-                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                        const Icon(
+                          Icons.access_time,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(width: 6),
                         Text(
-                          DateFormat('MMM dd, hh:mm a').format(booking.scheduledDate!),
+                          DateFormat(
+                            'MMM dd, hh:mm a',
+                          ).format(booking.scheduledDate!),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textPrimaryColor,
@@ -1033,12 +1250,17 @@ class _SimpleJobCard extends ConsumerWidget {
                         ),
                       ],
                     ),
-                  if (booking.scheduledDate != null && booking.customerAddress != null)
+                  if (booking.scheduledDate != null &&
+                      booking.customerAddress != null)
                     const SizedBox(height: 6),
                   if (booking.customerAddress != null)
                     Row(
                       children: [
-                        const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                        const Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -1076,7 +1298,10 @@ class _SimpleJobCard extends ConsumerWidget {
                     context.go('/tech-jobs');
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.deepBlue,
                       borderRadius: BorderRadius.circular(8),
@@ -1205,10 +1430,7 @@ class _MetricCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
         ],
       ),
@@ -1262,7 +1484,10 @@ class _MonthlyGoalCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -1289,10 +1514,7 @@ class _MonthlyGoalCard extends StatelessWidget {
           ),
           Text(
             'of ₱${goalAmount.toStringAsFixed(0)} goal',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-            ),
+            style: const TextStyle(fontSize: 14, color: Colors.white70),
           ),
           const SizedBox(height: 16),
           ClipRRect(
@@ -1300,17 +1522,16 @@ class _MonthlyGoalCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: Colors.white.withValues(alpha: 0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryCyan),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppTheme.primaryCyan,
+              ),
               minHeight: 10,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '₱${(goalAmount - currentEarnings).toStringAsFixed(0)} remaining',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white70,
-            ),
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
         ],
       ),
@@ -1374,7 +1595,9 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      earningsTrend >= 0 ? Icons.trending_up : Icons.trending_down,
+                      earningsTrend >= 0
+                          ? Icons.trending_up
+                          : Icons.trending_down,
                       size: 14,
                       color: earningsTrend >= 0 ? Colors.green : Colors.red,
                     ),
@@ -1398,7 +1621,9 @@ class _WeeklyPerformanceChart extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (index) {
-                final value = weeklyData.length > index ? weeklyData[index] : 0.0;
+                final value = weeklyData.length > index
+                    ? weeklyData[index]
+                    : 0.0;
                 final height = maxValue > 0 ? (value / maxValue * 80) : 0.0;
                 final isToday = index == todayIndex;
                 final dayOffset = 6 - index;
@@ -1415,7 +1640,9 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             fontWeight: FontWeight.w600,
-                            color: isToday ? AppTheme.deepBlue : Colors.grey.shade600,
+                            color: isToday
+                                ? AppTheme.deepBlue
+                                : Colors.grey.shade600,
                           ),
                         ),
                       const SizedBox(height: 4),
@@ -1423,7 +1650,9 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                         height: height.clamp(4.0, 80.0),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
-                          color: isToday ? AppTheme.deepBlue : AppTheme.lightBlue.withValues(alpha: 0.5),
+                          color: isToday
+                              ? AppTheme.deepBlue
+                              : AppTheme.lightBlue.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -1432,8 +1661,12 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                         dayLabel,
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                          color: isToday ? AppTheme.deepBlue : Colors.grey.shade600,
+                          fontWeight: isToday
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: isToday
+                              ? AppTheme.deepBlue
+                              : Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -1594,10 +1827,7 @@ class _LegendItem extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         ),
         Text(

@@ -4,6 +4,7 @@ import '../models/redeemed_voucher.dart';
 import '../services/redeemed_voucher_service.dart';
 import 'booking_provider.dart';
 import 'auth_provider.dart';
+import '../core/utils/app_logger.dart';
 
 // Service provider
 final redeemedVoucherServiceProvider = Provider((ref) => RedeemedVoucherService());
@@ -43,11 +44,11 @@ final rewardPointsProvider = FutureProvider<int>((ref) async {
     // Calculate remaining points
     final remainingPoints = earnedPoints - spentPoints;
 
-    print('RewardPointsProvider: Earned $earnedPoints points, spent $spentPoints points, remaining $remainingPoints points');
+    AppLogger.p('RewardPointsProvider: Earned $earnedPoints points, spent $spentPoints points, remaining $remainingPoints points');
 
     return remainingPoints > 0 ? remainingPoints : 0;
   } catch (e) {
-    print('RewardPointsProvider: Error calculating points from Supabase - $e');
+    AppLogger.p('RewardPointsProvider: Error calculating points from Supabase - $e');
     return 0;
   }
 });

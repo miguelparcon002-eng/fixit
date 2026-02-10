@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
+import '../core/utils/app_logger.dart';
 
 class VoucherService {
   final _supabase = SupabaseConfig.client;
@@ -13,7 +14,7 @@ class VoucherService {
           .single();
       return response['profile_setup_complete'] ?? false;
     } catch (e) {
-      print('VoucherService: Error loading profile_setup_complete - $e');
+      AppLogger.p('VoucherService: Error loading profile_setup_complete - $e');
       return false;
     }
   }
@@ -25,7 +26,7 @@ class VoucherService {
           .update({'profile_setup_complete': true})
           .eq('id', userId);
     } catch (e) {
-      print('VoucherService: Error marking profile setup complete - $e');
+      AppLogger.p('VoucherService: Error marking profile setup complete - $e');
       rethrow;
     }
   }

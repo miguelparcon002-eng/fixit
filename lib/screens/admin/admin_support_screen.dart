@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
+import '../../core/widgets/app_logo.dart';
 
 class AdminSupportScreen extends ConsumerStatefulWidget {
   const AdminSupportScreen({super.key});
@@ -12,7 +13,8 @@ class AdminSupportScreen extends ConsumerStatefulWidget {
   ConsumerState<AdminSupportScreen> createState() => _AdminSupportScreenState();
 }
 
-class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with SingleTickerProviderStateMixin {
+class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedFilter = 'all';
   String _selectedPriority = 'all';
@@ -53,10 +55,12 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
       }
 
       // Filter by category
-      bool matchesCategory = _selectedFilter == 'all' || ticket.category == _selectedFilter;
+      bool matchesCategory =
+          _selectedFilter == 'all' || ticket.category == _selectedFilter;
 
       // Filter by priority
-      bool matchesPriority = _selectedPriority == 'all' || ticket.priority == _selectedPriority;
+      bool matchesPriority =
+          _selectedPriority == 'all' || ticket.priority == _selectedPriority;
 
       return matchesTab && matchesCategory && matchesPriority;
     }).toList();
@@ -71,25 +75,32 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
     final filteredTickets = getFilteredTickets(tickets);
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.textPrimaryColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/admin-home'),
         ),
-        title: const Text(
-          'Customer Support',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Customer Support',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black),
+            icon: const Icon(Icons.refresh),
             onPressed: () {
               ref.read(supportTicketsProvider.notifier).reload();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +109,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
             },
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list, color: Colors.black),
+            icon: const Icon(Icons.filter_list),
             onPressed: _showFilterDialog,
           ),
         ],
@@ -242,10 +253,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
                 children: [
                   const Text(
                     'Filter Tickets',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   TextButton(
                     onPressed: () {
@@ -262,10 +270,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
               const SizedBox(height: 16),
               const Text(
                 'Category',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -300,7 +305,9 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
                     label: 'Technician',
                     isSelected: _selectedFilter == 'technician_complaint',
                     onTap: () {
-                      setModalState(() => _selectedFilter = 'technician_complaint');
+                      setModalState(
+                        () => _selectedFilter = 'technician_complaint',
+                      );
                       setState(() {});
                     },
                   ),
@@ -325,10 +332,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> with Si
               const SizedBox(height: 16),
               const Text(
                 'Priority',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -458,10 +462,7 @@ class _TicketCard extends StatelessWidget {
   final SupportTicket ticket;
   final VoidCallback onTap;
 
-  const _TicketCard({
-    required this.ticket,
-    required this.onTap,
-  });
+  const _TicketCard({required this.ticket, required this.onTap});
 
   Color get priorityColor {
     switch (ticket.priority) {
@@ -572,11 +573,7 @@ class _TicketCard extends StatelessWidget {
                         color: priorityColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
-                        categoryIcon,
-                        color: priorityColor,
-                        size: 20,
-                      ),
+                      child: Icon(categoryIcon, color: priorityColor, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -645,7 +642,9 @@ class _TicketCard extends StatelessWidget {
                       radius: 14,
                       backgroundColor: Colors.grey[300],
                       child: Text(
-                        ticket.customerName.isNotEmpty ? ticket.customerName[0] : '?',
+                        ticket.customerName.isNotEmpty
+                            ? ticket.customerName[0]
+                            : '?',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -709,10 +708,7 @@ class _TicketCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'Booking: ${ticket.bookingId}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -728,10 +724,7 @@ class _TicketCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       categoryLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                     ),
                     if (ticket.messages.isNotEmpty) ...[
                       const Spacer(),
@@ -743,10 +736,7 @@ class _TicketCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '${ticket.messages.length} message${ticket.messages.length > 1 ? 's' : ''}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                       ),
                     ],
                   ],

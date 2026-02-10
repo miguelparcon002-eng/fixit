@@ -30,51 +30,51 @@ class _AdminNavigationState extends State<AdminNavigation> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.dashboard,
-                  label: 'Dashboard',
-                  isSelected: _currentIndex == 0,
-                  onTap: () {
-                    setState(() => _currentIndex = 0);
-                    context.go('/admin-home');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.calendar_today,
-                  label: 'Appointment',
-                  isSelected: _currentIndex == 1,
-                  onTap: () {
-                    setState(() => _currentIndex = 1);
-                    context.go('/admin-appointments');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.engineering,
-                  label: 'Technician',
-                  isSelected: _currentIndex == 2,
-                  onTap: () {
-                    setState(() => _currentIndex = 2);
-                    context.go('/admin-technicians');
-                  },
-                ),
-                _NavItem(
-                  icon: Icons.bar_chart,
-                  label: 'Report',
-                  isSelected: _currentIndex == 3,
-                  onTap: () {
-                    setState(() => _currentIndex = 3);
-                    context.go('/admin-reports');
-                  },
-                ),
-              ],
-            ),
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(
+                icon: Icons.dashboard,
+                label: 'Dashboard',
+                isSelected: _currentIndex == 0,
+                onTap: () {
+                  setState(() => _currentIndex = 0);
+                  context.go('/admin-home');
+                },
+              ),
+              _NavItem(
+                icon: Icons.calendar_today,
+                label: 'Appointment',
+                isSelected: _currentIndex == 1,
+                onTap: () {
+                  setState(() => _currentIndex = 1);
+                  context.go('/admin-appointments');
+                },
+              ),
+              _NavItem(
+                icon: Icons.engineering,
+                label: 'Technician',
+                isSelected: _currentIndex == 2,
+                onTap: () {
+                  setState(() => _currentIndex = 2);
+                  context.go('/admin-technicians');
+                },
+              ),
+              _NavItem(
+                icon: Icons.bar_chart,
+                label: 'Report',
+                isSelected: _currentIndex == 3,
+                onTap: () {
+                  setState(() => _currentIndex = 3);
+                  context.go('/admin-reports');
+                },
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -99,7 +99,9 @@ class _NavItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryCyan : Colors.transparent,
+          color: isSelected
+              ? AppTheme.deepBlue.withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -107,7 +109,9 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.black : Colors.grey[600],
+              color: isSelected
+                  ? AppTheme.deepBlue
+                  : AppTheme.textSecondaryColor,
               size: 24,
             ),
             const SizedBox(height: 4),
@@ -115,8 +119,10 @@ class _NavItem extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                color: isSelected ? Colors.black : Colors.grey[600],
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected
+                    ? AppTheme.deepBlue
+                    : AppTheme.textSecondaryColor,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
               ),
             ),
           ],

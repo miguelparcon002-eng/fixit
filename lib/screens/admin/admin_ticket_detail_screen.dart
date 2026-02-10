@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
+import '../../core/widgets/app_logo.dart';
 
 class AdminTicketDetailScreen extends ConsumerStatefulWidget {
   final String ticketId;
@@ -12,10 +13,12 @@ class AdminTicketDetailScreen extends ConsumerStatefulWidget {
   const AdminTicketDetailScreen({super.key, required this.ticketId});
 
   @override
-  ConsumerState<AdminTicketDetailScreen> createState() => _AdminTicketDetailScreenState();
+  ConsumerState<AdminTicketDetailScreen> createState() =>
+      _AdminTicketDetailScreenState();
 }
 
-class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScreen> {
+class _AdminTicketDetailScreenState
+    extends ConsumerState<AdminTicketDetailScreen> {
   final TextEditingController _replyController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
@@ -88,7 +91,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
         createdAt: DateTime.now(),
       );
 
-      await ref.read(supportTicketsProvider.notifier).addMessage(widget.ticketId, message);
+      await ref
+          .read(supportTicketsProvider.notifier)
+          .addMessage(widget.ticketId, message);
       _replyController.clear();
 
       // Scroll to bottom
@@ -127,13 +132,17 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
   }
 
   Future<void> _updateStatus(String newStatus) async {
-    await ref.read(supportTicketsProvider.notifier).updateTicketStatus(widget.ticketId, newStatus);
+    await ref
+        .read(supportTicketsProvider.notifier)
+        .updateTicketStatus(widget.ticketId, newStatus);
 
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ticket status updated to ${newStatus.replaceAll('_', ' ')}'),
+          content: Text(
+            'Ticket status updated to ${newStatus.replaceAll('_', ' ')}',
+          ),
           backgroundColor: Colors.green,
         ),
       );
@@ -154,10 +163,7 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
           children: [
             const Text(
               'Update Ticket Status',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
             _StatusOption(
@@ -247,7 +253,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,15 +272,19 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                       _ResolutionStep(
                         number: '1',
                         title: 'Review the Issue',
-                        description: 'Ensure you understand the customer\'s problem',
+                        description:
+                            'Ensure you understand the customer\'s problem',
                         isCompleted: true,
                       ),
                       const SizedBox(height: 8),
                       _ResolutionStep(
                         number: '2',
                         title: 'Provide Solution',
-                        description: 'Reply with a clear solution or explanation',
-                        isCompleted: ticket.messages.any((m) => m.senderRole == 'admin'),
+                        description:
+                            'Reply with a clear solution or explanation',
+                        isCompleted: ticket.messages.any(
+                          (m) => m.senderRole == 'admin',
+                        ),
                       ),
                       const SizedBox(height: 8),
                       _ResolutionStep(
@@ -318,11 +330,17 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                     decoration: BoxDecoration(
                       color: Colors.amber.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.warning_amber, color: Colors.amber, size: 20),
+                        const Icon(
+                          Icons.warning_amber,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -367,14 +385,19 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                               senderId: 'admin_001',
                               senderName: 'Support Admin',
                               senderRole: 'admin',
-                              message: '✅ RESOLVED: ${resolutionController.text.trim()}',
+                              message:
+                                  '✅ RESOLVED: ${resolutionController.text.trim()}',
                               createdAt: DateTime.now(),
                             );
-                            await ref.read(supportTicketsProvider.notifier).addMessage(widget.ticketId, message);
+                            await ref
+                                .read(supportTicketsProvider.notifier)
+                                .addMessage(widget.ticketId, message);
                           }
 
                           // Update status to resolved
-                          await ref.read(supportTicketsProvider.notifier).updateTicketStatus(widget.ticketId, 'resolved');
+                          await ref
+                              .read(supportTicketsProvider.notifier)
+                              .updateTicketStatus(widget.ticketId, 'resolved');
 
                           resolutionController.dispose();
                           if (context.mounted) {
@@ -383,7 +406,10 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                               const SnackBar(
                                 content: Row(
                                   children: [
-                                    Icon(Icons.check_circle, color: Colors.white),
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                    ),
                                     SizedBox(width: 10),
                                     Text('Ticket resolved successfully!'),
                                   ],
@@ -437,7 +463,10 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
             ),
             if (ticket.bookingId != null)
               ListTile(
-                leading: const Icon(Icons.receipt_long, color: AppTheme.deepBlue),
+                leading: const Icon(
+                  Icons.receipt_long,
+                  color: AppTheme.deepBlue,
+                ),
                 title: const Text('View Related Booking'),
                 onTap: () {
                   Navigator.pop(context);
@@ -446,12 +475,17 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
               ),
             if (ticket.technicianId != null)
               ListTile(
-                leading: const Icon(Icons.engineering, color: AppTheme.deepBlue),
+                leading: const Icon(
+                  Icons.engineering,
+                  color: AppTheme.deepBlue,
+                ),
                 title: const Text('View Technician Profile'),
                 onTap: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Opening technician profile...')),
+                    const SnackBar(
+                      content: Text('Opening technician profile...'),
+                    ),
                   );
                 },
               ),
@@ -461,7 +495,11 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Calling ${ticket.customerPhone ?? ticket.customerEmail}...')),
+                  SnackBar(
+                    content: Text(
+                      'Calling ${ticket.customerPhone ?? ticket.customerEmail}...',
+                    ),
+                  ),
                 );
               },
             ),
@@ -471,13 +509,20 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Sending email to ${ticket.customerEmail}...')),
+                  SnackBar(
+                    content: Text(
+                      'Sending email to ${ticket.customerEmail}...',
+                    ),
+                  ),
                 );
               },
             ),
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Delete Ticket', style: TextStyle(color: Colors.red)),
+              title: const Text(
+                'Delete Ticket',
+                style: TextStyle(color: Colors.red),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteConfirmation();
@@ -494,7 +539,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Ticket?'),
-        content: const Text('Are you sure you want to delete this support ticket? This action cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete this support ticket? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -503,7 +550,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await ref.read(supportTicketsProvider.notifier).deleteTicket(widget.ticketId);
+              await ref
+                  .read(supportTicketsProvider.notifier)
+                  .deleteTicket(widget.ticketId);
               if (mounted) {
                 context.pop();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -531,21 +580,28 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
 
     if (ticket == null) {
       return Scaffold(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
-          backgroundColor: AppTheme.primaryCyan,
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.textPrimaryColor,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          title: const Text(
-            'Ticket Not Found',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+          titleSpacing: 16,
+          title: Row(
+            children: [
+              const AppLogo(size: 28, showText: false, assetPath: 'assets/images/logo_square.png'),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Ticket Not Found',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
         body: Container(
@@ -575,25 +631,32 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
     final categoryLabel = _getCategoryLabel(ticket.category);
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.textPrimaryColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: Text(
-          widget.ticketId,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            const AppLogo(size: 28, showText: false, assetPath: 'assets/images/logo_square.png'),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.ticketId,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.black),
+            icon: const Icon(Icons.more_vert),
             onPressed: () => _showMoreOptions(ticket),
           ),
         ],
@@ -664,7 +727,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                       radius: 18,
                       backgroundColor: Colors.grey[300],
                       child: Text(
-                        ticket.customerName.isNotEmpty ? ticket.customerName[0] : 'C',
+                        ticket.customerName.isNotEmpty
+                            ? ticket.customerName[0]
+                            : 'C',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -723,15 +788,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _InfoChip(
-                      icon: Icons.label,
-                      label: categoryLabel,
-                    ),
+                    _InfoChip(icon: Icons.label, label: categoryLabel),
                     if (ticket.bookingId != null)
-                      _InfoChip(
-                        icon: Icons.receipt,
-                        label: ticket.bookingId!,
-                      ),
+                      _InfoChip(icon: Icons.receipt, label: ticket.bookingId!),
                     if (ticket.customerPhone != null)
                       _InfoChip(
                         icon: Icons.phone,
@@ -832,7 +891,9 @@ class _AdminTicketDetailScreenState extends ConsumerState<AdminTicketDetailScree
                                       ),
                                     )
                                   : const Icon(Icons.send, color: Colors.white),
-                              onPressed: _isLoading ? null : () => _sendReply(ticket),
+                              onPressed: _isLoading
+                                  ? null
+                                  : () => _sendReply(ticket),
                             ),
                           ),
                         ],
@@ -853,10 +914,7 @@ class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-  });
+  const _InfoChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -871,13 +929,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: Colors.grey[600]),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[700],
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
         ],
       ),
     );
@@ -888,10 +940,7 @@ class _MessageBubble extends StatelessWidget {
   final TicketMessage message;
   final bool isAdmin;
 
-  const _MessageBubble({
-    required this.message,
-    required this.isAdmin,
-  });
+  const _MessageBubble({required this.message, required this.isAdmin});
 
   String get timeString {
     final hour = message.createdAt.hour;
@@ -906,7 +955,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: isAdmin ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isAdmin
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isAdmin) ...[
@@ -928,9 +979,7 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isAdmin
-                    ? AppTheme.deepBlue
-                    : Colors.grey[100],
+                color: isAdmin ? AppTheme.deepBlue : Colors.grey[100],
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -949,13 +998,18 @@ class _MessageBubble extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isAdmin ? Colors.white70 : AppTheme.textSecondaryColor,
+                          color: isAdmin
+                              ? Colors.white70
+                              : AppTheme.textSecondaryColor,
                         ),
                       ),
                       if (isAdmin) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white24,
                             borderRadius: BorderRadius.circular(4),
@@ -998,11 +1052,7 @@ class _MessageBubble extends StatelessWidget {
             const CircleAvatar(
               radius: 16,
               backgroundColor: AppTheme.deepBlue,
-              child: Icon(
-                Icons.support_agent,
-                size: 18,
-                color: Colors.white,
-              ),
+              child: Icon(Icons.support_agent, size: 18, color: Colors.white),
             ),
           ],
         ],
@@ -1053,8 +1103,7 @@ class _StatusOption extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            if (isSelected)
-              Icon(Icons.check_circle, color: color, size: 24),
+            if (isSelected) Icon(Icons.check_circle, color: color, size: 24),
           ],
         ),
       ),
@@ -1115,10 +1164,7 @@ class _ResolutionStep extends StatelessWidget {
               ),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
               ),
             ],
           ),

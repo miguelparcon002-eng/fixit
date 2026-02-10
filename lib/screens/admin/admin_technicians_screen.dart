@@ -10,174 +10,158 @@ class AdminTechniciansScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: Row(
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const AppLogo(size: 48),
-                  Row(
-                    children: [
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications, size: 28, color: Colors.black),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => const AdminNotificationsDialog(),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 10,
-                            top: 10,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, size: 24, color: Colors.black),
-                        onPressed: () {
-                          context.go('/login');
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            const AppLogo(
+              size: 28,
+              showText: false,
+              assetPath: 'assets/images/logo_square.png',
             ),
-            // Add Technicians Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Adding new technician...')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.deepBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '+ Add Technicians',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Search Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search technicians...',
-                  hintStyle: TextStyle(
-                    color: Colors.grey[400],
-                    fontStyle: FontStyle.italic,
-                  ),
-                  prefixIcon: const Icon(Icons.search, color: Colors.black54),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Filters Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.filter_list),
-                  label: const Text(
-                    'Filters',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    backgroundColor: Colors.white,
-                    side: BorderSide.none,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Technicians List
+            const SizedBox(width: 10),
             Expanded(
-              child: Container(
-                color: AppTheme.primaryCyan,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ListView(
-                  children: [
-                    _TechnicianCard(
-                      name: 'Shen Sarsale',
-                      techId: 'TECH001',
-                      status: 'active',
-                      statusColor: Colors.green,
-                      rating: '4.9',
-                      jobs: '234',
-                      experience: '3 years',
-                      phone: '09723724672',
-                      location: 'Barangay 7, SFADS',
-                      specialties: const ['Iphone', 'Samsung', 'Screen Repair'],
-                      currentJob: '#FX156 - Hernan Miguel Parcon\nIphone 14 Pro',
-                    ),
-                    const SizedBox(height: 16),
-                    _TechnicianCard(
-                      name: 'Ethanjames Estino',
-                      techId: 'TECH002',
-                      status: 'active',
-                      statusColor: Colors.green,
-                      rating: '4.6',
-                      jobs: '184',
-                      experience: '2 years',
-                      phone: '09723724672',
-                      location: 'Barangay 2, SFADS',
-                      specialties: const ['Macbook', 'Laptop Repair', 'Battery'],
-                      currentJob: '#FX189 - Emily Davis\nMacbook Air M2',
-                    ),
-                  ],
+              child: Text(
+                'Technicians',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryColor,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const AdminNotificationsDialog(),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.go('/login'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search technicians…',
+                      prefixIcon: const Icon(Icons.search),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.tune),
+                  label: const Text('Filters'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    foregroundColor: AppTheme.textPrimaryColor,
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Adding new technician…')),
+                  );
+                },
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('Add technician'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: const [
+                _TechnicianCard(
+                  name: 'Shen Sarsale',
+                  techId: 'TECH001',
+                  status: 'active',
+                  statusColor: Colors.green,
+                  rating: '4.9',
+                  jobs: '234',
+                  experience: '3 years',
+                  phone: '09723724672',
+                  location: 'Barangay 7, SFADS',
+                  specialties: ['Iphone', 'Samsung', 'Screen Repair'],
+                  currentJob: '#FX156 - Hernan Miguel Parcon\nIphone 14 Pro',
+                ),
+                SizedBox(height: 12),
+                _TechnicianCard(
+                  name: 'Ethanjames Estino',
+                  techId: 'TECH002',
+                  status: 'active',
+                  statusColor: Colors.green,
+                  rating: '4.6',
+                  jobs: '184',
+                  experience: '2 years',
+                  phone: '09723724672',
+                  location: 'Barangay 2, SFADS',
+                  specialties: ['Macbook', 'Laptop Repair', 'Battery'],
+                  currentJob: '#FX189 - Emily Davis\nMacbook Air M2',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -212,29 +196,43 @@ class _TechnicianCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = name.split(' ').map((n) => n[0]).take(2).join().toUpperCase();
+    final initials = name
+        .split(' ')
+        .map((n) => n[0])
+        .take(2)
+        .join()
+        .toUpperCase();
+
+    final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black, width: 2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.grey[300],
+                radius: 22,
+                backgroundColor: AppTheme.deepBlue.withValues(alpha: 0.10),
                 child: Text(
                   initials,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.deepBlue,
                   ),
                 ),
               ),
@@ -243,207 +241,216 @@ class _TechnicianCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.textPrimaryColor,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.30),
+                            ),
+                          ),
+                          child: Text(
+                            status.toUpperCase(),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: statusColor,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       techId,
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTheme.textSecondaryColor,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        status,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _StatColumn(
+                            icon: Icons.star,
+                            value: rating,
+                            label: 'Rating',
+                            color: Colors.amber,
+                            dense: true,
+                          ),
                         ),
-                      ),
+                        Expanded(
+                          child: _StatColumn(
+                            icon: Icons.work_outline,
+                            value: jobs,
+                            label: 'Jobs',
+                            color: AppTheme.lightBlue,
+                            dense: true,
+                          ),
+                        ),
+                        Expanded(
+                          child: _StatColumn(
+                            icon: Icons.timelapse,
+                            value: experience,
+                            label: 'Exp',
+                            color: AppTheme.accentPurple,
+                            dense: true,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _StatColumn(icon: Icons.star, value: rating, label: 'Ratings', color: Colors.amber),
-              _StatColumn(icon: Icons.work, value: jobs, label: 'Jobs', color: AppTheme.lightBlue),
-              _StatColumn(icon: Icons.access_time, value: experience, label: 'Experience', color: Colors.purple),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.phone, size: 18, color: AppTheme.textSecondaryColor),
-              const SizedBox(width: 8),
-              Text(
-                phone,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.location_on, size: 18, color: AppTheme.textSecondaryColor),
-              const SizedBox(width: 8),
-              Text(
-                location,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Specialties',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimaryColor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: specialties.map((specialty) {
+            children: specialties.take(4).map((specialty) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.black, width: 1),
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Text(
                   specialty,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
                   ),
                 ),
               );
             }).toList(),
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  location,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Assigning job to $name...')),
+                  );
+                },
+                icon: const Icon(Icons.assignment_add, size: 18),
+                label: const Text('Assign'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.deepBlue,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFFE5E7EB)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                tooltip: 'More actions',
+                onSelected: (value) {
+                  switch (value) {
+                    case 'call':
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Calling $name...')),
+                      );
+                      break;
+                    case 'message':
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Messaging $name...')),
+                      );
+                      break;
+                    case 'details':
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Opening $name details...')),
+                      );
+                      break;
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'details', child: Text('View details')),
+                  PopupMenuItem(value: 'call', child: Text('Call')),
+                  PopupMenuItem(value: 'message', child: Text('Message')),
+                ],
+                child: const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Icon(
+                    Icons.more_vert,
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
           if (currentJob.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.lightBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppTheme.lightBlue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.lightBlue.withValues(alpha: 0.18),
+                ),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.build, size: 16, color: AppTheme.lightBlue),
-                      SizedBox(width: 4),
-                      Text(
-                        'Current Job',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.lightBlue,
-                        ),
-                      ),
-                    ],
+                  const Icon(
+                    Icons.build_outlined,
+                    size: 16,
+                    color: AppTheme.lightBlue,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    currentJob,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondaryColor,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentJob,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Calling $name...')),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Call'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Messaging $name...')),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: const BorderSide(color: Colors.black),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Message'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Assigning job to $name...')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Assign Job'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -455,32 +462,40 @@ class _StatColumn extends StatelessWidget {
   final String value;
   final String label;
   final Color color;
+  final bool dense;
 
   const _StatColumn({
     required this.icon,
     required this.value,
     required this.label,
     required this.color,
+    this.dense = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final iconSize = dense ? 16.0 : 20.0;
+    final valueStyle = dense
+        ? theme.textTheme.bodyMedium
+        : theme.textTheme.titleSmall;
+
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
+        Icon(icon, color: color, size: iconSize),
+        SizedBox(height: dense ? 2 : 4),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+          style: valueStyle?.copyWith(
+            fontWeight: FontWeight.w900,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
+          style: theme.textTheme.labelSmall?.copyWith(
             color: AppTheme.textSecondaryColor,
           ),
         ),

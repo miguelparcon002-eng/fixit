@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/customer_model.dart';
+import '../core/utils/app_logger.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
@@ -85,7 +86,7 @@ class CustomersNotifier extends StateNotifier<AsyncValue<List<CustomerModel>>> {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'key');
     } catch (e) {
-      print('Error saving customers to Supabase: $e');
+      AppLogger.p('Error saving customers to Supabase: $e');
     }
   }
 
@@ -188,7 +189,7 @@ class CustomersNotifier extends StateNotifier<AsyncValue<List<CustomerModel>>> {
 
       return [];
     } catch (e) {
-      print('Error loading booking history: $e');
+      AppLogger.p('Error loading booking history: $e');
       return [];
     }
   }
@@ -206,7 +207,7 @@ class CustomersNotifier extends StateNotifier<AsyncValue<List<CustomerModel>>> {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'key');
     } catch (e) {
-      print('Error saving booking history: $e');
+      AppLogger.p('Error saving booking history: $e');
     }
   }
 

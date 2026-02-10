@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/theme/app_theme.dart';
 import '../../models/customer_model.dart';
 import '../../providers/customer_provider.dart';
+import '../../core/widgets/app_logo.dart';
 
 class AdminCustomersScreen extends ConsumerStatefulWidget {
   const AdminCustomersScreen({super.key});
 
   @override
-  ConsumerState<AdminCustomersScreen> createState() => _AdminCustomersScreenState();
+  ConsumerState<AdminCustomersScreen> createState() =>
+      _AdminCustomersScreenState();
 }
 
 class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
@@ -27,15 +30,29 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
     final customersAsync = ref.watch(customersProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Customers',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        foregroundColor: AppTheme.textPrimaryColor,
         elevation: 0,
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Customers',
+                style: TextStyle(fontWeight: FontWeight.w800),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: Colors.grey.shade200),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -49,10 +66,25 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
         children: [
           // Search and Filter Section
           Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text(
+                  'Search & filters',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 // Search Bar
                 TextField(
                   controller: _searchController,
@@ -80,7 +112,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.blue),
+                      borderSide: const BorderSide(color: AppTheme.deepBlue),
                     ),
                     filled: true,
                     fillColor: Colors.grey[50],
@@ -100,27 +132,31 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                       _FilterChip(
                         label: 'All',
                         isSelected: _selectedFilter == 'all',
-                        onSelected: () => setState(() => _selectedFilter = 'all'),
+                        onSelected: () =>
+                            setState(() => _selectedFilter = 'all'),
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
                         label: 'Active',
                         isSelected: _selectedFilter == 'active',
-                        onSelected: () => setState(() => _selectedFilter = 'active'),
+                        onSelected: () =>
+                            setState(() => _selectedFilter = 'active'),
                         color: Colors.green,
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
                         label: 'Inactive',
                         isSelected: _selectedFilter == 'inactive',
-                        onSelected: () => setState(() => _selectedFilter = 'inactive'),
+                        onSelected: () =>
+                            setState(() => _selectedFilter = 'inactive'),
                         color: Colors.grey,
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
                         label: 'Suspended',
                         isSelected: _selectedFilter == 'suspended',
-                        onSelected: () => setState(() => _selectedFilter = 'suspended'),
+                        onSelected: () =>
+                            setState(() => _selectedFilter = 'suspended'),
                         color: Colors.red,
                       ),
                     ],
@@ -132,10 +168,15 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
           // Stats Summary
           customersAsync.when(
             data: (customers) {
-              final activeCount = customers.where((c) => c.isCurrentlyActive).length;
+              final activeCount = customers
+                  .where((c) => c.isCurrentlyActive)
+                  .length;
               final totalCount = customers.length;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     _StatCard(
@@ -160,7 +201,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
           // Customer List
           Expanded(
@@ -172,19 +213,33 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                 // Search filter
                 if (_searchQuery.isNotEmpty) {
                   final query = _searchQuery.toLowerCase();
-                  filteredCustomers = filteredCustomers.where((c) =>
-                      c.name.toLowerCase().contains(query) ||
-                      c.email.toLowerCase().contains(query) ||
-                      (c.phone?.contains(query) ?? false)).toList();
+                  filteredCustomers = filteredCustomers
+                      .where(
+                        (c) =>
+                            c.name.toLowerCase().contains(query) ||
+                            c.email.toLowerCase().contains(query) ||
+                            (c.phone?.contains(query) ?? false),
+                      )
+                      .toList();
                 }
 
                 // Status filter
                 if (_selectedFilter == 'active') {
-                  filteredCustomers = filteredCustomers.where((c) => c.isCurrentlyActive).toList();
+                  filteredCustomers = filteredCustomers
+                      .where((c) => c.isCurrentlyActive)
+                      .toList();
                 } else if (_selectedFilter == 'inactive') {
-                  filteredCustomers = filteredCustomers.where((c) => !c.isCurrentlyActive && c.status != CustomerStatus.suspended).toList();
+                  filteredCustomers = filteredCustomers
+                      .where(
+                        (c) =>
+                            !c.isCurrentlyActive &&
+                            c.status != CustomerStatus.suspended,
+                      )
+                      .toList();
                 } else if (_selectedFilter == 'suspended') {
-                  filteredCustomers = filteredCustomers.where((c) => c.status == CustomerStatus.suspended).toList();
+                  filteredCustomers = filteredCustomers
+                      .where((c) => c.status == CustomerStatus.suspended)
+                      .toList();
                 }
 
                 if (filteredCustomers.isEmpty) {
@@ -205,9 +260,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                   },
                 );
               },
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -240,11 +293,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.people_outline,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.people_outline, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isNotEmpty || _selectedFilter != 'all'
@@ -261,10 +310,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
             _searchQuery.isNotEmpty || _selectedFilter != 'all'
                 ? 'Try adjusting your search or filter'
                 : 'Customers will appear here when they sign up',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -348,10 +394,7 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -364,10 +407,7 @@ class _CustomerCard extends StatelessWidget {
   final CustomerModel customer;
   final VoidCallback onTap;
 
-  const _CustomerCard({
-    required this.customer,
-    required this.onTap,
-  });
+  const _CustomerCard({required this.customer, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -471,10 +511,7 @@ class _CustomerCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     customer.email,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
@@ -497,10 +534,7 @@ class _CustomerCard extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.chevron_right, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -513,11 +547,7 @@ class _InfoBadge extends StatelessWidget {
   final String text;
   final Color? color;
 
-  const _InfoBadge({
-    required this.icon,
-    required this.text,
-    this.color,
-  });
+  const _InfoBadge({required this.icon, required this.text, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -527,13 +557,7 @@ class _InfoBadge extends StatelessWidget {
       children: [
         Icon(icon, size: 12, color: badgeColor),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            color: badgeColor,
-          ),
-        ),
+        Text(text, style: TextStyle(fontSize: 11, color: badgeColor)),
       ],
     );
   }

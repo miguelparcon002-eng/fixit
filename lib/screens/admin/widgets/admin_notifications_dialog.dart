@@ -30,7 +30,8 @@ class AdminNotificationsDialog extends StatefulWidget {
   const AdminNotificationsDialog({super.key});
 
   @override
-  State<AdminNotificationsDialog> createState() => _AdminNotificationsDialogState();
+  State<AdminNotificationsDialog> createState() =>
+      _AdminNotificationsDialogState();
 }
 
 class _AdminNotificationsDialogState extends State<AdminNotificationsDialog> {
@@ -243,7 +244,8 @@ class _AdminNotificationsDialogState extends State<AdminNotificationsDialog> {
                                 context.go(notification.route!);
                               }
                             },
-                            onDismiss: () => _removeNotification(notification.id),
+                            onDismiss: () =>
+                                _removeNotification(notification.id),
                           ),
                         );
                       },

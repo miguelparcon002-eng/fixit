@@ -2,9 +2,12 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
+import '../core/constants/app_constants.dart';
+import '../core/utils/app_logger.dart';
 
 class ImageUploadService {
-  static const String _bucketName = 'profile-images';
+  // Keep this aligned with AppConstants.bucketProfiles.
+  static const String _bucketName = AppConstants.bucketProfiles;
 
   /// Upload a profile image to Supabase Storage
   /// Returns the public URL of the uploaded image
@@ -18,7 +21,7 @@ class ImageUploadService {
       final extension = imageFile.path.split('.').last.toLowerCase();
       final fileName = '$userId/$timestamp.$extension';
 
-      print('ImageUploadService: Uploading image to $fileName');
+      AppLogger.p('ImageUploadService: Uploading image to $fileName');
 
       // Get image bytes
       final Uint8List imageBytes = await imageFile.readAsBytes();
@@ -39,11 +42,11 @@ class ImageUploadService {
           .from(_bucketName)
           .getPublicUrl(fileName);
 
-      print('ImageUploadService: Upload successful, URL: $publicUrl');
+      AppLogger.p('ImageUploadService: Upload successful, URL: $publicUrl');
 
       return publicUrl;
     } catch (e) {
-      print('ImageUploadService: Error uploading image - $e');
+      AppLogger.p('ImageUploadService: Error uploading image - $e');
       return null;
     }
   }
@@ -57,7 +60,7 @@ class ImageUploadService {
       final xFile = XFile(filePath);
       return await uploadProfileImage(userId: userId, imageFile: xFile);
     } catch (e) {
-      print('ImageUploadService: Error uploading from path - $e');
+      AppLogger.p('ImageUploadService: Error uploading from path - $e');
       return null;
     }
   }
@@ -72,7 +75,7 @@ class ImageUploadService {
       final uri = Uri.parse(imageUrl);
       final pathSegments = uri.pathSegments;
 
-      // Find the index of 'profile-images' and get everything after it
+      // Find the index of the bucket name and get everything after it
       final bucketIndex = pathSegments.indexOf(_bucketName);
       if (bucketIndex >= 0 && bucketIndex < pathSegments.length - 1) {
         final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
@@ -81,10 +84,10 @@ class ImageUploadService {
             .from(_bucketName)
             .remove([filePath]);
 
-        print('ImageUploadService: Deleted old image: $filePath');
+        AppLogger.p('ImageUploadService: Deleted old image: $filePath');
       }
     } catch (e) {
-      print('ImageUploadService: Error deleting image - $e');
+      AppLogger.p('ImageUploadService: Error deleting image - $e');
     }
   }
 
@@ -96,12 +99,12 @@ class ImageUploadService {
     try {
       await SupabaseConfig.client
           .from('users')
-          .update({'profile_picture': imageUrl})
+          .update({'profile_picture': imageUrl, 'profile_image_url': imageUrl})
           .eq('id', userId);
 
-      print('ImageUploadService: Updated profile_picture in database');
+      AppLogger.p('ImageUploadService: Updated profile picture URL(s) in database');
     } catch (e) {
-      print('ImageUploadService: Error updating database - $e');
+      AppLogger.p('ImageUploadService: Error updating database - $e');
       rethrow;
     }
   }
@@ -136,7 +139,7 @@ class ImageUploadService {
 
       return newUrl;
     } catch (e) {
-      print('ImageUploadService: Error in uploadAndSave - $e');
+      AppLogger.p('ImageUploadService: Error in uploadAndSave - $e');
       return null;
     }
   }

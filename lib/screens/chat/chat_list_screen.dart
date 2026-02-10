@@ -257,7 +257,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                     if (_matchesSearch('What devices') || _matchesSearch('devices') || _matchesSearch('repair') || _matchesSearch('smartphones') || _matchesSearch('tablets') || _matchesSearch('laptops'))
                       _FAQItem(
                         question: 'What devices do you repair?',
-                        answer: 'We repair smartphones, tablets, laptops, desktops, and other electronic devices.',
+                        answer: 'We repair smartphones and laptops (including common issues like screens, batteries, charging, and software problems).',
                         isExpanded: _expandedIndex == 1,
                         onTap: () => setState(() => _expandedIndex = _expandedIndex == 1 ? null : 1),
                       ),

@@ -1,4 +1,5 @@
 import '../core/config/supabase_config.dart';
+import '../core/utils/app_logger.dart';
 
 class Rating {
   final String id;
@@ -66,24 +67,24 @@ class RatingsService {
 
   Future<List<Rating>> getAllRatings() async {
     try {
-      print('RatingsService: Loading all ratings from Supabase...');
+      AppLogger.p('RatingsService: Loading all ratings from Supabase...');
 
       final response = await SupabaseConfig.client
           .from(_tableName)
           .select()
           .order('created_at', ascending: false);
 
-      print('RatingsService: Loaded ${response.length} ratings');
+      AppLogger.p('RatingsService: Loaded ${response.length} ratings');
       return (response as List).map((item) => Rating.fromSupabase(item)).toList();
     } catch (e) {
-      print('RatingsService: Error loading ratings - $e');
+      AppLogger.p('RatingsService: Error loading ratings - $e');
       return [];
     }
   }
 
   Future<List<Rating>> getRatingsForTechnician(String technician) async {
     try {
-      print('RatingsService: Loading ratings for $technician...');
+      AppLogger.p('RatingsService: Loading ratings for $technician...');
 
       final response = await SupabaseConfig.client
           .from(_tableName)
@@ -91,17 +92,17 @@ class RatingsService {
           .eq('technician', technician)
           .order('created_at', ascending: false);
 
-      print('RatingsService: Found ${response.length} ratings for $technician');
+      AppLogger.p('RatingsService: Found ${response.length} ratings for $technician');
       return (response as List).map((item) => Rating.fromSupabase(item)).toList();
     } catch (e) {
-      print('RatingsService: Error loading ratings - $e');
+      AppLogger.p('RatingsService: Error loading ratings - $e');
       return [];
     }
   }
 
   Future<void> addRating(Rating rating) async {
     try {
-      print('RatingsService: Adding rating to Supabase...');
+      AppLogger.p('RatingsService: Adding rating to Supabase...');
 
       await SupabaseConfig.client
           .from(_tableName)
@@ -115,9 +116,9 @@ class RatingsService {
             'device': rating.device,
           });
 
-      print('RatingsService: Rating added successfully');
+      AppLogger.p('RatingsService: Rating added successfully');
     } catch (e) {
-      print('RatingsService: Error adding rating - $e');
+      AppLogger.p('RatingsService: Error adding rating - $e');
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/customer_model.dart';
 import '../../providers/customer_provider.dart';
+import '../../core/widgets/app_logo.dart';
 
 class AdminCustomerDetailScreen extends ConsumerStatefulWidget {
   final String customerId;
@@ -11,10 +12,12 @@ class AdminCustomerDetailScreen extends ConsumerStatefulWidget {
   const AdminCustomerDetailScreen({super.key, required this.customerId});
 
   @override
-  ConsumerState<AdminCustomerDetailScreen> createState() => _AdminCustomerDetailScreenState();
+  ConsumerState<AdminCustomerDetailScreen> createState() =>
+      _AdminCustomerDetailScreenState();
 }
 
-class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailScreen>
+class _AdminCustomerDetailScreenState
+    extends ConsumerState<AdminCustomerDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -33,18 +36,30 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
   @override
   Widget build(BuildContext context) {
     final customer = ref.watch(customerByIdProvider(widget.customerId));
-    final bookingHistoryAsync = ref.watch(customerBookingHistoryProvider(widget.customerId));
+    final bookingHistoryAsync = ref.watch(
+      customerBookingHistoryProvider(widget.customerId),
+    );
 
     if (customer == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Customer Details'),
+          titleSpacing: 16,
+          title: Row(
+            children: [
+              const AppLogo(size: 30, showText: false, assetPath: 'assets/images/logo_square.png'),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Customer Details',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
         ),
-        body: const Center(
-          child: Text('Customer not found'),
-        ),
+        body: const Center(child: Text('Customer not found')),
       );
     }
 
@@ -58,6 +73,13 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
               pinned: true,
               backgroundColor: AppTheme.deepBlue,
               foregroundColor: Colors.white,
+              titleSpacing: 16,
+              title: const AppLogo(
+                size: 28,
+                showText: false,
+                textColor: Colors.white,
+                assetPath: 'assets/images/logo_square.png',
+              ),
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: BoxDecoration(
@@ -81,7 +103,8 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
                               CircleAvatar(
                                 radius: 40,
                                 backgroundColor: Colors.white,
-                                backgroundImage: customer.profileImageUrl != null
+                                backgroundImage:
+                                    customer.profileImageUrl != null
                                     ? NetworkImage(customer.profileImageUrl!)
                                     : null,
                                 child: customer.profileImageUrl == null
@@ -108,7 +131,10 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
                                         ? Colors.green
                                         : Colors.grey,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 3),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -130,7 +156,9 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: _getStatusColor(customer).withValues(alpha: 0.2),
+                              color: _getStatusColor(
+                                customer,
+                              ).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -220,10 +248,9 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
     if (action == 'suspend') {
       _showSuspendDialog(customer);
     } else if (action == 'activate') {
-      ref.read(customersProvider.notifier).updateCustomerStatus(
-            customer.id,
-            CustomerStatus.active,
-          );
+      ref
+          .read(customersProvider.notifier)
+          .updateCustomerStatus(customer.id, CustomerStatus.active);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Customer activated successfully'),
@@ -249,10 +276,9 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
           ),
           ElevatedButton(
             onPressed: () {
-              ref.read(customersProvider.notifier).updateCustomerStatus(
-                    customer.id,
-                    CustomerStatus.suspended,
-                  );
+              ref
+                  .read(customersProvider.notifier)
+                  .updateCustomerStatus(customer.id, CustomerStatus.suspended);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -341,7 +367,9 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
                 icon: Icons.access_time,
                 label: 'Last Active',
                 value: customer.lastActiveAt != null
-                    ? DateFormat('MMM d, yyyy h:mm a').format(customer.lastActiveAt!)
+                    ? DateFormat(
+                        'MMM d, yyyy h:mm a',
+                      ).format(customer.lastActiveAt!)
                     : 'Never',
               ),
               _InfoRow(
@@ -359,7 +387,9 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
     );
   }
 
-  Widget _buildBookingsTab(AsyncValue<List<CustomerBookingHistory>> bookingHistoryAsync) {
+  Widget _buildBookingsTab(
+    AsyncValue<List<CustomerBookingHistory>> bookingHistoryAsync,
+  ) {
     return bookingHistoryAsync.when(
       data: (bookings) {
         if (bookings.isEmpty) {
@@ -380,10 +410,7 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
                 const SizedBox(height: 8),
                 Text(
                   'This customer has not made any bookings yet',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 ),
               ],
             ),
@@ -400,9 +427,8 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(
-        child: Text('Error loading bookings: $error'),
-      ),
+      error: (error, _) =>
+          Center(child: Text('Error loading bookings: $error')),
     );
   }
 
@@ -438,11 +464,13 @@ class _AdminCustomerDetailScreenState extends ConsumerState<AdminCustomerDetailS
             _SectionCard(
               title: 'Saved Addresses',
               children: customer.addresses
-                  .map((address) => _ContactRow(
-                        icon: Icons.location_on,
-                        label: 'Address',
-                        value: address,
-                      ))
+                  .map(
+                    (address) => _ContactRow(
+                      icon: Icons.location_on,
+                      label: 'Address',
+                      value: address,
+                    ),
+                  )
                   .toList(),
             ),
           if (customer.addresses.isEmpty)
@@ -478,11 +506,12 @@ class _SliverTabBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => tabBar.preferredSize.height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white,
-      child: tabBar,
-    );
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(color: Colors.white, child: tabBar);
   }
 
   @override
@@ -538,13 +567,7 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
         ],
       ),
     );
@@ -555,10 +578,7 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const _SectionCard({
-    required this.title,
-    required this.children,
-  });
+  const _SectionCard({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -581,10 +601,7 @@ class _SectionCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
           const Divider(height: 1),
@@ -619,10 +636,7 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ),
           Text(
@@ -675,10 +689,7 @@ class _ContactRow extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -745,10 +756,7 @@ class _BookingHistoryCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 booking.technicianName,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               ),
             ],
           ),
@@ -759,10 +767,7 @@ class _BookingHistoryCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 DateFormat('MMM d, yyyy - h:mm a').format(booking.bookingDate),
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               ),
             ],
           ),
@@ -772,10 +777,7 @@ class _BookingHistoryCard extends StatelessWidget {
             children: [
               Text(
                 'Amount',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               ),
               Text(
                 '\$${booking.amount.toStringAsFixed(2)}',

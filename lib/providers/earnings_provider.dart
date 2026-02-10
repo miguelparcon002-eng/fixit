@@ -1,125 +1,92 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/earnings_service.dart';
+
+import '../models/booking_model.dart';
 import 'booking_provider.dart';
-import 'auth_provider.dart';
 
-final earningsServiceProvider = Provider((ref) => EarningsService());
+/// Range selection for transaction filtering in the technician earnings screen.
+enum EarningsRange { week, month }
 
-// Provider for total earnings calculated from Supabase bookings
+/// UI state for selected range.
+final selectedEarningsRangeProvider = StateProvider<EarningsRange>((ref) {
+  return EarningsRange.week;
+});
+
+bool _isCompleted(BookingModel b) {
+  return b.status.toLowerCase() == 'completed';
+}
+
+double _bookingAmount(BookingModel b) {
+  // Prefer final cost; fallback to estimated.
+  final finalCost = b.finalCost;
+  if (finalCost != null) return finalCost.toDouble();
+  final estimated = b.estimatedCost;
+  if (estimated != null) return estimated.toDouble();
+  return 0.0;
+}
+
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+/// Completed bookings (transactions) for the current technician.
+///
+/// Kept as a FutureProvider so UI can use `.when(...)`.
+final transactionsProvider = FutureProvider<List<BookingModel>>((ref) async {
+  final bookings = await ref.watch(technicianBookingsProvider.future);
+  return bookings.where(_isCompleted).toList();
+});
+
+/// Filters transactions by [selectedEarningsRangeProvider].
+final filteredTransactionsProvider = FutureProvider<List<BookingModel>>((ref) async {
+  final range = ref.watch(selectedEarningsRangeProvider);
+  final transactions = await ref.watch(transactionsProvider.future);
+
+  final now = DateTime.now();
+  final DateTime cutoff = switch (range) {
+    EarningsRange.week => now.subtract(const Duration(days: 7)),
+    EarningsRange.month => DateTime(now.year, now.month, 1),
+  };
+
+  return transactions.where((b) {
+    return b.createdAt.isAfter(cutoff);
+  }).toList();
+});
+
 final totalEarningsProvider = FutureProvider<double>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
-
-  double total = 0.0;
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed') {
-      total += (booking.finalCost ?? booking.estimatedCost ?? 0.0);
-    }
-  }
-
-  print('TotalEarningsProvider: Calculated ₱$total from Supabase completed bookings');
-  return total;
+  final transactions = await ref.watch(transactionsProvider.future);
+  return transactions.fold<double>(0.0, (sum, b) => sum + _bookingAmount(b));
 });
 
-// Provider for today's earnings calculated from Supabase bookings
 final todayEarningsProvider = FutureProvider<double>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
-  final today = DateTime.now();
-  final todayStart = DateTime(today.year, today.month, today.day);
-  final todayEnd = todayStart.add(const Duration(days: 1));
-
-  double total = 0.0;
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed' && booking.completedAt != null) {
-      final completedDate = booking.completedAt!;
-      if (completedDate.isAfter(todayStart) && completedDate.isBefore(todayEnd)) {
-        total += (booking.finalCost ?? booking.estimatedCost ?? 0.0);
-      }
-    }
-  }
-
-  print('TodayEarningsProvider: Calculated ₱$total for today from Supabase');
-  return total;
-});
-
-// Provider for this week's earnings calculated from Supabase bookings
-final weekEarningsProvider = FutureProvider<double>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
-  final now = DateTime.now();
-  final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-  final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-
-  double total = 0.0;
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed' && booking.completedAt != null) {
-      if (!booking.completedAt!.isBefore(startOfWeekDate)) {
-        total += (booking.finalCost ?? booking.estimatedCost ?? 0.0);
-      }
-    }
-  }
-
-  print('WeekEarningsProvider: Calculated ₱$total for this week from Supabase');
-  return total;
-});
-
-// Provider for this month's earnings calculated from Supabase bookings
-final monthEarningsProvider = FutureProvider<double>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
+  final transactions = await ref.watch(transactionsProvider.future);
   final now = DateTime.now();
 
-  double total = 0.0;
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed' && booking.completedAt != null) {
-      final completedDate = booking.completedAt!;
-      if (completedDate.year == now.year && completedDate.month == now.month) {
-        total += (booking.finalCost ?? booking.estimatedCost ?? 0.0);
-      }
-    }
-  }
-
-  print('MonthEarningsProvider: Calculated ₱$total for this month from Supabase');
-  return total;
-});
-
-// Provider for transactions list from Supabase bookings
-final transactionsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
-
-  final transactions = <Map<String, dynamic>>[];
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed') {
-      transactions.add({
-        'id': booking.id,
-        'customer_name': 'Customer', // BookingModel doesn't have customer name, would need to fetch
-        'service': booking.serviceId,
-        'job_id': booking.id,
-        'amount': (booking.finalCost ?? booking.estimatedCost ?? 0.0),
-        'created_at': (booking.completedAt ?? booking.createdAt).toIso8601String(),
-      });
-    }
-  }
-
-  // Sort by date descending
-  transactions.sort((a, b) {
-    final dateA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
-    final dateB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
-    return dateB.compareTo(dateA);
+  final todayTx = transactions.where((b) {
+    return _isSameDay(b.createdAt, now);
   });
 
-  print('TransactionsProvider: Found ${transactions.length} transactions from Supabase');
-  return transactions;
+  return todayTx.fold<double>(0.0, (sum, b) => sum + _bookingAmount(b));
 });
 
-// Provider for jobs completed count from Supabase bookings
-final jobsCompletedProvider = FutureProvider<int>((ref) async {
-  final bookingsAsync = await ref.watch(technicianBookingsProvider.future);
+final weekEarningsProvider = FutureProvider<double>((ref) async {
+  final transactions = await ref.watch(transactionsProvider.future);
+  final now = DateTime.now();
+  final weekAgo = now.subtract(const Duration(days: 7));
 
-  int count = 0;
-  for (final booking in bookingsAsync) {
-    if (booking.status == 'completed') {
-      count++;
-    }
-  }
+  final weekTx = transactions.where((b) {
+    return b.createdAt.isAfter(weekAgo);
+  });
 
-  print('JobsCompletedProvider: Found $count completed jobs from Supabase');
-  return count;
+  return weekTx.fold<double>(0.0, (sum, b) => sum + _bookingAmount(b));
+});
+
+final monthEarningsProvider = FutureProvider<double>((ref) async {
+  final transactions = await ref.watch(transactionsProvider.future);
+  final now = DateTime.now();
+  final monthStart = DateTime(now.year, now.month, 1);
+
+  final monthTx = transactions.where((b) {
+    return b.createdAt.isAfter(monthStart);
+  });
+
+  return monthTx.fold<double>(0.0, (sum, b) => sum + _bookingAmount(b));
 });

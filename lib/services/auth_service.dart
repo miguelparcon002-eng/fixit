@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../core/constants/db_constants.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
+import '../core/utils/app_logger.dart';
 
 class AuthService {
   final _supabase = SupabaseConfig.client;
@@ -17,11 +18,11 @@ class AuthService {
     final user = currentUser;
     if (user == null) {
       StorageService.setCurrentUser(null);
-      print('AuthService: No current user in auth');
+      AppLogger.p('AuthService: No current user in auth');
       return null;
     }
 
-    print('AuthService: Getting profile for user ${user.id} (${user.email})');
+    AppLogger.p('AuthService: Getting profile for user ${user.id} (${user.email})');
 
     // Set current user for storage isolation
     StorageService.setCurrentUser(user.id);
@@ -34,19 +35,19 @@ class AuthService {
           .eq('id', user.id)
           .maybeSingle();
 
-      print('AuthService: DB response = $response');
+      AppLogger.p('AuthService: DB response = $response');
 
       if (response == null) {
         // User exists in auth but not in users table - create profile from metadata
-        print('AuthService: User profile not found in DB, creating from metadata...');
+        AppLogger.p('AuthService: User profile not found in DB, creating from metadata...');
         final email = user.email ?? '';
         final metadata = user.userMetadata ?? {};
-        print('AuthService: User metadata = $metadata');
+        AppLogger.p('AuthService: User metadata = $metadata');
         final fullName = metadata['full_name'] as String? ?? email.split('@').first;
         final role = metadata['role'] as String? ?? AppConstants.roleCustomer;
         final contactNumber = metadata['contact_number'] as String?;
 
-        print('AuthService: Creating profile with role: $role');
+        AppLogger.p('AuthService: Creating profile with role: $role');
 
         await _createUserProfile(
           userId: user.id,
@@ -65,17 +66,17 @@ class AuthService {
 
         if (newResponse != null) {
           final newUser = UserModel.fromJson(newResponse);
-          print('AuthService: Created new profile - role: ${newUser.role}');
+          AppLogger.p('AuthService: Created new profile - role: ${newUser.role}');
           return newUser;
         }
         return null;
       }
 
       final userModel = UserModel.fromJson(response);
-      print('AuthService: Found existing profile - role: ${userModel.role}, email: ${userModel.email}');
+      AppLogger.p('AuthService: Found existing profile - role: ${userModel.role}, email: ${userModel.email}');
       return userModel;
     } catch (e) {
-      print('AuthService: Error getting user profile - $e');
+      AppLogger.p('AuthService: Error getting user profile - $e');
       return null;
     }
   }
@@ -98,9 +99,9 @@ class AuthService {
         'verified': role == AppConstants.roleCustomer ? true : false,
         'created_at': DateTime.now().toIso8601String(),
       });
-      print('AuthService: Created/updated user profile for $email with role $role');
+      AppLogger.p('AuthService: Created/updated user profile for $email with role $role');
     } catch (e) {
-      print('AuthService: Error creating user profile - $e');
+      AppLogger.p('AuthService: Error creating user profile - $e');
       rethrow;
     }
   }
@@ -133,9 +134,9 @@ class AuthService {
           role: role,
           contactNumber: contactNumber,
         );
-        print('AuthService: Successfully created account for $email as $role');
+        AppLogger.p('AuthService: Successfully created account for $email as $role');
       } catch (e) {
-        print('AuthService: Failed to create user profile in DB - $e');
+        AppLogger.p('AuthService: Failed to create user profile in DB - $e');
         // Don't throw here - the auth user was created, profile can be created on first login
       }
     }
@@ -160,7 +161,7 @@ class AuthService {
       try {
         await getCurrentUserProfile();
       } catch (e) {
-        print('AuthService: Error ensuring user profile on login - $e');
+        AppLogger.p('AuthService: Error ensuring user profile on login - $e');
       }
     }
 
@@ -232,7 +233,7 @@ class AuthService {
 
       return response?['role'] == role;
     } catch (e) {
-      print('AuthService: Error checking user role - $e');
+      AppLogger.p('AuthService: Error checking user role - $e');
       return false;
     }
   }
@@ -250,7 +251,7 @@ class AuthService {
 
       return response?['verified'] == true;
     } catch (e) {
-      print('AuthService: Error checking verification status - $e');
+      AppLogger.p('AuthService: Error checking verification status - $e');
       return false;
     }
   }
@@ -267,7 +268,7 @@ class AuthService {
           .map((json) => UserModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('AuthService: Error getting all users - $e');
+      AppLogger.p('AuthService: Error getting all users - $e');
       return [];
     }
   }
@@ -285,7 +286,7 @@ class AuthService {
           .map((json) => UserModel.fromJson(json))
           .toList();
     } catch (e) {
-      print('AuthService: Error getting users by role - $e');
+      AppLogger.p('AuthService: Error getting users by role - $e');
       return [];
     }
   }
@@ -297,9 +298,9 @@ class AuthService {
           .from(DBConstants.users)
           .update({'verified': verified})
           .eq('id', userId);
-      print('AuthService: Set technician $userId verification to $verified');
+      AppLogger.p('AuthService: Set technician $userId verification to $verified');
     } catch (e) {
-      print('AuthService: Error setting technician verification - $e');
+      AppLogger.p('AuthService: Error setting technician verification - $e');
       rethrow;
     }
   }

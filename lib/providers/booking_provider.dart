@@ -2,8 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/booking_model.dart';
 import '../services/booking_service.dart';
 import 'auth_provider.dart';
+import '../core/utils/app_logger.dart';
 
 final bookingServiceProvider = Provider((ref) => BookingService());
+
+final bookingByIdProvider = FutureProvider.family<BookingModel?, String>((ref, bookingId) async {
+  final bookingService = ref.watch(bookingServiceProvider);
+  return bookingService.getBookingById(bookingId);
+});
 
 final customerBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
@@ -18,14 +24,14 @@ final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
   final user = ref.watch(currentUserProvider).value;
 
-  print('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
+  AppLogger.p('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
 
   if (user == null) {
-    print('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
+    AppLogger.p('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
     return Stream.value([]);
   }
 
-  print('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
+  AppLogger.p('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
   return bookingService.watchTechnicianBookings(user.id);
 });
 

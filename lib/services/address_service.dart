@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../models/user_address.dart';
+import '../core/utils/app_logger.dart';
 
 class AddressService {
   final _supabase = SupabaseConfig.client;
@@ -17,7 +18,7 @@ class AddressService {
           .map((json) => UserAddress.fromJson(json))
           .toList();
     } catch (e) {
-      print('AddressService: Error loading addresses - $e');
+      AppLogger.p('AddressService: Error loading addresses - $e');
       return [];
     }
   }
@@ -45,10 +46,10 @@ class AddressService {
           .select()
           .single();
 
-      print('AddressService: Address added successfully');
+      AppLogger.p('AddressService: Address added successfully');
       return UserAddress.fromJson(response);
     } catch (e) {
-      print('AddressService: Error adding address - $e');
+      AppLogger.p('AddressService: Error adding address - $e');
       return null;
     }
   }
@@ -79,10 +80,10 @@ class AddressService {
           .select()
           .single();
 
-      print('AddressService: Address updated successfully');
+      AppLogger.p('AddressService: Address updated successfully');
       return UserAddress.fromJson(response);
     } catch (e) {
-      print('AddressService: Error updating address - $e');
+      AppLogger.p('AddressService: Error updating address - $e');
       return null;
     }
   }
@@ -92,10 +93,10 @@ class AddressService {
     try {
       await _supabase.from('user_addresses').delete().eq('id', addressId);
 
-      print('AddressService: Address deleted successfully');
+      AppLogger.p('AddressService: Address deleted successfully');
       return true;
     } catch (e) {
-      print('AddressService: Error deleting address - $e');
+      AppLogger.p('AddressService: Error deleting address - $e');
       return false;
     }
   }
@@ -108,10 +109,10 @@ class AddressService {
           .update({'is_default': true})
           .eq('id', addressId);
 
-      print('AddressService: Default address set successfully');
+      AppLogger.p('AddressService: Default address set successfully');
       return true;
     } catch (e) {
-      print('AddressService: Error setting default address - $e');
+      AppLogger.p('AddressService: Error setting default address - $e');
       return false;
     }
   }
@@ -129,7 +130,7 @@ class AddressService {
       if (response == null) return null;
       return UserAddress.fromJson(response);
     } catch (e) {
-      print('AddressService: Error getting default address - $e');
+      AppLogger.p('AddressService: Error getting default address - $e');
       return null;
     }
   }

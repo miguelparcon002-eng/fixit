@@ -5,6 +5,7 @@ import '../core/config/supabase_config.dart';
 import '../core/constants/app_constants.dart';
 import '../core/constants/db_constants.dart';
 import '../models/verification_request_model.dart';
+import '../core/utils/app_logger.dart';
 
 class VerificationService {
   final _supabase = SupabaseConfig.client;
@@ -34,8 +35,8 @@ class VerificationService {
         .from(AppConstants.bucketDocuments)
         .createSignedUrl(path, 31536000); // 1 year in seconds
 
-    print('Uploaded document: $path');
-    print('Signed URL: $signedUrl');
+    AppLogger.p('Uploaded document: $path');
+    AppLogger.p('Signed URL: $signedUrl');
     
     return signedUrl;
   }
@@ -184,7 +185,7 @@ class VerificationService {
       }
     }
 
-    print('✅ User profile updated with verification data for user: $userId');
+    AppLogger.p('✅ User profile updated with verification data for user: $userId');
   }
 
   Future<void> rejectVerification({

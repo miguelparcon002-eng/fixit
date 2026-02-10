@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/profile_service.dart';
+import '../core/utils/app_logger.dart';
 
 final profileServiceProvider = Provider((ref) => ProfileService());
 
@@ -111,9 +112,9 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       final reloadedSpecialties = await _profileService.loadSpecialties();
       state = AsyncValue.data(currentData.copyWith(specialties: reloadedSpecialties));
 
-      print('ProfileNotifier: Specialties updated and reloaded from Supabase: $reloadedSpecialties');
+      AppLogger.p('ProfileNotifier: Specialties updated and reloaded from Supabase: $reloadedSpecialties');
     } catch (e, stack) {
-      print('ProfileNotifier: Error updating specialties - $e');
+      AppLogger.p('ProfileNotifier: Error updating specialties - $e');
       state = AsyncValue.error(e, stack);
     }
   }

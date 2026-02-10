@@ -5,7 +5,6 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_address.dart';
-import '../../services/address_service.dart';
 
 class AddressesScreen extends ConsumerWidget {
   const AddressesScreen({super.key});
@@ -456,7 +455,7 @@ class _AddEditAddressDialogState extends ConsumerState<_AddEditAddressDialog> {
                         value: _isDefault,
                         onChanged: (value) => setState(() => _isDefault = value),
                         activeTrackColor: AppTheme.primaryCyan,
-                        activeColor: Colors.white,
+                        activeThumbColor: Colors.white,
                       ),
                     ],
                   ),

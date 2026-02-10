@@ -17,507 +17,525 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_selectedView != 'dashboard') {
+              setState(() => _selectedView = 'dashboard');
+              return;
+            }
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/admin-home');
+            }
+          },
+        ),
+        title: Row(
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const AppLogo(size: 48),
-                  Row(
-                    children: [
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications, size: 28, color: Colors.black),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => const AdminNotificationsDialog(),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 10,
-                            top: 10,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.logout, size: 24, color: Colors.black),
-                        onPressed: () {
-                          context.go('/login');
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            const AppLogo(
+              size: 28,
+              showText: false,
+              assetPath: 'assets/images/logo_square.png',
             ),
-            // Export Report Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Exporting report...')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.deepBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Export Report',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Reports Dashboard Header with Dropdown (only show on dashboard view)
-            if (_selectedView == 'dashboard')
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Reports Dashboard',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => Dialog(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _PeriodOption(
-                                    label: 'Month',
-                                    isSelected: _selectedPeriod == 'Month',
-                                    onTap: () {
-                                      setState(() => _selectedPeriod = 'Month');
-                                      Navigator.of(context).pop();
-                                    },
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _PeriodOption(
-                                    label: 'Week',
-                                    isSelected: _selectedPeriod == 'Week',
-                                    onTap: () {
-                                      setState(() => _selectedPeriod = 'Week');
-                                      Navigator.of(context).pop();
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _selectedPeriod,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.keyboard_arrow_down, color: Colors.black, size: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (_selectedView == 'dashboard') const SizedBox(height: 16),
-            // Content based on selected view
+            const SizedBox(width: 10),
             Expanded(
-              child: _selectedView == 'dashboard'
-                  ? _buildDashboardView()
-                  : _selectedView == 'device'
-                      ? _buildDeviceBreakdownView()
-                      : _selectedView == 'areas'
-                          ? _buildPopularAreasView()
-                          : _buildTeamPerformanceView(),
+              child: Text(
+                _selectedView == 'dashboard'
+                    ? 'Reports'
+                    : _selectedView == 'device'
+                    ? 'Device breakdown'
+                    : _selectedView == 'areas'
+                    ? 'Popular areas'
+                    : 'Team performance',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryColor,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => const AdminNotificationsDialog(),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.go('/login'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth >= 900
+              ? 820.0
+              : double.infinity;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Export & period',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => Dialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _PeriodOption(
+                                                label: 'Month',
+                                                isSelected:
+                                                    _selectedPeriod == 'Month',
+                                                onTap: () {
+                                                  setState(
+                                                    () => _selectedPeriod =
+                                                        'Month',
+                                                  );
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                              const SizedBox(height: 8),
+                                              _PeriodOption(
+                                                label: 'Week',
+                                                isSelected:
+                                                    _selectedPeriod == 'Week',
+                                                onTap: () {
+                                                  setState(
+                                                    () => _selectedPeriod =
+                                                        'Week',
+                                                  );
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.date_range_outlined),
+                                  label: Text('Period: $_selectedPeriod'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.textPrimaryColor,
+                                    backgroundColor: Colors.white,
+                                    side: const BorderSide(
+                                      color: Color(0xFFE5E7EB),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Exporting report…'),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.file_download_outlined,
+                                  ),
+                                  label: const Text('Export'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.deepBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildViewBody(),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
+  Widget _buildViewBody() {
+    switch (_selectedView) {
+      case 'device':
+        return _buildDeviceBreakdownView();
+      case 'areas':
+        return _buildPopularAreasView();
+      case 'team':
+        return _buildTeamPerformanceView();
+      case 'dashboard':
+      default:
+        return _buildDashboardView();
+    }
+  }
+
   Widget _buildDashboardView() {
-    return SingleChildScrollView(
-      child: Container(
-        color: AppTheme.primaryCyan,
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Overview',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: AppTheme.textPrimaryColor,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: MediaQuery.of(context).size.width >= 620 ? 4 : 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.25,
           children: [
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.35,
-              children: [
-                _StatCard(
-                  icon: Icons.calendar_today,
-                  iconColor: AppTheme.lightBlue,
-                  iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.2),
-                  value: _selectedPeriod == 'Month' ? '1245' : '321',
-                  label: 'Total Bookings',
-                  percentage: '+8%',
-                  isPositive: true,
-                ),
-                _StatCard(
-                  icon: Icons.access_time,
-                  iconColor: const Color(0xFFFF6B6B),
-                  iconBgColor: const Color(0xFFFF6B6B).withValues(alpha: 0.2),
-                  value: _selectedPeriod == 'Month' ? '18 mins' : '16 mins',
-                  label: 'Average Response Time',
-                  percentage: '+23%',
-                  isPositive: true,
-                ),
-                _StatCard(
-                  icon: Icons.attach_money,
-                  iconColor: Colors.green,
-                  iconBgColor: Colors.green.withValues(alpha: 0.2),
-                  value: _selectedPeriod == 'Month' ? '₱789,415' : '₱193,130',
-                  label: 'Total Revenue',
-                  percentage: '+12%',
-                  isPositive: true,
-                ),
-                _StatCard(
-                  icon: Icons.people,
-                  iconColor: Colors.purple,
-                  iconBgColor: Colors.purple.withValues(alpha: 0.2),
-                  value: _selectedPeriod == 'Month' ? '892' : '176',
-                  label: 'Total Customers',
-                  percentage: '+15%',
-                  isPositive: true,
-                ),
-              ],
+            _StatCard(
+              icon: Icons.calendar_today,
+              iconColor: AppTheme.lightBlue,
+              iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.18),
+              value: _selectedPeriod == 'Month' ? '1245' : '321',
+              label: 'Total bookings',
+              percentage: '+8%',
+              isPositive: true,
             ),
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  _ReportOption(
-                    title: 'Device Breakdown',
-                    onTap: () => setState(() => _selectedView = 'device'),
-                  ),
-                  const Divider(height: 1),
-                  _ReportOption(
-                    title: 'Popular Areas',
-                    onTap: () => setState(() => _selectedView = 'areas'),
-                  ),
-                  const Divider(height: 1),
-                  _ReportOption(
-                    title: 'Team Performance',
-                    onTap: () => setState(() => _selectedView = 'team'),
-                  ),
-                ],
-              ),
+            _StatCard(
+              icon: Icons.access_time,
+              iconColor: const Color(0xFFFF6B6B),
+              iconBgColor: const Color(0xFFFF6B6B).withValues(alpha: 0.18),
+              value: _selectedPeriod == 'Month' ? '18 mins' : '16 mins',
+              label: 'Avg response',
+              percentage: '+23%',
+              isPositive: true,
+            ),
+            _StatCard(
+              icon: Icons.attach_money,
+              iconColor: AppTheme.successColor,
+              iconBgColor: AppTheme.successColor.withValues(alpha: 0.18),
+              value: _selectedPeriod == 'Month' ? '₱789,415' : '₱193,130',
+              label: 'Revenue',
+              percentage: '+12%',
+              isPositive: true,
+            ),
+            _StatCard(
+              icon: Icons.people,
+              iconColor: AppTheme.accentPurple,
+              iconBgColor: AppTheme.accentPurple.withValues(alpha: 0.18),
+              value: _selectedPeriod == 'Month' ? '892' : '176',
+              label: 'Customers',
+              percentage: '+15%',
+              isPositive: true,
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          child: Column(
+            children: [
+              _ReportOption(
+                title: 'Device breakdown',
+                subtitle: 'See the most common device types for this period.',
+                icon: Icons.devices_other_outlined,
+                onTap: () => setState(() => _selectedView = 'device'),
+              ),
+              const Divider(height: 1),
+              _ReportOption(
+                title: 'Popular areas',
+                subtitle: 'Bookings distribution by location.',
+                icon: Icons.map_outlined,
+                onTap: () => setState(() => _selectedView = 'areas'),
+              ),
+              const Divider(height: 1),
+              _ReportOption(
+                title: 'Team performance',
+                subtitle: 'Top technicians by jobs, ratings and revenue.',
+                icon: Icons.groups_2_outlined,
+                onTap: () => setState(() => _selectedView = 'team'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildDeviceBreakdownView() {
-    return Container(
-      color: AppTheme.primaryCyan,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Device Breakdown',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SubViewHeader(
+          title: 'Device breakdown',
+          description: 'Most common device categories for the selected period.',
+          onBackToDashboard: () => setState(() => _selectedView = 'dashboard'),
+        ),
+        const SizedBox(height: 12),
+        _DeviceBreakdownCard(
+          icon: Icons.phone_iphone,
+          deviceName: 'iPhone',
+          percentage: '832 (41.6%)',
+          progress: 0.416,
+          revenue: '₱832,000',
+        ),
+        const SizedBox(height: 12),
+        _DeviceBreakdownCard(
+          icon: Icons.phone_android,
+          deviceName: 'Samsung',
+          percentage: '660 (33%)',
+          progress: 0.33,
+          revenue: '₱660,000',
+        ),
+        const SizedBox(height: 12),
+        _DeviceBreakdownCard(
+          icon: Icons.laptop_mac,
+          deviceName: 'MacBook',
+          percentage: '332 (16.6%)',
+          progress: 0.166,
+          revenue: '₱332,000',
+        ),
+        const SizedBox(height: 12),
+        _DeviceBreakdownCard(
+          icon: Icons.laptop,
+          deviceName: 'Vivobook',
+          percentage: '166 (8.3%)',
+          progress: 0.083,
+          revenue: '₱166,000',
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Other reports',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: AppTheme.textPrimaryColor,
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _DeviceBreakdownCard(
-                    icon: Icons.phone_android,
-                    deviceName: 'Iphone',
-                    percentage: '832(41.6%)',
-                    progress: 0.416,
-                    revenue: '₱832,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _DeviceBreakdownCard(
-                    icon: Icons.phone_android,
-                    deviceName: 'Samsung',
-                    percentage: '660(33%)',
-                    progress: 0.33,
-                    revenue: '₱660,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _DeviceBreakdownCard(
-                    icon: Icons.laptop_mac,
-                    deviceName: 'Macbook',
-                    percentage: '332(16.6%)',
-                    progress: 0.166,
-                    revenue: '₱332,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _DeviceBreakdownCard(
-                    icon: Icons.laptop,
-                    deviceName: 'Vivobook',
-                    percentage: '166(8.3%)',
-                    progress: 0.083,
-                    revenue: '₱166,000',
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        _ReportOption(
-                          title: 'Reports Dashboard',
-                          onTap: () => setState(() => _selectedView = 'dashboard'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Popular Areas',
-                          onTap: () => setState(() => _selectedView = 'areas'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Team Performance',
-                          onTap: () => setState(() => _selectedView = 'team'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        ),
+        const SizedBox(height: 8),
+        _SectionCard(
+          child: Column(
+            children: [
+              _ReportOption(
+                title: 'Popular areas',
+                icon: Icons.map_outlined,
+                onTap: () => setState(() => _selectedView = 'areas'),
               ),
-            ),
+              const Divider(height: 1),
+              _ReportOption(
+                title: 'Team performance',
+                icon: Icons.groups_2_outlined,
+                onTap: () => setState(() => _selectedView = 'team'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildPopularAreasView() {
-    return Container(
-      color: AppTheme.primaryCyan,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Popular Areas',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SubViewHeader(
+          title: 'Popular areas',
+          description: 'Where most bookings come from in this period.',
+          onBackToDashboard: () => setState(() => _selectedView = 'dashboard'),
+        ),
+        const SizedBox(height: 12),
+        _AreaCard(
+          areaName: 'Barangay 1, SFADS',
+          count: '1820',
+          revenue: '₱1.8M',
+        ),
+        const SizedBox(height: 12),
+        _AreaCard(
+          areaName: 'Barangay 3, SFADS',
+          count: '1132',
+          revenue: '₱1.1M',
+        ),
+        const SizedBox(height: 12),
+        _AreaCard(
+          areaName: 'Barangay 2, SFADS',
+          count: '786',
+          revenue: '₱786,000',
+        ),
+        const SizedBox(height: 12),
+        _AreaCard(
+          areaName: 'Barangay 7, SFADS',
+          count: '401',
+          revenue: '₱401,000',
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Other reports',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: AppTheme.textPrimaryColor,
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _AreaCard(
-                    areaName: 'Barangay 1, SFADS',
-                    count: '1820',
-                    revenue: '₱1.8M',
-                  ),
-                  const SizedBox(height: 12),
-                  _AreaCard(
-                    areaName: 'Barangay 3, SFADS',
-                    count: '1132',
-                    revenue: '₱1.1M',
-                  ),
-                  const SizedBox(height: 12),
-                  _AreaCard(
-                    areaName: 'Barangay 2, SFADS',
-                    count: '786',
-                    revenue: '₱786,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _AreaCard(
-                    areaName: 'Barangay 7, SFADS',
-                    count: '401',
-                    revenue: '₱401,000',
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        _ReportOption(
-                          title: 'Reports Dashboard',
-                          onTap: () => setState(() => _selectedView = 'dashboard'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Device Breakdown',
-                          onTap: () => setState(() => _selectedView = 'device'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Team Performance',
-                          onTap: () => setState(() => _selectedView = 'team'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        ),
+        const SizedBox(height: 8),
+        _SectionCard(
+          child: Column(
+            children: [
+              _ReportOption(
+                title: 'Device breakdown',
+                icon: Icons.devices_other_outlined,
+                onTap: () => setState(() => _selectedView = 'device'),
               ),
-            ),
+              const Divider(height: 1),
+              _ReportOption(
+                title: 'Team performance',
+                icon: Icons.groups_2_outlined,
+                onTap: () => setState(() => _selectedView = 'team'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildTeamPerformanceView() {
-    return Container(
-      color: AppTheme.primaryCyan,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Team Performance',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SubViewHeader(
+          title: 'Team performance',
+          description: 'A quick look at technician output and ratings.',
+          onBackToDashboard: () => setState(() => _selectedView = 'dashboard'),
+        ),
+        const SizedBox(height: 12),
+        _TechnicianPerformanceCard(
+          initials: 'SS',
+          name: 'Shen Sarsale',
+          rating: 4.7,
+          jobs: '123 jobs',
+          revenue: '₱123,000',
+        ),
+        const SizedBox(height: 12),
+        _TechnicianPerformanceCard(
+          initials: 'EE',
+          name: 'Ethanjames Estino',
+          rating: 4.6,
+          jobs: '110 jobs',
+          revenue: '₱110,000',
+        ),
+        const SizedBox(height: 12),
+        _TechnicianPerformanceCard(
+          initials: 'MC',
+          name: 'Mark Cole',
+          rating: 4.0,
+          jobs: '87 jobs',
+          revenue: '₱87,000',
+        ),
+        const SizedBox(height: 12),
+        _TechnicianPerformanceCard(
+          initials: 'BY',
+          name: 'Bai Yag',
+          rating: 4.0,
+          jobs: '65 jobs',
+          revenue: '₱65,000',
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Other reports',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: AppTheme.textPrimaryColor,
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _TechnicianPerformanceCard(
-                    initials: 'SS',
-                    name: 'Shen Sarsale',
-                    rating: 4.7,
-                    jobs: '123 jobs',
-                    revenue: '₱123,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _TechnicianPerformanceCard(
-                    initials: 'EE',
-                    name: 'Ethanjames Estino',
-                    rating: 4.6,
-                    jobs: '110 jobs',
-                    revenue: '₱110,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _TechnicianPerformanceCard(
-                    initials: 'MC',
-                    name: 'Mark Cole',
-                    rating: 4.0,
-                    jobs: '87 jobs',
-                    revenue: '₱87,000',
-                  ),
-                  const SizedBox(height: 12),
-                  _TechnicianPerformanceCard(
-                    initials: 'BY',
-                    name: 'Bai Yag',
-                    rating: 4.0,
-                    jobs: '65 jobs',
-                    revenue: '₱65,000',
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        _ReportOption(
-                          title: 'Reports Dashboard',
-                          onTap: () => setState(() => _selectedView = 'dashboard'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Device Breakdown',
-                          onTap: () => setState(() => _selectedView = 'device'),
-                        ),
-                        const Divider(height: 1),
-                        _ReportOption(
-                          title: 'Popular Areas',
-                          onTap: () => setState(() => _selectedView = 'areas'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+        ),
+        const SizedBox(height: 8),
+        _SectionCard(
+          child: Column(
+            children: [
+              _ReportOption(
+                title: 'Device breakdown',
+                icon: Icons.devices_other_outlined,
+                onTap: () => setState(() => _selectedView = 'device'),
               ),
-            ),
+              const Divider(height: 1),
+              _ReportOption(
+                title: 'Popular areas',
+                icon: Icons.map_outlined,
+                onTap: () => setState(() => _selectedView = 'areas'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -543,105 +561,232 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
+    final theme = Theme.of(context);
+
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isPositive ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isPositive ? Colors.green : Colors.red,
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  percentage,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isPositive ? Colors.green : Colors.red,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.textSecondaryColor,
-                ),
-              ),
-            ],
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 18),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        (isPositive
+                                ? AppTheme.successColor
+                                : AppTheme.errorColor)
+                            .withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color:
+                          (isPositive
+                                  ? AppTheme.successColor
+                                  : AppTheme.errorColor)
+                              .withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    percentage,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: isPositive
+                          ? AppTheme.successColor
+                          : AppTheme.errorColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: AppTheme.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondaryColor,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _ReportOption extends StatelessWidget {
-  final String title;
-  final VoidCallback onTap;
-
   const _ReportOption({
     required this.title,
+    this.subtitle,
+    this.icon,
     required this.onTap,
   });
 
+  final String title;
+  final String? subtitle;
+  final IconData? icon;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimaryColor,
+            if (icon != null) ...[
+              Container(
+                height: 34,
+                width: 34,
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 18, color: AppTheme.deepBlue),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+}
+
+class _SubViewHeader extends StatelessWidget {
+  const _SubViewHeader({
+    required this.title,
+    required this.description,
+    required this.onBackToDashboard,
+  });
+
+  final String title;
+  final String description;
+  final VoidCallback onBackToDashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return _SectionCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton.icon(
+            onPressed: onBackToDashboard,
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Dashboard'),
+          ),
+        ],
       ),
     );
   }
@@ -664,17 +809,22 @@ class _DeviceBreakdownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final theme = Theme.of(context);
+
+    return _SectionCard(
       child: Column(
         children: [
           Row(
             children: [
-              Icon(icon, size: 24, color: Colors.black),
+              Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, size: 22, color: AppTheme.deepBlue),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -682,17 +832,15 @@ class _DeviceBreakdownCard extends StatelessWidget {
                   children: [
                     Text(
                       deviceName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimaryColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       percentage,
-                      style: const TextStyle(
-                        fontSize: 12,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: AppTheme.textSecondaryColor,
                       ),
                     ),
@@ -701,22 +849,23 @@ class _DeviceBreakdownCard extends StatelessWidget {
               ),
               Text(
                 revenue,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondaryColor,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textPrimaryColor,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.lightBlue),
-              minHeight: 8,
+              backgroundColor: const Color(0xFFE5E7EB),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppTheme.lightBlue,
+              ),
+              minHeight: 10,
             ),
           ),
         ],
@@ -738,15 +887,24 @@ class _AreaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final theme = Theme.of(context);
+
+    return _SectionCard(
       child: Row(
         children: [
-          const Icon(Icons.location_on, size: 24, color: AppTheme.textSecondaryColor),
+          Container(
+            height: 40,
+            width: 40,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryCyan.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.location_on_outlined,
+              size: 22,
+              color: AppTheme.primaryCyan,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -754,17 +912,15 @@ class _AreaCard extends StatelessWidget {
               children: [
                 Text(
                   areaName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
                     color: AppTheme.textPrimaryColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  count,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  '$count bookings',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondaryColor,
                   ),
                 ),
@@ -773,10 +929,9 @@ class _AreaCard extends StatelessWidget {
           ),
           Text(
             revenue,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondaryColor,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: AppTheme.textPrimaryColor,
             ),
           ),
         ],
@@ -802,23 +957,19 @@ class _TechnicianPerformanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final theme = Theme.of(context);
+
+    return _SectionCard(
       child: Row(
         children: [
           CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.grey[300],
+            radius: 22,
+            backgroundColor: AppTheme.deepBlue.withValues(alpha: 0.10),
             child: Text(
               initials,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: AppTheme.deepBlue,
               ),
             ),
           ),
@@ -829,44 +980,47 @@ class _TechnicianPerformanceCard extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
                     color: AppTheme.textPrimaryColor,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const Icon(Icons.star, size: 14, color: Colors.amber),
-                    const SizedBox(width: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          rating.toStringAsFixed(1),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
                     Text(
-                      rating.toString(),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimaryColor,
+                      jobs,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryColor,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  jobs,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondaryColor,
-                  ),
                 ),
               ],
             ),
           ),
           Text(
             revenue,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondaryColor,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: AppTheme.textPrimaryColor,
             ),
           ),
         ],
@@ -874,7 +1028,6 @@ class _TechnicianPerformanceCard extends StatelessWidget {
     );
   }
 }
-
 
 class _PeriodOption extends StatelessWidget {
   final String label;
@@ -897,7 +1050,9 @@ class _PeriodOption extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppTheme.deepBlue : Colors.grey.withValues(alpha: 0.3),
+            color: isSelected
+                ? AppTheme.deepBlue
+                : Colors.grey.withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -913,11 +1068,7 @@ class _PeriodOption extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              const Icon(
-                Icons.check_box,
-                color: AppTheme.deepBlue,
-                size: 20,
-              )
+              const Icon(Icons.check_box, color: AppTheme.deepBlue, size: 20)
             else
               Icon(
                 Icons.check_box_outline_blank,

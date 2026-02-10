@@ -2,6 +2,7 @@ import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
 import 'storage_service.dart';
 import 'technician_specialty_service.dart';
+import '../core/utils/app_logger.dart';
 
 class ProfileService {
   String? get _userId => StorageService.currentUserId;
@@ -40,7 +41,7 @@ class ProfileService {
         'memberSince': memberSince,
       };
     } catch (e) {
-      print('ProfileService: Error loading from Supabase - $e');
+      AppLogger.p('ProfileService: Error loading from Supabase - $e');
       return {
         'email': '',
         'phone': 'Not set',
@@ -123,7 +124,7 @@ class ProfileService {
       final specialties = await specialtyService.getTechnicianSpecialties(_userId!);
       return specialties.map((s) => s.specialtyName).toList();
     } catch (e) {
-      print('ProfileService: Error loading specialties - $e');
+      AppLogger.p('ProfileService: Error loading specialties - $e');
       return <String>[];
     }
   }
@@ -147,7 +148,7 @@ class ProfileService {
           .single();
       return response['profile_image_url'] as String?;
     } catch (e) {
-      print('ProfileService: Error loading profile image URL - $e');
+      AppLogger.p('ProfileService: Error loading profile image URL - $e');
       return null;
     }
   }

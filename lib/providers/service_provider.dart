@@ -25,12 +25,25 @@ class SearchServicesParams {
   final double? maxPrice;
   final String? partsAvailability;
 
-  SearchServicesParams({
+  const SearchServicesParams({
     this.query,
     this.category,
     this.maxPrice,
     this.partsAvailability,
   });
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SearchServicesParams &&
+            other.query == query &&
+            other.category == category &&
+            other.maxPrice == maxPrice &&
+            other.partsAvailability == partsAvailability;
+  }
+
+  @override
+  int get hashCode => Object.hash(query, category, maxPrice, partsAvailability);
 }
 
 final searchServicesProvider = FutureProvider.family<List<ServiceModel>, SearchServicesParams>((ref, params) async {

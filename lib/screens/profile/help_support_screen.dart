@@ -9,84 +9,79 @@ class HelpSupportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final ticketCount = ref.watch(customerTicketsProvider).length;
+
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
           onPressed: () => context.pop(),
         ),
         title: const Text(
           'Help & Support',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.support_agent,
-                  size: 60,
+          _SupportHeroCard(
+            title: 'How can we help?',
+            subtitle: 'Find answers, submit a ticket, or track an existing request.',
+            trailing: _TicketCountBadge(count: ticketCount),
+          ),
+          const SizedBox(height: 16),
+
+          // Quick actions
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.support_agent,
+                  title: 'New Ticket',
+                  subtitle: 'Get help fast',
+                  color: AppTheme.warningColor,
+                  onTap: () => context.push('/submit-ticket'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.confirmation_number,
+                  title: 'My Tickets',
+                  subtitle: 'Track status',
                   color: AppTheme.deepBlue,
+                  onTap: () => context.push('/my-tickets'),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'How can we help you?',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'We\'re here to assist you 24/7',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'FAQs & Resources',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _HelpOption(
+
+          const SizedBox(height: 22),
+          const _SectionTitle('FAQs & Resources'),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.help,
+            iconColor: AppTheme.lightBlue,
             title: 'FAQs',
             subtitle: 'Frequently asked questions',
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const _FAQScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const _FAQScreen()),
               );
             },
           ),
-          const SizedBox(height: 12),
-          _HelpOption(
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.menu_book,
+            iconColor: AppTheme.primaryCyan,
             title: 'User Guide',
             subtitle: 'Learn how to use FixIt',
             onTap: () {
@@ -95,9 +90,10 @@ class HelpSupportScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 12),
-          _HelpOption(
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.video_library,
+            iconColor: AppTheme.darkCyan,
             title: 'Video Tutorials',
             subtitle: 'Watch step-by-step guides',
             onTap: () {
@@ -106,49 +102,29 @@ class HelpSupportScreen extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 32),
-          const Text(
-            'Other',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _HelpOption(
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Other'),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.feedback,
+            iconColor: AppTheme.primaryCyan,
             title: 'Send Feedback',
             subtitle: 'Help us improve our service',
-            onTap: () {
-              _showFeedbackDialog(context);
-            },
+            onTap: () => _showFeedbackDialog(context),
           ),
-          const SizedBox(height: 12),
-          _HelpOption(
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.bug_report,
+            iconColor: AppTheme.errorColor,
             title: 'Report a Bug',
             subtitle: 'Let us know about issues',
-            onTap: () {
-              _showBugReportDialog(context);
-            },
+            onTap: () => _showBugReportDialog(context),
           ),
-          const SizedBox(height: 12),
-          _SubmitTicketOption(
-            onTap: () {
-              context.push('/submit-ticket');
-            },
-          ),
-          const SizedBox(height: 12),
-          _MyTicketsOption(
-            ticketCount: ref.watch(customerTicketsProvider).length,
-            onTap: () {
-              context.push('/my-tickets');
-            },
-          ),
-          const SizedBox(height: 12),
-          _HelpOption(
+          const SizedBox(height: 10),
+          _SupportOptionTile(
             icon: Icons.info,
+            iconColor: Colors.grey,
             title: 'About FixIt',
             subtitle: 'Version 1.0.0',
             onTap: () {
@@ -157,8 +133,8 @@ class HelpSupportScreen extends ConsumerWidget {
                 applicationName: 'FixIt',
                 applicationVersion: '1.0.0',
                 applicationIcon: const Icon(Icons.build, size: 48),
-                children: [
-                  const Text(
+                children: const [
+                  Text(
                     'FixIt is your trusted device repair service platform, connecting you with skilled technicians for all your repair needs.',
                   ),
                 ],
@@ -349,14 +325,225 @@ class HelpSupportScreen extends ConsumerWidget {
   }
 }
 
-class _HelpOption extends StatelessWidget {
+class _SectionTitle extends StatelessWidget {
+  final String text;
+
+  const _SectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: AppTheme.textPrimaryColor,
+      ),
+    );
+  }
+}
+
+class _TicketCountBadge extends StatelessWidget {
+  final int count;
+
+  const _TicketCountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        '$count open',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportHeroCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  const _SupportHeroCard({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.deepBlue,
+            AppTheme.deepBlue.withValues(alpha: 0.92),
+            AppTheme.primaryCyan,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.deepBlue.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.support_agent,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 10),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
   final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade500),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportOptionTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
-  const _HelpOption({
+  const _SupportOptionTile({
     required this.icon,
+    required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -365,27 +552,28 @@ class _HelpOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(10),
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: Colors.black, size: 24),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,7 +582,7 @@ class _HelpOption extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimaryColor,
                       ),
                     ),
@@ -403,173 +591,14 @@ class _HelpOption extends StatelessWidget {
                       subtitle,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: AppTheme.textSecondaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SubmitTicketOption extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _SubmitTicketOption({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.orange.shade200,
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.support_agent,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Submit Support Ticket',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Report a problem or request assistance',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.orange.shade700,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MyTicketsOption extends StatelessWidget {
-  final int ticketCount;
-  final VoidCallback onTap;
-
-  const _MyTicketsOption({
-    required this.ticketCount,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.confirmation_number,
-                  color: Colors.black,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'My Support Tickets',
-                      style: TextStyle(
-                        fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'View and track your submitted tickets',
-                      style: TextStyle(
-                        fontSize: 12,
                         color: AppTheme.textSecondaryColor,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (ticketCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.deepBlue,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$ticketCount',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
+              Icon(Icons.chevron_right, color: Colors.grey.shade500),
             ],
           ),
         ),
@@ -617,25 +646,25 @@ class _FAQScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
           onPressed: () => context.pop(),
         ),
         title: const Text(
           'FAQs',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: faqs.length,
         itemBuilder: (context, index) {
           final faq = faqs[index];

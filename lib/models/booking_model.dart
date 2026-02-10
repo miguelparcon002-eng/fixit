@@ -154,7 +154,21 @@ class BookingModel {
   
   String get customerPhone => 'No phone'; // Will be replaced when we fetch customer details
   
-  String get priority => 'Normal';
+  /// Derived booking type based on how CreateBookingScreen currently persists it.
+  ///
+  /// Today this is encoded into `diagnostic_notes` as a line like:
+  ///   Booking Type: EMERGENCY
+  ///
+  /// If you later add a dedicated column (recommended), update this getter.
+  bool get isEmergency {
+    final notes = diagnosticNotes;
+    if (notes == null || notes.isEmpty) return false;
+    return RegExp(r'Booking Type:\s*EMERGENCY', caseSensitive: false).hasMatch(notes);
+  }
+
+  /// Priority used by technician UI chips.
+  /// We treat Emergency bookings as HIGH priority.
+  String get priority => isEmergency ? 'High' : 'Normal';
   
   String? get moreDetails {
     // Extract only the customer's original booking details (before "---TECHNICIAN NOTES---")

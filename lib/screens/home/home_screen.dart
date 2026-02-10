@@ -5,15 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
-import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/voucher_provider.dart';
+import '../../providers/address_provider.dart';
 import '../../models/booking_model.dart';
 import '../../models/redeemed_voucher.dart';
 import '../../services/voucher_service.dart';
-import '../booking/widgets/booking_dialog.dart';
 import '../profile/rewards_screen.dart';
-import '../profile/addresses_screen.dart';
 import '../services/more_services_screen.dart';
 import 'profile_setup_dialog.dart';
 
@@ -128,10 +126,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: const Color(0xFFFF6B6B),
                 onTap: () {
                   Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (context) => const BookingDialog(isEmergency: true),
-                  );
+                  context.push('/create-booking?type=emergency');
                 },
               ),
               const SizedBox(height: 12),
@@ -142,10 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: const Color(0xFF4ECDC4),
                 onTap: () {
                   Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (context) => const BookingDialog(),
-                  );
+                  context.push('/create-booking');
                 },
               ),
               const SizedBox(height: 12),
@@ -156,10 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 color: const Color(0xFF9B59B6),
                 onTap: () {
                   Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (context) => const BookingDialog(),
-                  );
+                  context.push('/create-booking');
                 },
               ),
               const SizedBox(height: 16),
@@ -289,15 +278,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final savedAddressCount = ref.watch(savedAddressCountProvider);
     final rewardPointsAsync = ref.watch(rewardPointsProvider);
-    // Use proper Supabase bookings table
-    final bookingsAsync = ref.watch(customerBookingsProvider);
     final validVouchersAsync = ref.watch(validVouchersProvider);
-
-    // Count active orders (only In Progress)
-    final activeOrdersCount = bookingsAsync.maybeWhen(
-      data: (bookings) => bookings.where((booking) => booking.status == 'in_progress').length,
-      orElse: () => 0,
-    );
 
     // Check for welcome voucher
     final validVouchers = validVouchersAsync.valueOrNull ?? [];
@@ -316,119 +297,242 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final hasWelcomeVoucher = welcomeVoucher != null;
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       body: CustomScrollView(
         slivers: [
-          // Cyan header section - Now scrollable
+          // Enhanced Gradient header section
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
               decoration: const BoxDecoration(
-                color: AppTheme.primaryCyan,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF6C3CE1),
+                    Color(0xFF4A5FE0),
+                    Color(0xFF2196F3),
+                    Color(0xFF17A2B8),
+                  ],
+                  stops: [0.0, 0.3, 0.65, 1.0],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Top Row: Logo/Brand + Location + Notifications
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(
-                              'assets/images/logo_gears.png',
-                              width: 50,
-                              height: 50,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.build_circle,
-                                  size: 50,
-                                  color: Colors.black,
-                                );
-                              },
+                          // Logo and Brand
+                          Expanded(
+                            child: Row(
+                              children: [
+                                // Logo with white background circle
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.15),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Image.asset(
+                                      'assets/images/logo.jpg',
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const Icon(
+                                          Icons.build_circle,
+                                          size: 32,
+                                          color: Color(0xFF4A5FE0),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Brand Name
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'FixIT',
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: -0.5,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Repair Services',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white.withValues(alpha: 0.9),
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'FixIT',
-                            style: TextStyle(
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black,
-                              letterSpacing: -1,
+                          // Notification Bell
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Stack(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.notifications_outlined,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                  onPressed: () => context.push('/notifications'),
+                                ),
+                                Positioned(
+                                  right: 10,
+                                  top: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF6B6B),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 18,
+                                      minHeight: 18,
+                                    ),
+                                    child: const Text(
+                                      '3',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications, color: Colors.black, size: 28),
-                            onPressed: () => context.push('/notifications'),
-                          ),
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 18,
-                                minHeight: 18,
-                              ),
-                              child: const Text(
-                                '3',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
+                      const SizedBox(height: 20),
+                      
+                      // Welcome Message
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final user = ref.watch(currentUserProvider).valueOrNull;
+                          final displayName = user?.fullName ?? (user?.email != null ? user!.email.split('@').first : "Customer");
+                          return Text(
+                            'Hi, $displayName! 👋',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'What device needs fixing today?',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Search Bar with enhanced design
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search services or technicians...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey.shade400,
+                              fontSize: 14,
+                            ),
+                            prefixIcon: Container(
+                              padding: const EdgeInsets.all(12),
+                              child: Icon(
+                                Icons.search_rounded,
+                                color: const Color(0xFF4A5FE0),
+                                size: 22,
                               ),
                             ),
+                            suffixIcon: Container(
+                              margin: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF6C3CE1), Color(0xFF4A5FE0)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.tune_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  // Filter action
+                                },
+                              ),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Ask any question regarding to our business',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search for help...',
-                        hintStyle: TextStyle(color: Colors.grey.shade400),
-                        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-          // Cyan content section - Now in sliver list
+          // Main content section
           SliverPadding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                         // Welcome Voucher Card
@@ -437,14 +541,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 24),
                         ],
 
-                        // Stats Cards Row
+                        // Stats Cards Row - Addresses and Rewards
                         Row(
                           children: [
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => context.push('/bookings'),
+                                onTap: () => context.push('/addresses'),
                                 child: Container(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
@@ -457,102 +561,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ],
                                   ),
                                   child: Column(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.lightBlue,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: AppTheme.successColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
                                         child: const Icon(
-                                          Icons.shopping_bag,
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        '$activeOrdersCount',
-                                        style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.textPrimaryColor,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        'Active Orders',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppTheme.textSecondaryColor,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const AddressesScreen()),
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.05),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
+                                          Icons.location_on_rounded,
                                           color: AppTheme.successColor,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: const Icon(
-                                          Icons.location_on,
-                                          color: Colors.white,
-                                          size: 24,
+                                          size: 20,
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
                                       Text(
                                         '$savedAddressCount',
                                         style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
                                           color: AppTheme.textPrimaryColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       const Text(
                                         'Saved Addresses',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.w500,
                                           color: AppTheme.textSecondaryColor,
                                         ),
                                         textAlign: TextAlign.center,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: GestureDetector(
                                 onTap: () {
@@ -562,7 +611,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   );
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
@@ -575,37 +624,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ],
                                   ),
                                   child: Column(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.warningColor,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: Colors.amber,
+                                          borderRadius: BorderRadius.circular(10),
                                         ),
                                         child: const Icon(
                                           Icons.star,
                                           color: Colors.white,
-                                          size: 24,
+                                          size: 20,
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
                                       Text(
                                         '${rewardPointsAsync.valueOrNull ?? 0}',
                                         style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
                                           color: AppTheme.textPrimaryColor,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       const Text(
-                                        'Reward Points',
+                                        'Rewards',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.w500,
                                           color: AppTheme.textSecondaryColor,
                                         ),
                                         textAlign: TextAlign.center,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
@@ -621,59 +673,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             Expanded(
                               child: _CategoryCard(
-                                icon: Icons.bolt,
-                                title: 'Emergency Repair',
-                                subtitle: '24/7 Service',
-                                color: const Color(0xFFFF6B6B),
+                                icon: Icons.calendar_month_rounded,
+                                title: 'Schedule Booking',
+                                subtitle: 'Book a repair',
+                                color: const Color(0xFF4A5FE0),
                                 onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(isEmergency: true),
-                                  );
+                                  context.push('/create-booking');
                                 },
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: _CategoryCard(
-                                icon: Icons.access_time,
-                                title: 'Same Day',
-                                subtitle: 'Quick Fix',
-                                color: const Color(0xFF4ECDC4),
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _CategoryCard(
-                                icon: Icons.calendar_today,
-                                title: 'A Week',
-                                subtitle: 'More time, Less hassle',
-                                color: const Color(0xFF9B59B6),
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => const BookingDialog(isWeekBooking: true),
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _CategoryCard(
-                                icon: Icons.more_horiz,
-                                title: 'More Service',
-                                subtitle: 'Available /Accessible',
-                                color: const Color(0xFF66BB6A),
+                                icon: Icons.build_circle,
+                                title: 'All Services',
+                                subtitle: 'View all',
+                                color: const Color(0xFF17A2B8),
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -756,16 +771,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         // Featured Shop Cards (Horizontal Scroll)
                         SizedBox(
-                          height: 215,
+                          height: 195,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
+                            padding: EdgeInsets.zero,
                             children: [
                               const _FeaturedShopCard(
                                 shopName: 'TechFix Hub',
-                                ownerName: 'Juan Dela Cruz',
+                                ownerName: 'Expert in Screen Repairs',
                                 rating: 4.8,
                                 reviewCount: 156,
-                                services: ['Laptops', 'Phones', 'Tablets'],
+                                services: ['Screen Repair', 'Battery', 'Water Damage'],
                                 distance: '0.5 km',
                                 isOpen: true,
                                 openTime: '8 AM - 8 PM',
@@ -775,10 +791,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
                                 shopName: 'Mobile Masters',
-                                ownerName: 'Maria Santos',
+                                ownerName: 'Mobile Specialist',
                                 rating: 4.6,
                                 reviewCount: 98,
-                                services: ['Phones', 'Accessories'],
+                                services: ['Phone Repair', 'Software Fix', 'Unlocking'],
                                 distance: '1.2 km',
                                 isOpen: true,
                                 openTime: '9 AM - 7 PM',
@@ -788,10 +804,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
                                 shopName: 'Gadget Care Pro',
-                                ownerName: 'Pedro Reyes',
+                                ownerName: 'Laptop & Gaming Expert',
                                 rating: 4.9,
                                 reviewCount: 203,
-                                services: ['Laptops', 'Phones', 'Gaming'],
+                                services: ['Laptop Repair', 'Gaming Console', 'Upgrades'],
                                 distance: '2.0 km',
                                 isOpen: false,
                                 openTime: 'Opens 9 AM',
@@ -801,10 +817,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
                                 shopName: 'QuickFix Station',
-                                ownerName: 'Ana Gonzales',
+                                ownerName: 'Fast & Reliable',
                                 rating: 4.5,
                                 reviewCount: 67,
-                                services: ['Phones', 'Tablets'],
+                                services: ['Express Service', 'Diagnostics', 'Data Recovery'],
                                 distance: '2.8 km',
                                 isOpen: true,
                                 openTime: '10 AM - 6 PM',
@@ -858,17 +874,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 },
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _ModernQuickActionCard(
-                                icon: Icons.local_shipping_rounded,
-                                label: 'Track Order',
-                                subtitle: 'Live status',
-                                gradientColors: const [Color(0xFF11998e), Color(0xFF38ef7d)],
-                                onTap: () => context.push('/bookings'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: _ModernQuickActionCard(
                                 icon: Icons.support_agent_rounded,
@@ -882,7 +888,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        // Tips & Tricks
+                        // Service Information Card
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -890,44 +896,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: AppTheme.deepBlue, width: 2),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.deepBlue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.lightbulb,
-                                  color: AppTheme.deepBlue,
-                                  size: 32,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Pro Tip!',
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.info_outline,
+                                      color: AppTheme.deepBlue,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  const Expanded(
+                                    child: Text(
+                                      'Our Services',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.deepBlue,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'Book repairs during weekdays for faster service and exclusive discounts!',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: AppTheme.textSecondaryColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 16),
+                              _buildServiceFeature(Icons.phone_android, 'Mobile Phone Repairs', 'Screen, Battery, Camera, Water Damage'),
+                              const SizedBox(height: 10),
+                              _buildServiceFeature(Icons.laptop, 'Laptop Repairs', 'Screen, Keyboard, RAM/SSD Upgrades'),
+                              const SizedBox(height: 10),
+                              _buildServiceFeature(Icons.verified_user, 'Quality Guarantee', '90-Day Warranty on All Repairs'),
+                              const SizedBox(height: 10),
+                              _buildServiceFeature(Icons.schedule, 'Fast Service', 'Same-Day & Emergency Repairs Available'),
                             ],
                           ),
                         ),
@@ -958,6 +964,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             );
+  }
+
+  Widget _buildServiceFeature(IconData icon, String title, String description) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppTheme.deepBlue),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimaryColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondaryColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildWelcomeVoucherCard(RedeemedVoucher voucher) {
@@ -1286,48 +1325,62 @@ class _CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: color.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: Icon(icon, color: Colors.white, size: 24),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimaryColor,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
                 color: Colors.grey.shade600,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -1470,7 +1523,7 @@ class _FeaturedShopCard extends StatelessWidget {
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'Professional repair shop specializing in mobile devices, laptops, and tablets. We offer fast, reliable service with genuine parts and experienced technicians. Same-day repairs available for most common issues.',
+                            'Professional repair shop specializing in mobile devices and laptops. We offer fast, reliable service with genuine parts and experienced technicians. Same-day repairs available for most common issues.',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppTheme.textSecondaryColor,
@@ -1722,10 +1775,7 @@ class _FeaturedShopCard extends StatelessWidget {
                           child: ElevatedButton.icon(
                             onPressed: () {
                               Navigator.pop(context);
-                              showDialog(
-                                context: context,
-                                builder: (_) => const BookingDialog(),
-                              );
+                              context.push('/create-booking');
                             },
                             icon: const Icon(Icons.build, size: 18),
                             label: const Text('Book Repair'),
@@ -1764,7 +1814,7 @@ class _FeaturedShopCard extends StatelessWidget {
         children: [
           // Header with gradient
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: gradientColors,
@@ -1876,7 +1926,7 @@ class _FeaturedShopCard extends StatelessWidget {
           ),
           // Content section
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

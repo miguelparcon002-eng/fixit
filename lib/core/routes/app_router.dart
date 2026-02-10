@@ -1,4 +1,6 @@
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../screens/onboarding/onboarding_screen.dart';
 import '../../screens/auth/welcome_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
@@ -7,6 +9,7 @@ import '../../screens/home/home_screen.dart';
 import '../../screens/home/main_navigation.dart';
 import '../../screens/booking/booking_list_screen.dart';
 import '../../screens/booking/booking_detail_screen.dart';
+import '../../screens/booking/booking_device_details_screen.dart';
 import '../../screens/booking/create_booking_screen.dart';
 import '../../screens/chat/chat_list_screen.dart';
 import '../../screens/chat/chat_detail_screen.dart';
@@ -51,8 +54,31 @@ import '../../screens/admin/admin_customer_detail_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/welcome',
+    initialLocation: '/onboarding',
+    redirect: (context, state) async {
+      if (state.matchedLocation == '/onboarding') {
+        final prefs = await SharedPreferences.getInstance();
+        final completed = prefs.getBool('onboarding_completed') ?? false;
+        if (completed) {
+          return '/welcome';
+        }
+      }
+      return null;
+    },
     routes: [
+      // Root fallback
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/home',
+      ),
+
+      // Onboarding route
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+
       // Auth routes
       GoRoute(
         path: '/welcome',
@@ -90,6 +116,12 @@ class AppRouter {
             builder: (context, state) => const BookingListScreen(),
           ),
           GoRoute(
+            path: '/help-support',
+            name: 'support',
+            builder: (context, state) => const HelpSupportScreen(),
+          ),
+          // Keep chats accessible, but not as a bottom-nav tab
+          GoRoute(
             path: '/chats',
             name: 'chats',
             builder: (context, state) => const ChatListScreen(),
@@ -110,10 +142,33 @@ class AppRouter {
           final bookingId = state.pathParameters['id']!;
           return BookingDetailScreen(bookingId: bookingId);
         },
+        routes: [
+          GoRoute(
+            path: 'device',
+            name: 'bookingDeviceDetails',
+            builder: (context, state) {
+              final bookingId = state.pathParameters['id']!;
+              return BookingDeviceDetailsScreen(bookingId: bookingId);
+            },
+          ),
+        ],
       ),
+      // Full-screen customer booking flow
+      GoRoute(
+        path: '/create-booking',
+        name: 'createBooking',
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          return CreateBookingScreen(
+            serviceId: 'any',
+            isEmergency: type == 'emergency',
+          );
+        },
+      ),
+      // Backwards-compatible route (if something still navigates with a serviceId)
       GoRoute(
         path: '/create-booking/:serviceId',
-        name: 'createBooking',
+        name: 'createBookingWithService',
         builder: (context, state) {
           final serviceId = state.pathParameters['serviceId']!;
           return CreateBookingScreen(serviceId: serviceId);
@@ -156,11 +211,8 @@ class AppRouter {
         name: 'privacySecurity',
         builder: (context, state) => const PrivacySecurityScreen(),
       ),
-      GoRoute(
-        path: '/help-support',
-        name: 'helpSupport',
-        builder: (context, state) => const HelpSupportScreen(),
-      ),
+      // NOTE: Help/Support is now under the MainNavigation ShellRoute at /help-support
+
       GoRoute(
         path: '/live-chat',
         name: 'liveChat',

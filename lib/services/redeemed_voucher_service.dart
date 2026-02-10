@@ -1,6 +1,7 @@
 import '../core/config/supabase_config.dart';
 import '../models/redeemed_voucher.dart';
 import '../models/reward.dart';
+import '../core/utils/app_logger.dart';
 
 class RedeemedVoucherService {
   final _supabase = SupabaseConfig.client;
@@ -18,7 +19,7 @@ class RedeemedVoucherService {
           .map((json) => RedeemedVoucher.fromJson(json))
           .toList();
     } catch (e) {
-      print('RedeemedVoucherService: Error loading redeemed vouchers - $e');
+      AppLogger.p('RedeemedVoucherService: Error loading redeemed vouchers - $e');
       return [];
     }
   }
@@ -46,10 +47,10 @@ class RedeemedVoucherService {
           .select()
           .single();
 
-      print('RedeemedVoucherService: Voucher redeemed successfully');
+      AppLogger.p('RedeemedVoucherService: Voucher redeemed successfully');
       return RedeemedVoucher.fromJson(response);
     } catch (e) {
-      print('RedeemedVoucherService: Error redeeming voucher - $e');
+      AppLogger.p('RedeemedVoucherService: Error redeeming voucher - $e');
       return null;
     }
   }
@@ -69,10 +70,10 @@ class RedeemedVoucherService {
           })
           .eq('id', voucherId);
 
-      print('RedeemedVoucherService: Voucher marked as used');
+      AppLogger.p('RedeemedVoucherService: Voucher marked as used');
       return true;
     } catch (e) {
-      print('RedeemedVoucherService: Error marking voucher as used - $e');
+      AppLogger.p('RedeemedVoucherService: Error marking voucher as used - $e');
       return false;
     }
   }
@@ -84,14 +85,15 @@ class RedeemedVoucherService {
           .from('user_redeemed_vouchers')
           .select()
           .eq('user_id', userId)
-          .eq('is_used', false)
+          // Treat NULL as "not used" for legacy rows created before `is_used` was reliably populated.
+          .or('is_used.is.null,is_used.eq.false')
           .order('redeemed_at', ascending: false);
 
       return (response as List)
           .map((json) => RedeemedVoucher.fromJson(json))
           .toList();
     } catch (e) {
-      print('RedeemedVoucherService: Error loading unused vouchers - $e');
+      AppLogger.p('RedeemedVoucherService: Error loading unused vouchers - $e');
       return [];
     }
   }
@@ -104,10 +106,10 @@ class RedeemedVoucherService {
           .delete()
           .eq('id', voucherId);
 
-      print('RedeemedVoucherService: Redeemed voucher deleted');
+      AppLogger.p('RedeemedVoucherService: Redeemed voucher deleted');
       return true;
     } catch (e) {
-      print('RedeemedVoucherService: Error deleting redeemed voucher - $e');
+      AppLogger.p('RedeemedVoucherService: Error deleting redeemed voucher - $e');
       return false;
     }
   }

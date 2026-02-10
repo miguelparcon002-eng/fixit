@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/support_ticket_model.dart';
 import '../core/config/supabase_config.dart';
 import 'auth_provider.dart';
+import '../core/utils/app_logger.dart';
 
 // Storage key for support tickets
 const String _ticketsStorageKey = 'support_tickets';
@@ -36,9 +37,9 @@ class SupportTicketService {
               'updated_at': DateTime.now().toIso8601String()
             });
       }
-      print('SupportTicketService: Saved ${tickets.length} tickets');
+      AppLogger.p('SupportTicketService: Saved ${tickets.length} tickets');
     } catch (e) {
-      print('SupportTicketService: Error saving tickets - $e');
+      AppLogger.p('SupportTicketService: Error saving tickets - $e');
     }
   }
 
@@ -54,13 +55,13 @@ class SupportTicketService {
       if (response != null && response['value'] != null) {
         final List<dynamic> decoded = json.decode(response['value'] as String);
         final tickets = decoded.map((item) => SupportTicket.fromJson(item)).toList();
-        print('SupportTicketService: Loaded ${tickets.length} tickets');
+        AppLogger.p('SupportTicketService: Loaded ${tickets.length} tickets');
         return tickets;
       }
-      print('SupportTicketService: No tickets found');
+      AppLogger.p('SupportTicketService: No tickets found');
       return [];
     } catch (e) {
-      print('SupportTicketService: Error loading tickets - $e');
+      AppLogger.p('SupportTicketService: Error loading tickets - $e');
       return [];
     }
   }
@@ -71,10 +72,10 @@ class SupportTicketService {
       final tickets = await loadTickets();
       tickets.add(ticket);
       await saveTickets(tickets);
-      print('SupportTicketService: Created ticket ${ticket.id}');
+      AppLogger.p('SupportTicketService: Created ticket ${ticket.id}');
       return ticket;
     } catch (e) {
-      print('SupportTicketService: Error creating ticket - $e');
+      AppLogger.p('SupportTicketService: Error creating ticket - $e');
       return null;
     }
   }
@@ -87,12 +88,12 @@ class SupportTicketService {
       if (index != -1) {
         tickets[index] = updatedTicket;
         await saveTickets(tickets);
-        print('SupportTicketService: Updated ticket ${updatedTicket.id}');
+        AppLogger.p('SupportTicketService: Updated ticket ${updatedTicket.id}');
         return true;
       }
       return false;
     } catch (e) {
-      print('SupportTicketService: Error updating ticket - $e');
+      AppLogger.p('SupportTicketService: Error updating ticket - $e');
       return false;
     }
   }
@@ -103,10 +104,10 @@ class SupportTicketService {
       final tickets = await loadTickets();
       tickets.removeWhere((t) => t.id == ticketId);
       await saveTickets(tickets);
-      print('SupportTicketService: Deleted ticket $ticketId');
+      AppLogger.p('SupportTicketService: Deleted ticket $ticketId');
       return true;
     } catch (e) {
-      print('SupportTicketService: Error deleting ticket - $e');
+      AppLogger.p('SupportTicketService: Error deleting ticket - $e');
       return false;
     }
   }
@@ -125,12 +126,12 @@ class SupportTicketService {
           status: ticket.status == 'open' ? 'in_progress' : ticket.status,
         );
         await saveTickets(tickets);
-        print('SupportTicketService: Added message to ticket $ticketId');
+        AppLogger.p('SupportTicketService: Added message to ticket $ticketId');
         return true;
       }
       return false;
     } catch (e) {
-      print('SupportTicketService: Error adding message - $e');
+      AppLogger.p('SupportTicketService: Error adding message - $e');
       return false;
     }
   }
@@ -147,12 +148,12 @@ class SupportTicketService {
           resolvedAt: status == 'resolved' ? DateTime.now() : null,
         );
         await saveTickets(tickets);
-        print('SupportTicketService: Updated status of ticket $ticketId to $status');
+        AppLogger.p('SupportTicketService: Updated status of ticket $ticketId to $status');
         return true;
       }
       return false;
     } catch (e) {
-      print('SupportTicketService: Error updating status - $e');
+      AppLogger.p('SupportTicketService: Error updating status - $e');
       return false;
     }
   }
@@ -166,7 +167,7 @@ class SupportTicketService {
         orElse: () => throw Exception('Ticket not found'),
       );
     } catch (e) {
-      print('SupportTicketService: Error getting ticket - $e');
+      AppLogger.p('SupportTicketService: Error getting ticket - $e');
       return null;
     }
   }
@@ -177,7 +178,7 @@ class SupportTicketService {
       final tickets = await loadTickets();
       return tickets.where((t) => t.customerId == customerId).toList();
     } catch (e) {
-      print('SupportTicketService: Error getting customer tickets - $e');
+      AppLogger.p('SupportTicketService: Error getting customer tickets - $e');
       return [];
     }
   }
@@ -202,7 +203,7 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
       state = tickets;
       _isInitialized = true;
     } catch (e) {
-      print('SupportTicketNotifier: Error loading tickets - $e');
+      AppLogger.p('SupportTicketNotifier: Error loading tickets - $e');
       _isInitialized = true;
     }
   }

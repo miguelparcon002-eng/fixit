@@ -3,6 +3,7 @@ import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
 import '../core/constants/app_constants.dart';
 import '../models/booking_model.dart';
+import '../core/utils/app_logger.dart';
 
 class BookingService {
   final _supabase = SupabaseConfig.client;
@@ -270,7 +271,7 @@ class BookingService {
   }
 
   Stream<List<BookingModel>> watchTechnicianBookings(String technicianId) {
-    print('🔍 BOOKING SERVICE: Starting stream for technician $technicianId');
+    AppLogger.p('🔍 BOOKING SERVICE: Starting stream for technician $technicianId');
 
     return _supabase
         .from(DBConstants.bookings)
@@ -278,10 +279,10 @@ class BookingService {
         .eq('technician_id', technicianId)
         .order('created_at', ascending: false)
         .map((data) {
-          print('🔍 BOOKING SERVICE: Received ${data.length} bookings from Supabase');
+          AppLogger.p('🔍 BOOKING SERVICE: Received ${data.length} bookings from Supabase');
           final bookings = data.map((e) => BookingModel.fromJson(e)).toList();
           for (var booking in bookings) {
-            print('  📋 Booking ${booking.id}: ${booking.status}');
+            AppLogger.p('  📋 Booking ${booking.id}: ${booking.status}');
           }
           return bookings;
         });

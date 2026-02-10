@@ -6,6 +6,7 @@ import '../providers/voucher_provider.dart';
 import '../providers/earnings_provider.dart';
 import '../providers/auth_provider.dart';
 import 'storage_service.dart';
+import '../core/utils/app_logger.dart';
 
 /// Service to manage user session and ensure data isolation between accounts.
 /// Call this when a user logs in, logs out, or signs up to reset all user-specific data.
@@ -17,7 +18,7 @@ class UserSessionService {
   /// Call this after a user successfully logs in.
   /// This ensures all providers reload data for the new user.
   Future<void> onUserLogin(String userId) async {
-    print('UserSessionService: User logged in - $userId');
+    AppLogger.p('UserSessionService: User logged in - $userId');
 
     // Set the current user for storage isolation
     StorageService.setCurrentUser(userId);
@@ -29,7 +30,7 @@ class UserSessionService {
   /// Call this when a user logs out.
   /// This clears all cached data and resets providers.
   Future<void> onUserLogout() async {
-    print('UserSessionService: User logged out');
+    AppLogger.p('UserSessionService: User logged out');
 
     // Clear storage user context
     StorageService.setCurrentUser(null);
@@ -41,7 +42,7 @@ class UserSessionService {
   /// Call this after a new user signs up.
   /// This ensures the new user starts with completely fresh data.
   Future<void> onUserSignup(String userId) async {
-    print('UserSessionService: New user signed up - $userId');
+    AppLogger.p('UserSessionService: New user signed up - $userId');
 
     // Set the current user for storage isolation
     StorageService.setCurrentUser(userId);
@@ -50,7 +51,7 @@ class UserSessionService {
     _invalidateAllProviders();
 
     // New users start with empty data - no need to load anything
-    print('UserSessionService: New user initialized with fresh data');
+    AppLogger.p('UserSessionService: New user initialized with fresh data');
   }
 
   /// Reload all user-specific data from storage
@@ -81,9 +82,9 @@ class UserSessionService {
       // Refresh user profile
       _ref.invalidate(currentUserProvider);
 
-      print('UserSessionService: All user data reloaded');
+      AppLogger.p('UserSessionService: All user data reloaded');
     } catch (e) {
-      print('UserSessionService: Error reloading user data - $e');
+      AppLogger.p('UserSessionService: Error reloading user data - $e');
     }
   }
 
@@ -114,7 +115,7 @@ class UserSessionService {
     _ref.invalidate(monthEarningsProvider);
     _ref.invalidate(transactionsProvider);
 
-    print('UserSessionService: All providers invalidated');
+    AppLogger.p('UserSessionService: All providers invalidated');
   }
 }
 

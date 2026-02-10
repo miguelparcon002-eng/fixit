@@ -22,7 +22,7 @@ final savedAddressCountProvider = Provider<int>((ref) {
   return addressesAsync.when(
     data: (addresses) => addresses.length,
     loading: () => 0,
-    error: (_, __) => 0,
+    error: (_, _) => 0,
   );
 });
 
@@ -38,6 +38,6 @@ final defaultAddressProvider = Provider<UserAddress?>(( ref) {
       }
     },
     loading: () => null,
-    error: (_, __) => null,
+    error: (_, _) => null,
   );
 });

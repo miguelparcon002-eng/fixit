@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -9,7 +8,8 @@ class RoleSelectionScreen extends StatefulWidget {
   State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
 
-class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTickerProviderStateMixin {
+class _RoleSelectionScreenState extends State<RoleSelectionScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -18,14 +18,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
@@ -41,89 +41,102 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primaryCyan,
-              AppTheme.darkCyan,
-              Color(0xFF006B8F),
+              Color(0xFF6C3CE1),
+              Color(0xFF4A5FE0),
+              Color(0xFF2196F3),
+              Color(0xFF17A2B8),
             ],
+            stops: [0.0, 0.3, 0.65, 1.0],
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Column(
+                children: [
+                  Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Spacer(flex: 2),
-                        // Animated logo container
+                        // Logo
                         Container(
-                          padding: const EdgeInsets.all(24),
+                          width: 120,
+                          height: 120,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.2),
+                            color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 30,
-                                spreadRadius: 5,
+                                color: const Color(0xFF6C3CE1).withValues(alpha: 0.3),
+                                blurRadius: 40,
+                                spreadRadius: 3,
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                          child: Image.asset(
-                            'assets/images/logo_gears.png',
-                            width: 100,
-                            height: 100,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.settings,
-                                size: 100,
-                                color: Colors.black,
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-                        // Logo text with shadow
-                        Text(
-                          'FixIT',
-                          style: TextStyle(
-                            fontSize: 72,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black,
-                            letterSpacing: -2,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.3),
-                                offset: const Offset(0, 4),
-                                blurRadius: 8,
+                          child: ClipOval(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Image.asset(
+                                'assets/images/logo.jpg',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.build_circle,
+                                    size: 60,
+                                    color: Color(0xFF6C3CE1),
+                                  );
+                                },
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        // Enhanced subtitle
+                        const SizedBox(height: 24),
+                        // App name
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Colors.white, Color(0xFFE0E7FF)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ).createShader(bounds),
+                          child: const Text(
+                            'FixIT',
+                            style: TextStyle(
+                              fontSize: 52,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              width: 1,
+                            ),
                           ),
                           child: const Text(
-                            'Mobile and Laptops Repair Service',
+                            'Mobile & Laptop Repair Service',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontStyle: FontStyle.italic,
+                              fontSize: 14,
                               color: Colors.white,
                               fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
@@ -131,84 +144,81 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> with SingleTi
                       ],
                     ),
                   ),
-                ),
-              ),
-              // Bottom section with modern buttons
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  children: [
-                    // Login button with icon
-                    _ModernButton(
-                      label: 'Login',
-                      icon: Icons.login_rounded,
-                      isPrimary: true,
-                      onPressed: () => context.go('/login'),
+                  // Bottom buttons
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
+                    child: Column(
+                      children: [
+                        // Login button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => context.go('/login'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF4A5FE0),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 8,
+                              shadowColor: Colors.black.withValues(alpha: 0.2),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.login_rounded, size: 22),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        // Sign Up button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => context.go('/signup'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withValues(alpha: 0.2),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: const BorderSide(color: Colors.white, width: 1.5),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.person_add_rounded, size: 22),
+                                SizedBox(width: 10),
+                                Text(
+                                  'Sign Up',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    // Sign Up button with icon
-                    _ModernButton(
-                      label: 'Sign Up',
-                      icon: Icons.person_add_rounded,
-                      isPrimary: false,
-                      onPressed: () => context.go('/signup'),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ModernButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isPrimary;
-  final VoidCallback onPressed;
-
-  const _ModernButton({
-    required this.label,
-    required this.icon,
-    required this.isPrimary,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppTheme.deepBlue : Colors.white,
-          foregroundColor: isPrimary ? Colors.white : AppTheme.deepBlue,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          elevation: isPrimary ? 8 : 4,
-          shadowColor: isPrimary
-              ? AppTheme.deepBlue.withValues(alpha: 0.5)
-              : Colors.black.withValues(alpha: 0.2),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../booking/widgets/booking_dialog.dart';
+import 'package:go_router/go_router.dart';
 
 class ServicesListScreen extends ConsumerWidget {
   const ServicesListScreen({super.key});
@@ -127,35 +127,6 @@ class ServicesListScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // Tablet Repairs Section
-              const Text(
-                'Tablet Repairs',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _ServiceCard(
-                icon: Icons.tablet,
-                iconColor: Colors.pink,
-                title: 'Screen Replacement',
-                description: 'Touchscreen or LCD repair',
-                price: '₱1,500 - ₱4,000',
-                onTap: () => _showBookingDialog(context),
-              ),
-              const SizedBox(height: 12),
-              _ServiceCard(
-                icon: Icons.power,
-                iconColor: const Color(0xFF66BB6A),
-                title: 'Charging Port Repair',
-                description: 'Not charging or loose port',
-                price: '₱500 - ₱1,200',
-                onTap: () => _showBookingDialog(context),
-              ),
-              const SizedBox(height: 24),
-
               // Other Services Section
               const Text(
                 'Other Services',
@@ -210,10 +181,8 @@ class ServicesListScreen extends ConsumerWidget {
   }
 
   void _showBookingDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const BookingDialog(),
-    );
+    // Full-screen booking flow
+    context.push('/create-booking');
   }
 }
 

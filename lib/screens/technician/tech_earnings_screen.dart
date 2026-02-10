@@ -1,16 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_theme.dart';
-import '../../providers/earnings_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/earnings_provider.dart';
 
 class TechEarningsScreen extends ConsumerWidget {
   const TechEarningsScreen({super.key});
 
   String _formatTransactionDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
@@ -21,457 +33,394 @@ class TechEarningsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-    final totalEarningsAsync = ref.watch(totalEarningsProvider);
+    // The card is labeled "This Month", so use month earnings to match bookings.
+    final totalEarningsAsync = ref.watch(monthEarningsProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.deepBlue,
-      body: Column(
-        children: [
-          // Profile Header
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.deepBlue, AppTheme.lightBlue],
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 8, 20, 12),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'FixIT Technician',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        userAsync.when(
-                          data: (user) => Text(
-                            user?.fullName ?? 'Technician',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          loading: () => const Text(
-                            'Loading...',
-                            style: TextStyle(fontSize: 14, color: Colors.white70),
-                          ),
-                          error: (_, __) => const Text(
-                            'Technician',
-                            style: TextStyle(fontSize: 14, color: Colors.white70),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Stack(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                          onPressed: () {},
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 18,
-                              minHeight: 18,
-                            ),
-                            child: const Text(
-                              '0',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, color: Colors.white, size: 18),
-                    const SizedBox(width: 6),
-                    userAsync.when(
-                      data: (user) => Text(
-                        user?.address ?? 'Location not set',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                      loading: () => const Text(
-                        'Loading...',
-                        style: TextStyle(color: Colors.white, fontSize: 14),
-                      ),
-                      error: (_, __) => const Text(
-                        'Location not set',
-                        style: TextStyle(color: Colors.white, fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          'Earnings',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor,
           ),
-          // Main Content
-          Expanded(
-            child: Container(
-              color: AppTheme.primaryCyan,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.deepBlue),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              userAsync.when(
+                data: (user) {
+                  return Text(
+                    user?.fullName ?? 'Technician',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Track your income and transaction history',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Main earnings card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF10B981),
+                      Color(0xFF059669),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Earnings',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Track your income and transaction history',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.black,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.account_balance_wallet,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'This Month',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
-                    // Main earnings card
-                    Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF10B981),
-                              Color(0xFF059669),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(
-                                    Icons.account_balance_wallet,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'This Month',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF10B981),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            const Text(
-                              'Total Earnings',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            totalEarningsAsync.when(
-                              data: (total) => Text(
-                                '₱${total.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                              loading: () => const Text(
-                                '₱0.00',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                              error: (_, __) => const Text(
-                                '₱0.00',
-                                style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.info_outline,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Complete jobs to earn',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withValues(alpha: 0.95),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                    const Text(
+                      'Total Earnings',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    totalEarningsAsync.when(
+                      data: (total) => Text(
+                        '₱${total.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -1,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      // Stats grid
-                      Consumer(
-                        builder: (context, ref, child) {
-                          final todayEarningsAsync = ref.watch(todayEarningsProvider);
-                          final weekEarningsAsync = ref.watch(weekEarningsProvider);
-                          final transactionsAsync = ref.watch(transactionsProvider);
-
-                          final todayEarningsValue = todayEarningsAsync.value ?? 0.0;
-                          final weekEarningsValue = weekEarningsAsync.value ?? 0.0;
-                          final transactions = transactionsAsync.value ?? [];
-                          final jobsCompleted = transactions.length;
-                          final avgPerJob = jobsCompleted > 0
-                              ? (transactionsAsync.value?.fold<double>(0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0)) ?? 0) / jobsCompleted
-                              : 0.0;
-
-                          return GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.15,
-                            children: [
-                              _EarningStatCard(
-                                icon: Icons.calendar_today_outlined,
-                                iconColor: const Color(0xFF4F7CFF),
-                                bgColor: Colors.white,
-                                amount: '₱${todayEarningsValue.toStringAsFixed(2)}',
-                                label: 'Today',
-                              ),
-                              _EarningStatCard(
-                                icon: Icons.trending_up,
-                                iconColor: const Color(0xFFE91E63),
-                                bgColor: Colors.white,
-                                amount: '₱${weekEarningsValue.toStringAsFixed(2)}',
-                                label: 'This Week',
-                              ),
-                              _EarningStatCard(
-                                icon: Icons.check_circle_outline,
-                                iconColor: const Color(0xFF4CAF50),
-                                bgColor: Colors.white,
-                                amount: '$jobsCompleted',
-                                label: 'Jobs Completed',
-                              ),
-                              _EarningStatCard(
-                                icon: Icons.attach_money,
-                                iconColor: const Color(0xFFFF9800),
-                                bgColor: Colors.white,
-                                amount: '₱${avgPerJob.toStringAsFixed(2)}',
-                                label: 'Avg per Job',
-                              ),
-                            ],
-                          );
-                        },
+                      loading: () => const Text(
+                        '₱0.00',
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -1,
+                        ),
                       ),
-                      const SizedBox(height: 24),
-                      // Transaction History
-                      const Text(
-                        'Transaction History',
+                      error: (e, _) => Text(
+                        'Error',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black,
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      // Tab buttons
-                      Row(
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
                         children: [
                           Expanded(
-                            child: _TabButton(
-                              label: 'This Week',
-                              isSelected: true,
-                              onTap: () {},
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final todayEarningsAsync = ref.watch(todayEarningsProvider);
+                                return _SmallMetric(
+                                  label: 'Today',
+                                  value: todayEarningsAsync.when(
+                                    data: (value) => '₱${value.toStringAsFixed(0)}',
+                                    loading: () => '…',
+                                    error: (_, _) => '—',
+                                  ),
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          Container(
+                            width: 1,
+                            height: 32,
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
                           Expanded(
-                            child: _TabButton(
-                              label: 'This Month',
-                              isSelected: false,
-                              onTap: () {},
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final weekEarningsAsync = ref.watch(weekEarningsProvider);
+                                return _SmallMetric(
+                                  label: 'This week',
+                                  value: weekEarningsAsync.when(
+                                    data: (value) => '₱${value.toStringAsFixed(0)}',
+                                    loading: () => '…',
+                                    error: (_, _) => '—',
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      // Transaction items
-                      Consumer(
-                        builder: (context, ref, child) {
-                          final transactionsAsync = ref.watch(transactionsProvider);
-
-                          return transactionsAsync.when(
-                            data: (transactions) {
-                              if (transactions.isEmpty) {
-                                return Container(
-                                  padding: const EdgeInsets.all(32),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.shade200),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.receipt_long_outlined,
-                                        size: 48,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'No transactions yet',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Complete jobs to see your earnings here',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey.shade500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
-
-                              return Column(
-                                children: transactions.map((transaction) {
-                                  final createdAt = DateTime.tryParse(transaction['created_at'] ?? '');
-                                  final dateStr = createdAt != null
-                                      ? _formatTransactionDate(createdAt)
-                                      : 'Unknown date';
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: _TransactionItem(
-                                      customerName: transaction['customer_name'] ?? 'Customer',
-                                      service: transaction['service'] ?? 'Service',
-                                      jobId: '#${transaction['job_id'] ?? 'N/A'}',
-                                      date: dateStr,
-                                      amount: '+₱${((transaction['amount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
-                                    ),
-                                  );
-                                }).toList(),
-                              );
-                            },
-                            loading: () => const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(32),
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
-                            error: (_, _) => Container(
-                              padding: const EdgeInsets.all(32),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.error_outline,
-                                    size: 48,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Could not load transactions',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-        ],
+
+              const SizedBox(height: 24),
+
+              // Transaction History
+              const Text(
+                'Transaction History',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Transaction History Range
+              Consumer(
+                builder: (context, ref, child) {
+                  final range = ref.watch(selectedEarningsRangeProvider);
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _TabButton(
+                          label: 'This Week',
+                          isSelected: range == EarningsRange.week,
+                          onTap: () => ref.read(selectedEarningsRangeProvider.notifier).state = EarningsRange.week,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _TabButton(
+                          label: 'This Month',
+                          isSelected: range == EarningsRange.month,
+                          onTap: () => ref.read(selectedEarningsRangeProvider.notifier).state = EarningsRange.month,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+
+              Consumer(
+                builder: (context, ref, child) {
+                  final transactionsAsync = ref.watch(filteredTransactionsProvider);
+
+                  return transactionsAsync.when(
+                    data: (transactions) {
+                      if (transactions.isEmpty) {
+                        return Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.receipt_long_outlined,
+                                size: 48,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No transactions yet',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Complete jobs to see your earnings here',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: transactions.map((booking) {
+                          final dateStr = _formatTransactionDate(booking.createdAt);
+
+                          // Use booking id as job id fallback.
+                          final jobId = booking.id;
+
+                          // Prefer final cost; fallback to estimated.
+                          final amountValue = booking.finalCost ?? booking.estimatedCost ?? 0.0;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _TransactionItem(
+                              bookingId: booking.id,
+                              customerName: booking.customerName,
+                              service: booking.serviceName,
+                              jobId: '#$jobId',
+                              date: dateStr,
+                              isEmergency: booking.isEmergency,
+                              amount: '+₱${amountValue.toStringAsFixed(2)}',
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                    loading: () => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                    error: (_, _) => Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Could not load transactions',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+}
+
+class _SmallMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SmallMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -516,24 +465,30 @@ class _TabButton extends StatelessWidget {
 }
 
 class _TransactionItem extends StatelessWidget {
+  final String bookingId;
   final String customerName;
   final String service;
   final String jobId;
   final String date;
+  final bool isEmergency;
   final String amount;
 
   const _TransactionItem({
+    required this.bookingId,
     required this.customerName,
     required this.service,
     required this.jobId,
     required this.date,
+    required this.isEmergency,
     required this.amount,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+    return GestureDetector(
+      onTap: bookingId.isEmpty ? null : () => context.push('/booking/$bookingId'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -554,27 +509,54 @@ class _TransactionItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      customerName,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                    Expanded(
+                      child: Text(
+                        customerName,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimaryColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(4),
+                        color: AppTheme.successColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
                         'completed',
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.successColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isEmergency
+                            ? Colors.red.withValues(alpha: 0.12)
+                            : Colors.blue.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isEmergency
+                              ? Colors.red.withValues(alpha: 0.25)
+                              : Colors.blue.withValues(alpha: 0.20),
+                        ),
+                      ),
+                      child: Text(
+                        isEmergency ? 'Emergency' : 'Regular',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isEmergency ? Colors.red : Colors.blue,
                         ),
                       ),
                     ),
@@ -583,9 +565,10 @@ class _TransactionItem extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '$service • $jobId',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondaryColor,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -603,84 +586,13 @@ class _TransactionItem extends StatelessWidget {
             amount,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.green,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.successColor,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EarningStatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
-  final String amount;
-  final String label;
-
-  const _EarningStatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
-    required this.amount,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(height: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                amount,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimaryColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    ),
     );
   }
 }

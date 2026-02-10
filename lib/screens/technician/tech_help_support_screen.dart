@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/theme/app_theme.dart';
 
 class TechHelpSupportScreen extends StatelessWidget {
@@ -9,183 +10,161 @@ class TechHelpSupportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryCyan,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryCyan,
+        backgroundColor: const Color(0xFFF5F7FA),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
           onPressed: () => context.go('/tech-profile'),
         ),
         title: const Text(
           'Help & Support',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Contact Support Section
-            const Text(
-              'Contact Support',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          const _SupportHeroCard(
+            title: 'Need help?',
+            subtitle:
+                'Contact FixIT support or browse resources for technicians.',
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.chat_bubble_outline,
+                  title: 'Live chat',
+                  subtitle: 'Talk to support',
+                  color: AppTheme.lightBlue,
+                  onTap: () => context.push('/live-chat'),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _SupportTile(
-              icon: Icons.chat_bubble,
-              iconColor: AppTheme.lightBlue,
-              title: 'Live Chat',
-              subtitle: 'Chat with our support team',
-              onTap: () {
-                context.push('/live-chat');
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportTile(
-              icon: Icons.email,
-              iconColor: Colors.orange,
-              title: 'Email Support',
-              subtitle: 'support@fixit.com',
-              onTap: () async {
-                final Uri emailUri = Uri(
-                  scheme: 'mailto',
-                  path: 'support@fixit.com',
-                  queryParameters: {
-                    'subject': 'Technician Support Request',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.phone_outlined,
+                  title: 'Call',
+                  subtitle: '1-800-FIX-IT',
+                  color: AppTheme.successColor,
+                  onTap: () async {
+                    final uri = Uri(scheme: 'tel', path: '18003494866');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    }
                   },
-                );
-                if (await canLaunchUrl(emailUri)) {
-                  await launchUrl(emailUri);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportTile(
-              icon: Icons.phone,
-              iconColor: Colors.green,
-              title: 'Phone Support',
-              subtitle: '1-800-FIX-IT-NOW',
-              onTap: () async {
-                final Uri phoneUri = Uri(scheme: 'tel', path: '18003494866');
-                if (await canLaunchUrl(phoneUri)) {
-                  await launchUrl(phoneUri);
-                }
-              },
-            ),
-            const SizedBox(height: 32),
-
-            // Resources Section
-            const Text(
-              'Resources',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _SupportTile(
-              icon: Icons.help_outline,
-              iconColor: Colors.purple,
-              title: 'FAQ',
-              subtitle: 'Frequently asked questions',
-              onTap: () {
-                _showFAQDialog(context);
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportTile(
-              icon: Icons.video_library,
-              iconColor: Colors.red,
-              title: 'Video Tutorials',
-              subtitle: 'Learn how to use FixIt',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Video tutorials coming soon')),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportTile(
-              icon: Icons.article,
-              iconColor: AppTheme.deepBlue,
-              title: 'Technician Guide',
-              subtitle: 'Best practices and tips',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Technician guide coming soon')),
-                );
-              },
-            ),
-            const SizedBox(height: 32),
+            ],
+          ),
 
-            // Feedback Section
-            const Text(
-              'Feedback',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _SupportTile(
-              icon: Icons.rate_review,
-              iconColor: Colors.amber,
-              title: 'Rate Our App',
-              subtitle: 'Share your experience',
-              onTap: () {
-                _showRatingDialog(context);
-              },
-            ),
-            const SizedBox(height: 12),
-            _SupportTile(
-              icon: Icons.bug_report,
-              iconColor: Colors.red,
-              title: 'Report a Bug',
-              subtitle: 'Help us improve',
-              onTap: () {
-                _showBugReportDialog(context);
-              },
-            ),
-          ],
-        ),
+          const SizedBox(height: 22),
+          const _SectionTitle('Contact'),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
+            icon: Icons.email_outlined,
+            iconColor: AppTheme.warningColor,
+            title: 'Email support',
+            subtitle: 'support@fixit.com',
+            onTap: () async {
+              final emailUri = Uri(
+                scheme: 'mailto',
+                path: 'support@fixit.com',
+                queryParameters: {
+                  'subject': 'Technician Support Request',
+                },
+              );
+              if (await canLaunchUrl(emailUri)) {
+                await launchUrl(emailUri);
+              }
+            },
+          ),
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Resources'),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
+            icon: Icons.help_outline,
+            iconColor: AppTheme.deepBlue,
+            title: 'FAQ',
+            subtitle: 'Common technician questions',
+            onTap: () => _showFAQDialog(context),
+          ),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
+            icon: Icons.article_outlined,
+            iconColor: AppTheme.primaryCyan,
+            title: 'Technician guide',
+            subtitle: 'Best practices and tips',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Technician guide coming soon')),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
+            icon: Icons.video_library_outlined,
+            iconColor: AppTheme.errorColor,
+            title: 'Video tutorials',
+            subtitle: 'Learn the workflow',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Video tutorials coming soon')),
+              );
+            },
+          ),
+
+          const SizedBox(height: 22),
+          const _SectionTitle('Feedback'),
+          const SizedBox(height: 10),
+          _SupportOptionTile(
+            icon: Icons.bug_report_outlined,
+            iconColor: AppTheme.errorColor,
+            title: 'Report a bug',
+            subtitle: 'Help us improve',
+            onTap: () => _showBugReportDialog(context),
+          ),
+        ],
       ),
     );
   }
 
-  void _showFAQDialog(BuildContext context) {
+  static void _showFAQDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Frequently Asked Questions'),
-          content: SingleChildScrollView(
+          content: const SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 _FAQItem(
                   question: 'How do I accept a job request?',
-                  answer: 'Go to the Jobs tab and tap on a job request to view details. Then tap "Accept Job" to confirm.',
+                  answer:
+                      'Go to Jobs and open a request. Tap Accept to start the job.',
                 ),
+                SizedBox(height: 14),
                 _FAQItem(
                   question: 'When do I get paid?',
-                  answer: 'Payments are processed within 24-48 hours after job completion and customer approval.',
+                  answer:
+                      'Payments are processed within 24-48 hours after completion and customer approval.',
                 ),
+                SizedBox(height: 14),
                 _FAQItem(
                   question: 'How do I contact a customer?',
-                  answer: 'Use the in-app messaging feature available in the job details screen.',
+                  answer:
+                      'Use in-app messaging from the job details screen (coming soon if not available).',
                 ),
               ],
             ),
@@ -201,60 +180,14 @@ class TechHelpSupportScreen extends StatelessWidget {
     );
   }
 
-  void _showRatingDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Rate FixIt'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('How would you rate your experience?'),
-              SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.star, color: Colors.amber, size: 32),
-                  Icon(Icons.star, color: Colors.amber, size: 32),
-                  Icon(Icons.star, color: Colors.amber, size: 32),
-                  Icon(Icons.star, color: Colors.amber, size: 32),
-                  Icon(Icons.star, color: Colors.amber, size: 32),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Thank you for your feedback!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              child: const Text('Submit'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showBugReportDialog(BuildContext context) {
-    final TextEditingController bugController = TextEditingController();
+  static void _showBugReportDialog(BuildContext context) {
+    final bugController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Report a Bug'),
+          title: const Text('Report a bug'),
           content: TextField(
             controller: bugController,
             maxLines: 5,
@@ -274,7 +207,7 @@ class TechHelpSupportScreen extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Bug report submitted. Thank you!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppTheme.successColor,
                   ),
                 );
               },
@@ -287,14 +220,182 @@ class TechHelpSupportScreen extends StatelessWidget {
   }
 }
 
-class _SupportTile extends StatelessWidget {
+class _SectionTitle extends StatelessWidget {
+  final String text;
+  const _SectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: AppTheme.textPrimaryColor,
+      ),
+    );
+  }
+}
+
+class _SupportHeroCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SupportHeroCard({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.deepBlue,
+            AppTheme.deepBlue.withValues(alpha: 0.92),
+            AppTheme.primaryCyan,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.deepBlue.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.support_agent, color: Colors.white),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade500),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportOptionTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
-  const _SupportTile({
+  const _SupportOptionTile({
     required this.icon,
     required this.iconColor,
     required this.title,
@@ -304,52 +405,56 @@ class _SupportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimaryColor,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondaryColor,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondaryColor,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
-          ],
+              Icon(Icons.chevron_right, color: Colors.grey.shade500),
+            ],
+          ),
         ),
       ),
     );
@@ -360,36 +465,32 @@ class _FAQItem extends StatelessWidget {
   final String question;
   final String answer;
 
-  const _FAQItem({
-    required this.question,
-    required this.answer,
-  });
+  const _FAQItem({required this.question, required this.answer});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            question,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimaryColor,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          question,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryColor,
           ),
-          const SizedBox(height: 4),
-          Text(
-            answer,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondaryColor,
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          answer,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSecondaryColor,
+            height: 1.35,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

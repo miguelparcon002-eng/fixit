@@ -1,9 +1,11 @@
 /// Utility to migrate old bookings in local storage to include customerId
 /// This ensures customers only see their own bookings after the security fix
+library;
 
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../services/storage_service.dart';
+import '../core/utils/app_logger.dart';
 
 class BookingMigrationUtility {
   /// Migrate all bookings in local storage
@@ -11,13 +13,13 @@ class BookingMigrationUtility {
   /// - Log the migration results
   static Future<MigrationResult> migrateLocalBookings() async {
     try {
-      print('=== Starting Booking Migration ===');
+      AppLogger.p('=== Starting Booking Migration ===');
       
       // Load all bookings from local storage as JSON string
       final bookingsJson = await StorageService.loadGlobalBookings();
       
       if (bookingsJson == null || bookingsJson.isEmpty) {
-        print('No bookings found in local storage');
+        AppLogger.p('No bookings found in local storage');
         return MigrationResult(
           totalBookings: 0,
           validBookings: 0,
@@ -30,7 +32,7 @@ class BookingMigrationUtility {
       final List<dynamic> allBookings = json.decode(bookingsJson);
       final totalBookings = allBookings.length;
       
-      print('Found $totalBookings bookings in local storage');
+      AppLogger.p('Found $totalBookings bookings in local storage');
       
       // Separate bookings with and without customerId
       final validBookings = <Map<String, dynamic>>[];
@@ -44,12 +46,12 @@ class BookingMigrationUtility {
           validBookings.add(booking);
         } else {
           invalidBookings.add(booking);
-          print('⚠️ Found booking without customerId: ${booking['id']} (${booking['customerName']})');
+          AppLogger.p('⚠️ Found booking without customerId: ${booking['id']} (${booking['customerName']})');
         }
       }
       
-      print('Valid bookings (with customerId): ${validBookings.length}');
-      print('Invalid bookings (without customerId): ${invalidBookings.length}');
+      AppLogger.p('Valid bookings (with customerId): ${validBookings.length}');
+      AppLogger.p('Invalid bookings (without customerId): ${invalidBookings.length}');
       
       // Save only valid bookings back to storage
       final validBookingsJson = json.encode(validBookings);
@@ -62,15 +64,15 @@ class BookingMigrationUtility {
         removedBookingIds: invalidBookings.map((b) => b['id'] as String).toList(),
       );
       
-      print('=== Migration Complete ===');
-      print('Kept: ${result.validBookings} bookings');
-      print('Removed: ${result.removedBookings} bookings');
+      AppLogger.p('=== Migration Complete ===');
+      AppLogger.p('Kept: ${result.validBookings} bookings');
+      AppLogger.p('Removed: ${result.removedBookings} bookings');
       
       return result;
     } catch (e, stackTrace) {
-      print('❌ Migration failed: $e');
+      AppLogger.p('❌ Migration failed: $e');
       if (kDebugMode) {
-        print(stackTrace);
+        AppLogger.p(stackTrace);
       }
       rethrow;
     }
@@ -101,12 +103,12 @@ class BookingMigrationUtility {
       }
       
       if (needsMigration) {
-        print('⚠️ Migration needed: $count bookings without customerId');
+        AppLogger.p('⚠️ Migration needed: $count bookings without customerId');
       }
       
       return needsMigration;
     } catch (e) {
-      print('Error checking migration status: $e');
+      AppLogger.p('Error checking migration status: $e');
       return false;
     }
   }
@@ -144,7 +146,7 @@ class BookingMigrationUtility {
         affectedBookingIds: bookingsWithoutCustomerId,
       );
     } catch (e) {
-      print('Error getting migration stats: $e');
+      AppLogger.p('Error getting migration stats: $e');
       return MigrationStats(
         totalBookings: 0,
         bookingsWithCustomerId: 0,
@@ -157,7 +159,7 @@ class BookingMigrationUtility {
   /// Clear all bookings from local storage (use with caution!)
   static Future<void> clearAllBookings() async {
     await StorageService.saveGlobalBookings('[]');
-    print('✅ Cleared all bookings from local storage');
+    AppLogger.p('✅ Cleared all bookings from local storage');
   }
 }
 

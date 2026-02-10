@@ -3,11 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../../core/theme/app_theme.dart';
-import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
-import '../../services/verification_service.dart';
-import '../../services/auth_service.dart';
 import 'package:go_router/go_router.dart';
 
 class VerificationSubmissionScreen extends ConsumerStatefulWidget {

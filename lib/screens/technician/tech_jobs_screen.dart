@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/booking_model.dart';
+import '../../core/utils/app_logger.dart';
 
 class TechJobsScreen extends ConsumerStatefulWidget {
   const TechJobsScreen({super.key});
@@ -237,9 +238,18 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
     return bookingsAsync.when(
       data: (bookings) {
         // Filter bookings with "requested" or "accepted" status (these are the job requests)
-        final techBookings = bookings.where((booking) =>
-          booking.status == 'requested' || booking.status == 'accepted'
-        ).toList();
+        final techBookings = bookings
+            .where((booking) => booking.status == 'requested' || booking.status == 'accepted')
+            .toList();
+
+        // Emergency first, then most recent
+        techBookings.sort((a, b) {
+          final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
+          if (prio != 0) return prio;
+          final aTime = a.scheduledDate ?? a.createdAt;
+          final bTime = b.scheduledDate ?? b.createdAt;
+          return bTime.compareTo(aTime);
+        });
 
         if (techBookings.isEmpty) {
           return Center(
@@ -281,17 +291,24 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
     return bookingsAsync.when(
       data: (bookings) {
         // DEBUG: Print booking data
-        print('🔍 ACTIVE JOBS: Found ${bookings.length} total bookings from Supabase');
+        AppLogger.p('🔍 ACTIVE JOBS: Found ${bookings.length} total bookings from Supabase');
         for (var booking in bookings) {
-          print('  - Booking ${booking.id}: ${booking.status}');
-          print('    Promo: ${booking.promoCode}, Discount: ${booking.discountAmount}');
-          print('    Original: ${booking.originalPrice}, Final: ${booking.finalCost}');
+          AppLogger.p('  - Booking ${booking.id}: ${booking.status}');
+          AppLogger.p('    Promo: ${booking.promoCode}, Discount: ${booking.discountAmount}');
+          AppLogger.p('    Original: ${booking.originalPrice}, Final: ${booking.finalCost}');
         }
 
         // Filter bookings with "in_progress" status
-        final activeBookings = bookings.where((booking) =>
-          booking.status == 'in_progress'
-        ).toList();
+        final activeBookings = bookings.where((booking) => booking.status == 'in_progress').toList();
+
+        // Emergency first, then most recent
+        activeBookings.sort((a, b) {
+          final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
+          if (prio != 0) return prio;
+          final aTime = a.scheduledDate ?? a.createdAt;
+          final bTime = b.scheduledDate ?? b.createdAt;
+          return bTime.compareTo(aTime);
+        });
 
         if (activeBookings.isEmpty) {
           return Center(
@@ -333,9 +350,16 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
     return bookingsAsync.when(
       data: (bookings) {
         // Filter bookings with "completed" status
-        final completedBookings = bookings.where((booking) =>
-          booking.status == 'completed'
-        ).toList();
+        final completedBookings = bookings.where((booking) => booking.status == 'completed').toList();
+
+        // Emergency first, then most recent
+        completedBookings.sort((a, b) {
+          final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
+          if (prio != 0) return prio;
+          final aTime = a.scheduledDate ?? a.createdAt;
+          final bTime = b.scheduledDate ?? b.createdAt;
+          return bTime.compareTo(aTime);
+        });
 
         if (completedBookings.isEmpty) {
           return Center(
@@ -393,12 +417,22 @@ class _TechJobsScreenState extends ConsumerState<TechJobsScreen>
           );
         }
 
+        // Emergency first, then most recent
+        final allBookings = [...bookings];
+        allBookings.sort((a, b) {
+          final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
+          if (prio != 0) return prio;
+          final aTime = a.scheduledDate ?? a.createdAt;
+          final bTime = b.scheduledDate ?? b.createdAt;
+          return bTime.compareTo(aTime);
+        });
+
         return ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          itemCount: bookings.length,
+          itemCount: allBookings.length,
           separatorBuilder: (context, index) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
-            final booking = bookings[index];
+            final booking = allBookings[index];
             // Show different card based on status
             if (booking.status == 'requested' || booking.status == 'accepted') {
               return _RequestJobCard(booking: booking);
@@ -585,6 +619,45 @@ class _RequestJobCard extends ConsumerWidget {
                   ),
                   child: Column(
                     children: [
+                      // New Request + Type (Emergency/Regular)
+                      Row(
+                        children: [
+                          const Icon(Icons.fiber_new, size: 16, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'New Request',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: booking.isEmergency
+                                  ? Colors.red.withValues(alpha: 0.12)
+                                  : Colors.blue.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: booking.isEmergency
+                                    ? Colors.red.withValues(alpha: 0.25)
+                                    : Colors.blue.withValues(alpha: 0.20),
+                              ),
+                            ),
+                            child: Text(
+                              booking.isEmergency ? 'Emergency' : 'Regular',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: booking.isEmergency ? Colors.red : Colors.blue,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
@@ -1176,7 +1249,7 @@ class _ActiveJobCard extends ConsumerWidget {
                         GestureDetector(
                           onTap: () {
                             // Show dialog to add additional charges or details
-                            print('🟡 EDIT BUTTON CLICKED for booking: ${booking.id}');
+                            AppLogger.p('🟡 EDIT BUTTON CLICKED for booking: ${booking.id}');
                             _showEditBookingDialog(context, ref, booking);
                           },
                           child: Container(
@@ -1664,17 +1737,17 @@ class _CompletedJobCard extends StatelessWidget {
 
 void _showEditBookingDialog(BuildContext context, WidgetRef ref, BookingModel booking) {
   // DEBUG: Print booking details when dialog opens
-  print('🔍 EDIT DIALOG OPENED:');
-  print('  Booking ID: ${booking.id}');
-  print('  Status: ${booking.status}');
-  print('  Diagnostic Notes: ${booking.diagnosticNotes}');
-  print('  Customer Details: ${booking.moreDetails}');
-  print('  Technician Notes: ${booking.technicianNotes}');
-  print('  Promo Code: ${booking.promoCode}');
-  print('  Discount: ${booking.discountAmount}');
-  print('  Original Price: ${booking.originalPrice}');
-  print('  Final Cost: ${booking.finalCost}');
-  print('  Estimated Cost: ${booking.estimatedCost}');
+  AppLogger.p('🔍 EDIT DIALOG OPENED:');
+  AppLogger.p('  Booking ID: ${booking.id}');
+  AppLogger.p('  Status: ${booking.status}');
+  AppLogger.p('  Diagnostic Notes: ${booking.diagnosticNotes}');
+  AppLogger.p('  Customer Details: ${booking.moreDetails}');
+  AppLogger.p('  Technician Notes: ${booking.technicianNotes}');
+  AppLogger.p('  Promo Code: ${booking.promoCode}');
+  AppLogger.p('  Discount: ${booking.discountAmount}');
+  AppLogger.p('  Original Price: ${booking.originalPrice}');
+  AppLogger.p('  Final Cost: ${booking.finalCost}');
+  AppLogger.p('  Estimated Cost: ${booking.estimatedCost}');
 
   // Start with empty notes - technician adds NEW notes each time
   final TextEditingController additionalNotesController = TextEditingController(text: '');
@@ -1871,10 +1944,10 @@ void _showEditBookingDialog(BuildContext context, WidgetRef ref, BookingModel bo
 
               // Update the booking using BookingService
               try {
-                print('💾 SAVING BOOKING UPDATE:');
-                print('  Booking ID: ${booking.id}');
-                print('  Technician Notes: $technicianNotes');
-                print('  Price Adjustment: $additionalCharge');
+                AppLogger.p('💾 SAVING BOOKING UPDATE:');
+                AppLogger.p('  Booking ID: ${booking.id}');
+                AppLogger.p('  Technician Notes: $technicianNotes');
+                AppLogger.p('  Price Adjustment: $additionalCharge');
 
                 await bookingService.addTechnicianNotes(
                   bookingId: booking.id,
@@ -1882,7 +1955,7 @@ void _showEditBookingDialog(BuildContext context, WidgetRef ref, BookingModel bo
                   priceAdjustment: additionalCharge != 0.0 ? additionalCharge : null,
                 );
 
-                print('✅ BOOKING SAVED SUCCESSFULLY');
+                AppLogger.p('✅ BOOKING SAVED SUCCESSFULLY');
 
                 // Show success message
                 if (!context.mounted) return;
