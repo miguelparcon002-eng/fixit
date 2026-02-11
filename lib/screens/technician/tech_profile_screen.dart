@@ -6,6 +6,7 @@ import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../services/user_session_service.dart';
+import 'tech_jobs_screen_new.dart';
 
 // Uses currentUserProvider.user.profilePicture (users.profile_picture) for avatar
 
@@ -135,7 +136,7 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
                       icon: Icons.notifications,
                       iconColor: Colors.orange,
                       label: 'Notifications',
-                      onTap: () => context.go('/tech-notifications'),
+                      onTap: () => context.go('/tech-notification-settings'),
                     ),
                     const SizedBox(height: 12),
                     _SettingsItem(
@@ -352,13 +353,150 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
   }
 }
 
-class _StatsCards extends StatelessWidget {
+class _StatsCards extends ConsumerWidget {
   final TechnicianStats? stats;
 
   const _StatsCards({this.stats});
 
+  void _showExperienceDetails(BuildContext context) {
+    final completedJobs = stats?.completedJobs ?? 0;
+    final totalReviews = stats?.totalReviews ?? 0;
+    final averageRating = stats?.averageRating ?? 0.0;
+    final currentLevel = stats?.experience ?? 'New';
+
+    const levels = <String, int>{
+      'New': 0,
+      'Beginner': 1,
+      'Intermediate': 2,
+      'Experienced': 3,
+      'Expert': 4,
+      'Master': 5,
+    };
+
+    // Thresholds must match TechnicianStats.calculateExperience
+    const thresholds = <String, int>{
+      'New': 0,
+      'Beginner': 1,
+      'Intermediate': 10,
+      'Experienced': 25,
+      'Expert': 50,
+      'Master': 100,
+    };
+
+    final currentRank = levels[currentLevel] ?? 0;
+    final nextLevel = levels.entries
+        .firstWhere(
+          (e) => e.value == currentRank + 1,
+          orElse: () => const MapEntry('Master', 5),
+        )
+        .key;
+
+    final nextThreshold = thresholds[nextLevel] ?? 100;
+    final remainingJobs = (nextThreshold - completedJobs).clamp(0, 1000000);
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              16 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Experience details',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ExperienceRow(label: 'Current level', value: currentLevel),
+                _ExperienceRow(label: 'Completed jobs', value: '$completedJobs'),
+                _ExperienceRow(label: 'Total reviews', value: '$totalReviews'),
+                _ExperienceRow(
+                  label: 'Average rating',
+                  value: averageRating.toStringAsFixed(1),
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text(
+                  currentLevel == 'Master'
+                      ? 'You’ve reached the highest level.'
+                      : 'Next level: $nextLevel',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                if (currentLevel != 'Master')
+                  Text(
+                    remainingJobs == 0
+                        ? 'You’re ready to level up!'
+                        : 'Complete $remainingJobs more job(s) to reach $nextLevel.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'How to increase your experience',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const _ChecklistItem(
+                  text: 'Finish more bookings (completed jobs are what level you up).',
+                ),
+                const _ChecklistItem(
+                  text: 'Ask customers to leave a review after each job.',
+                ),
+                const _ChecklistItem(
+                  text: 'Maintain a high rating by communicating clearly and arriving on time.',
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.deepBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final experience = stats?.experience ?? 'New';
     final rating = stats?.averageRating ?? 0.0;
     final jobsDone = stats?.completedJobs ?? 0;
@@ -372,6 +510,7 @@ class _StatsCards extends StatelessWidget {
               iconColor: Colors.pink,
               label: 'Experience',
               value: experience,
+              onTap: () => _showExperienceDetails(context),
             ),
           ),
           const SizedBox(width: 12),
@@ -381,6 +520,7 @@ class _StatsCards extends StatelessWidget {
               iconColor: Colors.green,
               label: 'Rating',
               value: rating.toStringAsFixed(1),
+              onTap: () => context.go('/tech-ratings'),
             ),
           ),
           const SizedBox(width: 12),
@@ -390,6 +530,11 @@ class _StatsCards extends StatelessWidget {
               iconColor: AppTheme.lightBlue,
               label: 'Jobs Done',
               value: '$jobsDone',
+              onTap: () {
+                // Jump to Completed tab
+                ref.read(techJobsInitialTabProvider.notifier).state = 2;
+                context.go('/tech-jobs');
+              },
             ),
           ),
         ],
@@ -403,58 +548,133 @@ class _StatCard extends StatelessWidget {
   final Color iconColor;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textSecondaryColor,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExperienceRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ExperienceRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondaryColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+              fontSize: 13,
               color: AppTheme.textPrimaryColor,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondaryColor,
-              fontWeight: FontWeight.w500,
+        ],
+      ),
+    );
+  }
+}
+
+class _ChecklistItem extends StatelessWidget {
+  final String text;
+
+  const _ChecklistItem({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.check_circle, size: 18, color: Colors.green),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondaryColor,
+                height: 1.3,
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

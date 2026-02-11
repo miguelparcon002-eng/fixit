@@ -1,20 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
+import '../../models/admin_technician_list_item.dart';
+import '../../providers/admin_technicians_provider.dart';
 import 'widgets/admin_notifications_dialog.dart';
+import 'widgets/admin_technician_details_sheet.dart';
 
-class AdminTechniciansScreen extends ConsumerWidget {
+enum _TechnicianSort { experience, createdAt, jobsDone }
+
+enum _VerifiedFilter { all, verified, unverified }
+
+class AdminTechniciansScreen extends ConsumerStatefulWidget {
   const AdminTechniciansScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminTechniciansScreen> createState() =>
+      _AdminTechniciansScreenState();
+}
+
+class _AdminTechniciansScreenState
+    extends ConsumerState<AdminTechniciansScreen> {
+  _TechnicianSort _sort = _TechnicianSort.jobsDone;
+  _VerifiedFilter _verifiedFilter = _VerifiedFilter.all;
+
+  String get _verifiedFilterLabel {
+    switch (_verifiedFilter) {
+      case _VerifiedFilter.all:
+        return 'All';
+      case _VerifiedFilter.verified:
+        return 'Verified';
+      case _VerifiedFilter.unverified:
+        return 'Unverified';
+    }
+  }
+
+  String get _sortLabel {
+    switch (_sort) {
+      case _TechnicianSort.experience:
+        return 'Experience';
+      case _TechnicianSort.createdAt:
+        return 'Account created';
+      case _TechnicianSort.jobsDone:
+        return 'Bookings done';
+    }
+  }
+
+  int _compare(AdminTechnicianListItem a, AdminTechnicianListItem b) {
+    // Keep suspended at the bottom.
+    if (a.isSuspended != b.isSuspended) {
+      return a.isSuspended ? 1 : -1;
+    }
+
+    int desc(num x, num y) => y.compareTo(x);
+
+    switch (_sort) {
+      case _TechnicianSort.experience:
+        return desc(a.profile?.yearsExperience ?? 0, b.profile?.yearsExperience ?? 0);
+      case _TechnicianSort.createdAt:
+        final ad = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bd = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bd.compareTo(ad);
+      case _TechnicianSort.jobsDone:
+        return desc(a.completedBookings, b.completedBookings);
+    }
+  }
+
+  void _pickVerifiedFilter(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SortOption(
+                  label: 'All',
+                  isSelected: _verifiedFilter == _VerifiedFilter.all,
+                  onTap: () {
+                    setState(() => _verifiedFilter = _VerifiedFilter.all);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                const SizedBox(height: 8),
+                _SortOption(
+                  label: 'Verified',
+                  isSelected: _verifiedFilter == _VerifiedFilter.verified,
+                  onTap: () {
+                    setState(() => _verifiedFilter = _VerifiedFilter.verified);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                const SizedBox(height: 8),
+                _SortOption(
+                  label: 'Unverified',
+                  isSelected: _verifiedFilter == _VerifiedFilter.unverified,
+                  onTap: () {
+                    setState(() => _verifiedFilter = _VerifiedFilter.unverified);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<AdminTechnicianListItem> _applyVerifiedFilter(List<AdminTechnicianListItem> items) {
+    switch (_verifiedFilter) {
+      case _VerifiedFilter.all:
+        return items;
+      case _VerifiedFilter.verified:
+        return items.where((t) => t.verified).toList();
+      case _VerifiedFilter.unverified:
+        return items.where((t) => !t.verified).toList();
+    }
+  }
+
+  void _pickSort(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SortOption(
+                  label: 'Bookings done',
+                  isSelected: _sort == _TechnicianSort.jobsDone,
+                  onTap: () {
+                    setState(() => _sort = _TechnicianSort.jobsDone);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                const SizedBox(height: 8),
+                _SortOption(
+                  label: 'Experience',
+                  isSelected: _sort == _TechnicianSort.experience,
+                  onTap: () {
+                    setState(() => _sort = _TechnicianSort.experience);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+                const SizedBox(height: 8),
+                _SortOption(
+                  label: 'Account created',
+                  isSelected: _sort == _TechnicianSort.createdAt,
+                  onTap: () {
+                    setState(() => _sort = _TechnicianSort.createdAt);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final techsAsync = ref.watch(adminTechniciansProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/admin-home');
+            }
+          },
+        ),
         title: Row(
           children: [
             const AppLogo(
@@ -36,6 +209,21 @@ class AdminTechniciansScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => _pickVerifiedFilter(context),
+            icon: const Icon(Icons.filter_list),
+            label: Text(_verifiedFilterLabel),
+          ),
+          TextButton.icon(
+            onPressed: () => _pickSort(context),
+            icon: const Icon(Icons.sort),
+            label: Text(_sortLabel),
+          ),
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh),
+            onPressed: () => ref.invalidate(adminTechniciansProvider),
+          ),
           IconButton(
             tooltip: 'Notifications',
             icon: const Icon(Icons.notifications_outlined),
@@ -46,460 +234,363 @@ class AdminTechniciansScreen extends ConsumerWidget {
               );
             },
           ),
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: () => context.go('/login'),
-          ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search technicians…',
-                      prefixIcon: const Icon(Icons.search),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Filters'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    foregroundColor: AppTheme.textPrimaryColor,
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Adding new technician…')),
+      body: techsAsync.when(
+        data: (items) {
+          final filtered = _applyVerifiedFilter(items);
+          final sorted = [...filtered]..sort(_compare);
+          if (sorted.isEmpty) {
+            return Center(
+              child: Text(
+                'No technicians found',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: sorted.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final t = sorted[index];
+              return _TechnicianCard(
+                technician: t,
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    showDragHandle: true,
+                    isScrollControlled: true,
+                    builder: (_) => AdminTechnicianDetailsSheet(technician: t),
                   );
                 },
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('Add technician'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
+              );
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Error loading technicians: $e',
+              style: TextStyle(color: Colors.grey.shade700),
+              textAlign: TextAlign.center,
             ),
           ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              children: const [
-                _TechnicianCard(
-                  name: 'Shen Sarsale',
-                  techId: 'TECH001',
-                  status: 'active',
-                  statusColor: Colors.green,
-                  rating: '4.9',
-                  jobs: '234',
-                  experience: '3 years',
-                  phone: '09723724672',
-                  location: 'Barangay 7, SFADS',
-                  specialties: ['Iphone', 'Samsung', 'Screen Repair'],
-                  currentJob: '#FX156 - Hernan Miguel Parcon\nIphone 14 Pro',
-                ),
-                SizedBox(height: 12),
-                _TechnicianCard(
-                  name: 'Ethanjames Estino',
-                  techId: 'TECH002',
-                  status: 'active',
-                  statusColor: Colors.green,
-                  rating: '4.6',
-                  jobs: '184',
-                  experience: '2 years',
-                  phone: '09723724672',
-                  location: 'Barangay 2, SFADS',
-                  specialties: ['Macbook', 'Laptop Repair', 'Battery'],
-                  currentJob: '#FX189 - Emily Davis\nMacbook Air M2',
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _TechnicianCard extends StatelessWidget {
-  final String name;
-  final String techId;
-  final String status;
-  final Color statusColor;
-  final String rating;
-  final String jobs;
-  final String experience;
-  final String phone;
-  final String location;
-  final List<String> specialties;
-  final String currentJob;
+  final AdminTechnicianListItem technician;
+  final VoidCallback onTap;
 
-  const _TechnicianCard({
-    required this.name,
-    required this.techId,
-    required this.status,
-    required this.statusColor,
-    required this.rating,
-    required this.jobs,
-    required this.experience,
-    required this.phone,
-    required this.location,
-    required this.specialties,
-    required this.currentJob,
-  });
+  const _TechnicianCard({required this.technician, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final initials = name
-        .split(' ')
-        .map((n) => n[0])
-        .take(2)
-        .join()
-        .toUpperCase();
-
     final theme = Theme.of(context);
+    final profile = technician.profile;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppTheme.deepBlue.withValues(alpha: 0.10),
-                child: Text(
-                  initials,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.deepBlue,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.textPrimaryColor,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.30),
-                            ),
-                          ),
-                          child: Text(
-                            status.toUpperCase(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: statusColor,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      techId,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _StatColumn(
-                            icon: Icons.star,
-                            value: rating,
-                            label: 'Rating',
-                            color: Colors.amber,
-                            dense: true,
-                          ),
-                        ),
-                        Expanded(
-                          child: _StatColumn(
-                            icon: Icons.work_outline,
-                            value: jobs,
-                            label: 'Jobs',
-                            color: AppTheme.lightBlue,
-                            dense: true,
-                          ),
-                        ),
-                        Expanded(
-                          child: _StatColumn(
-                            icon: Icons.timelapse,
-                            value: experience,
-                            label: 'Exp',
-                            color: AppTheme.accentPurple,
-                            dense: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: specialties.take(4).map((specialty) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Text(
-                  specialty,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondaryColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Assigning job to $name...')),
-                  );
-                },
-                icon: const Icon(Icons.assignment_add, size: 18),
-                label: const Text('Assign'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.deepBlue,
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFE5E7EB)),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                tooltip: 'More actions',
-                onSelected: (value) {
-                  switch (value) {
-                    case 'call':
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Calling $name...')),
-                      );
-                      break;
-                    case 'message':
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Messaging $name...')),
-                      );
-                      break;
-                    case 'details':
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Opening $name details...')),
-                      );
-                      break;
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'details', child: Text('View details')),
-                  PopupMenuItem(value: 'call', child: Text('Call')),
-                  PopupMenuItem(value: 'message', child: Text('Message')),
-                ],
-                child: const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Icon(
-                    Icons.more_vert,
-                    color: AppTheme.textSecondaryColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (currentJob.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.lightBlue.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.lightBlue.withValues(alpha: 0.18),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.build_outlined,
-                    size: 16,
-                    color: AppTheme.lightBlue,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      currentJob,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondaryColor,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    final specialties = profile?.specialties ?? const <String>[];
+    final rating = profile?.rating ?? 0.0;
+    final jobs = technician.completedBookings;
+    final experienceYears = profile?.yearsExperience ?? 0;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: (technician.profilePicture != null &&
+                          technician.profilePicture!.isNotEmpty)
+                      ? NetworkImage(technician.profilePicture!)
+                      : null,
+                  child: (technician.profilePicture != null &&
+                          technician.profilePicture!.isNotEmpty)
+                      ? null
+                      : const Icon(Icons.engineering),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              technician.fullName,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: AppTheme.textPrimaryColor,
+                              ),
+                            ),
+                          ),
+                          if (technician.isSuspended)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: Colors.red.withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.block, size: 16, color: Colors.red),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Suspended',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (technician.verified)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.successColor
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppTheme.successColor
+                                      .withValues(alpha: 0.25),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.verified,
+                                    size: 16,
+                                    color: AppTheme.successColor,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Verified',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.successColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        technician.email,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MiniStat(
+                  icon: Icons.star,
+                  value: rating.toStringAsFixed(1),
+                  color: Colors.pink,
+                ),
+                _MiniStat(
+                  icon: Icons.work,
+                  value: '$jobs jobs',
+                  color: AppTheme.lightBlue,
+                ),
+                _MiniStat(
+                  icon: Icons.trending_up,
+                  value: '${experienceYears}y exp',
+                  color: AppTheme.accentPurple,
+                ),
+              ],
+            ),
+            if (specialties.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: specialties.take(4).map((s) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryCyan.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: AppTheme.primaryCyan.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Text(
+                      s,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+            if ((technician.city ?? technician.address) != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.location_on,
+                      size: 16, color: AppTheme.textSecondaryColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      technician.city ?? technician.address ?? '',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StatColumn extends StatelessWidget {
-  final IconData icon;
-  final String value;
+class _SortOption extends StatelessWidget {
   final String label;
-  final Color color;
-  final bool dense;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _StatColumn({
-    required this.icon,
-    required this.value,
+  const _SortOption({
     required this.label,
-    required this.color,
-    this.dense = false,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final iconSize = dense ? 16.0 : 20.0;
-    final valueStyle = dense
-        ? theme.textTheme.bodyMedium
-        : theme.textTheme.titleSmall;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: iconSize),
-        SizedBox(height: dense ? 2 : 4),
-        Text(
-          value,
-          style: valueStyle?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: color,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.deepBlue.withValues(alpha: 0.08)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.deepBlue
+                : Colors.grey.withValues(alpha: 0.3),
           ),
         ),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: AppTheme.textSecondaryColor,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? AppTheme.deepBlue : Colors.black,
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_box, color: AppTheme.deepBlue, size: 20)
+            else
+              Icon(
+                Icons.check_box_outline_blank,
+                color: Colors.grey.withValues(alpha: 0.5),
+                size: 20,
+              ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  const _MiniStat({required this.icon, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

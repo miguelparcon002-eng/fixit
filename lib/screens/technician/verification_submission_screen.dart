@@ -149,6 +149,7 @@ class _VerificationSubmissionScreenState extends ConsumerState<VerificationSubmi
           final url = await verificationService.uploadDocument(
             userId: user.id,
             fileBytes: entry.value!,
+            // Embed the document type as filename for admin labeling.
             fileName: '${entry.key.replaceAll(' ', '_').toLowerCase()}.jpg',
           );
           documentUrls.add(url);

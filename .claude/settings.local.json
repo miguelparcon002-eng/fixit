@@ -14,7 +14,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(flutter build:*)",
-      "Bash(flutter doctor:*)"
+      "Bash(flutter doctor:*)",
+      "Bash(git checkout:*)",
+      "Bash(wc:*)",
+      "Bash(for f in lib/screens/booking/booking_list_screen.dart lib/screens/booking/booking_detail_screen.dart lib/screens/booking/booking_device_details_screen.dart lib/screens/booking/widgets/booking_dialog.dart)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -9,60 +9,79 @@ class ImageUploadService {
   // Keep this aligned with AppConstants.bucketProfiles.
   static const String _bucketName = AppConstants.bucketProfiles;
 
-  /// Upload a profile image to Supabase Storage
-  /// Returns the public URL of the uploaded image
-  static Future<String?> uploadProfileImage({
+  static String _contentTypeFromExtension(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'heic':
+      case 'heif':
+        return 'image/heic';
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  /// Upload a profile image to Supabase Storage.
+  ///
+  /// Throws the underlying Supabase/storage error if upload fails.
+  static Future<String> uploadProfileImage({
     required String userId,
     required XFile imageFile,
   }) async {
+    // Generate unique filename with user ID and timestamp
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    // On web, XFile.path can be empty; default to jpg.
+    final rawPath = imageFile.path;
+    final ext = (rawPath.contains('.')
+            ? rawPath.split('.').last.toLowerCase()
+            : 'jpg')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    final safeExt = ext.isEmpty ? 'jpg' : ext;
+    final fileName = '$userId/$timestamp.$safeExt';
+    final contentType = _contentTypeFromExtension(safeExt);
+
+    AppLogger.p('ImageUploadService: Uploading image to bucket=$_bucketName path=$fileName contentType=$contentType');
+
+    final Uint8List imageBytes = await imageFile.readAsBytes();
+
     try {
-      // Generate unique filename with user ID and timestamp
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = imageFile.path.split('.').last.toLowerCase();
-      final fileName = '$userId/$timestamp.$extension';
-
-      AppLogger.p('ImageUploadService: Uploading image to $fileName');
-
-      // Get image bytes
-      final Uint8List imageBytes = await imageFile.readAsBytes();
-
-      // Upload to Supabase Storage
-      await SupabaseConfig.client.storage
-          .from(_bucketName)
-          .uploadBinary(
+      await SupabaseConfig.client.storage.from(_bucketName).uploadBinary(
             fileName,
             imageBytes,
-            fileOptions: const FileOptions(
+            fileOptions: FileOptions(
               upsert: true,
+              contentType: contentType,
+              cacheControl: '3600',
             ),
           );
 
-      // Get the public URL
-      final publicUrl = SupabaseConfig.client.storage
-          .from(_bucketName)
-          .getPublicUrl(fileName);
+      final publicUrl =
+          SupabaseConfig.client.storage.from(_bucketName).getPublicUrl(fileName);
 
       AppLogger.p('ImageUploadService: Upload successful, URL: $publicUrl');
-
       return publicUrl;
-    } catch (e) {
-      AppLogger.p('ImageUploadService: Error uploading image - $e');
-      return null;
+    } catch (e, st) {
+      // IMPORTANT: don't hide the real error; surface it to the UI.
+      AppLogger.e('ImageUploadService: Upload failed', error: e, stackTrace: st);
+      rethrow;
     }
   }
 
   /// Upload profile image from file path (for mobile)
-  static Future<String?> uploadProfileImageFromPath({
+  static Future<String> uploadProfileImageFromPath({
     required String userId,
     required String filePath,
   }) async {
-    try {
-      final xFile = XFile(filePath);
-      return await uploadProfileImage(userId: userId, imageFile: xFile);
-    } catch (e) {
-      AppLogger.p('ImageUploadService: Error uploading from path - $e');
-      return null;
-    }
+    final xFile = XFile(filePath);
+    return uploadProfileImage(userId: userId, imageFile: xFile);
   }
 
   /// Delete old profile image from storage
@@ -110,37 +129,28 @@ class ImageUploadService {
   }
 
   /// Complete flow: Upload image and update database
-  static Future<String?> uploadAndSaveProfileImage({
+  static Future<String> uploadAndSaveProfileImage({
     required String userId,
     required XFile imageFile,
     String? oldImageUrl,
   }) async {
-    try {
-      // Upload new image
-      final newUrl = await uploadProfileImage(
-        userId: userId,
-        imageFile: imageFile,
-      );
+    // Upload new image (throws on failure)
+    final newUrl = await uploadProfileImage(
+      userId: userId,
+      imageFile: imageFile,
+    );
 
-      if (newUrl == null) {
-        throw Exception('Failed to upload image');
-      }
+    // Update database with new URL
+    await updateUserProfilePicture(
+      userId: userId,
+      imageUrl: newUrl,
+    );
 
-      // Update database with new URL
-      await updateUserProfilePicture(
-        userId: userId,
-        imageUrl: newUrl,
-      );
-
-      // Delete old image if exists (optional, to save storage)
-      if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
-        await deleteProfileImage(userId: userId, imageUrl: oldImageUrl);
-      }
-
-      return newUrl;
-    } catch (e) {
-      AppLogger.p('ImageUploadService: Error in uploadAndSave - $e');
-      return null;
+    // Delete old image if exists (optional, to save storage)
+    if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
+      await deleteProfileImage(userId: userId, imageUrl: oldImageUrl);
     }
+
+    return newUrl;
   }
 }

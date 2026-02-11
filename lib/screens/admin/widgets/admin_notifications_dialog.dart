@@ -1,213 +1,112 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/notification_icon_mapper.dart';
+import '../../../core/utils/time_ago.dart';
+import '../../../models/notification_model.dart';
+import '../../../providers/admin_notifications_provider.dart';
 
-class NotificationItem {
-  final String id;
-  final String title;
-  final String message;
-  final String time;
-  final IconData icon;
-  final Color iconColor;
-  final bool isRead;
-  final String type;
-  final String? route; // Route to navigate when tapped
-
-  NotificationItem({
-    required this.id,
-    required this.title,
-    required this.message,
-    required this.time,
-    required this.icon,
-    required this.iconColor,
-    this.isRead = false,
-    required this.type,
-    this.route,
-  });
-}
-
-class AdminNotificationsDialog extends StatefulWidget {
+class AdminNotificationsDialog extends ConsumerWidget {
   const AdminNotificationsDialog({super.key});
 
   @override
-  State<AdminNotificationsDialog> createState() =>
-      _AdminNotificationsDialogState();
-}
-
-class _AdminNotificationsDialogState extends State<AdminNotificationsDialog> {
-  final List<NotificationItem> _notifications = [
-    NotificationItem(
-      id: '1',
-      title: 'High Priority Booking',
-      message: 'Emergency repair request for water damaged iPhone 15 Pro',
-      time: '5 minutes ago',
-      icon: Icons.priority_high,
-      iconColor: const Color(0xFFFF6B6B),
-      type: 'urgent',
-      route: '/admin-bookings',
-    ),
-    NotificationItem(
-      id: '2',
-      title: 'Technician Check-In',
-      message: 'Ethanjames has started the screen replacement job',
-      time: '8 minutes ago',
-      icon: Icons.engineering,
-      iconColor: AppTheme.lightBlue,
-      type: 'technician',
-      isRead: true,
-      route: '/admin-team',
-    ),
-    NotificationItem(
-      id: '3',
-      title: 'Job Completed',
-      message: 'Shen Anthony completed MacBook battery replacement for #FX156',
-      time: '15 minutes ago',
-      icon: Icons.check_circle,
-      iconColor: Colors.green,
-      type: 'completed',
-      route: '/admin-bookings',
-    ),
-    NotificationItem(
-      id: '4',
-      title: 'Appointment Reminder',
-      message: 'Upcoming appointment at 4:00 PM - Emily Davis laptop repair',
-      time: '30 minutes ago',
-      icon: Icons.schedule,
-      iconColor: Colors.orange,
-      type: 'reminder',
-      route: '/admin-bookings',
-    ),
-    NotificationItem(
-      id: '5',
-      title: 'New Customer Registration',
-      message: 'John Michael registered and booked iPhone screen repair',
-      time: '45 minutes ago',
-      icon: Icons.person_add,
-      iconColor: Colors.purple,
-      type: 'customer',
-      isRead: true,
-      route: '/admin-customers',
-    ),
-    NotificationItem(
-      id: '6',
-      title: 'Payment Received',
-      message: '₱10,000 payment confirmed for job #FX156',
-      time: '1 hour ago',
-      icon: Icons.payments,
-      iconColor: Colors.green,
-      type: 'payment',
-      route: '/admin-reports',
-    ),
-    NotificationItem(
-      id: '7',
-      title: 'Technician Unavailable',
-      message: 'Sarah Chen marked as unavailable due to emergency',
-      time: '2 hours ago',
-      icon: Icons.warning,
-      iconColor: Colors.amber,
-      type: 'warning',
-      isRead: true,
-      route: '/admin-team',
-    ),
-    NotificationItem(
-      id: '8',
-      title: 'New Review',
-      message: 'Hernan Miguel left 5-star review for technician Shen Anthony',
-      time: '3 hours ago',
-      icon: Icons.star,
-      iconColor: Colors.amber,
-      type: 'review',
-      isRead: true,
-      route: '/admin-reviews',
-    ),
-  ];
-
-  void _removeNotification(String id) {
-    setState(() {
-      _notifications.removeWhere((n) => n.id == id);
-    });
-  }
-
-  void _markAsRead(String id) {
-    setState(() {
-      final index = _notifications.indexWhere((n) => n.id == id);
-      if (index != -1) {
-        _notifications[index] = NotificationItem(
-          id: _notifications[index].id,
-          title: _notifications[index].title,
-          message: _notifications[index].message,
-          time: _notifications[index].time,
-          icon: _notifications[index].icon,
-          iconColor: _notifications[index].iconColor,
-          type: _notifications[index].type,
-          route: _notifications[index].route,
-          isRead: true,
-        );
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n.isRead).length;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feedAsync = ref.watch(adminNotificationsFeedProvider);
+    final unreadCount = ref.watch(adminUnreadNotificationsCountProvider);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: const BoxConstraints(maxHeight: 600),
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.7,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.primaryCyan,
+                color: AppTheme.deepBlue,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),
                 ),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontSize: 20,
+                  const Icon(Icons.notifications, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (unreadCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryCyan,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(
+                          color: AppTheme.deepBlue,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black,
                         ),
                       ),
-                      if (unreadCount > 0)
-                        Text(
-                          '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.black),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
             ),
+
+            if (unreadCount > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Row(
+                  children: [
+                    Text(
+                      '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => ref.invalidate(adminNotificationsFeedProvider),
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Refresh'),
+                    ),
+                  ],
+                ),
+              ),
+
             // Notifications List
             Expanded(
-              child: _notifications.isEmpty
-                  ? Center(
+              child: feedAsync.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -227,29 +126,60 @@ class _AdminNotificationsDialogState extends State<AdminNotificationsDialog> {
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: _notifications.length,
-                      itemBuilder: (context, index) {
-                        final notification = _notifications[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _NotificationCard(
-                            notification: notification,
-                            onTap: () {
-                              _markAsRead(notification.id);
-                              Navigator.of(context).pop();
-                              if (notification.route != null) {
-                                context.go(notification.route!);
-                              }
-                            },
-                            onDismiss: () =>
-                                _removeNotification(notification.id),
-                          ),
-                        );
-                      },
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final notification = items[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _NotificationCard(
+                          notification: notification,
+                          onTap: () async {
+                            final route = notification.route;
+
+                            // Close the dialog immediately (before async) so we don't
+                            // rely on dialog context after awaits.
+                            final rootContext = context;
+                            Navigator.of(rootContext).pop();
+
+                            if (!notification.isRead) {
+                              await ref
+                                  .read(adminNotificationsServiceProvider)
+                                  .markAsRead(notification.id);
+                              ref.invalidate(adminNotificationsFeedProvider);
+                            }
+
+                            if (route != null && route.isNotEmpty) {
+                              if (rootContext.mounted) rootContext.go(route);
+                            }
+                          },
+                          onDismiss: () async {
+                            await ref
+                                .read(adminNotificationsServiceProvider)
+                                .deleteNotification(notification.id);
+                            ref.invalidate(adminNotificationsFeedProvider);
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      'Error loading notifications:\n$e',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade700),
                     ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -259,7 +189,7 @@ class _AdminNotificationsDialogState extends State<AdminNotificationsDialog> {
 }
 
 class _NotificationCard extends StatelessWidget {
-  final NotificationItem notification;
+  final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
 
@@ -271,6 +201,8 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mapped = mapNotificationIcon(notification.type);
+
     return Container(
       decoration: BoxDecoration(
         color: notification.isRead
@@ -281,8 +213,14 @@ class _NotificationCard extends StatelessWidget {
           color: notification.isRead
               ? Colors.grey.shade200
               : AppTheme.primaryCyan.withValues(alpha: 0.3),
-          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -297,30 +235,25 @@ class _NotificationCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: notification.iconColor.withValues(alpha: 0.1),
+                    color: mapped.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    notification.icon,
-                    color: notification.iconColor,
-                    size: 24,
-                  ),
+                  child: Icon(mapped.icon, color: mapped.color, size: 24),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
                               notification.title,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 15,
-                                fontWeight: notification.isRead
-                                    ? FontWeight.w600
-                                    : FontWeight.w700,
+                                fontWeight: FontWeight.w700,
                                 color: AppTheme.textPrimaryColor,
                               ),
                             ),
@@ -358,7 +291,7 @@ class _NotificationCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                notification.time,
+                                timeAgo(notification.createdAt),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[600],

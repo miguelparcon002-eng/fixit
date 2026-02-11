@@ -3,7 +3,7 @@ import '../models/chat_model.dart';
 import '../services/chat_service.dart';
 import 'auth_provider.dart';
 
-final chatServiceProvider = Provider((ref) => ChatService());
+final chatServiceProvider = Provider((ref) => ChatService(ref: ref));
 
 final userChatsProvider = StreamProvider<List<ChatModel>>((ref) {
   final chatService = ref.watch(chatServiceProvider);

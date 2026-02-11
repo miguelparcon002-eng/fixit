@@ -4,10 +4,19 @@ import '../core/constants/db_constants.dart';
 import '../core/constants/app_constants.dart';
 import '../models/booking_model.dart';
 import '../core/utils/app_logger.dart';
+import '../core/utils/technician_verification_guard.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class BookingService {
   final _supabase = SupabaseConfig.client;
   final _uuid = const Uuid();
+
+  // Optional ref for enforcing technician verification in write operations.
+  Ref? _ref;
+
+  BookingService({Ref? ref}) {
+    _ref = ref;
+  }
 
   Future<BookingModel> createBooking({
     required String customerId,
@@ -43,6 +52,9 @@ class BookingService {
     required String status,
     String? cancellationReason,
   }) async {
+    if (_ref != null) {
+      await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
+    }
     final updates = <String, dynamic>{
       'status': status,
     };

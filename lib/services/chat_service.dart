@@ -2,16 +2,26 @@ import 'package:uuid/uuid.dart';
 import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
 import '../models/chat_model.dart';
+import '../core/utils/technician_verification_guard.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ChatService {
   final _supabase = SupabaseConfig.client;
   final _uuid = const Uuid();
+
+  Ref? _ref;
+  ChatService({Ref? ref}) {
+    _ref = ref;
+  }
 
   Future<ChatModel> createOrGetChat({
     required String customerId,
     required String technicianId,
     String? bookingId,
   }) async {
+    if (_ref != null) {
+      await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
+    }
     final existingChat = await _supabase
         .from(DBConstants.chats)
         .select()
@@ -42,6 +52,9 @@ class ChatService {
     required String message,
     String? imageUrl,
   }) async {
+    if (_ref != null) {
+      await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
+    }
     final messageId = _uuid.v4();
 
     final response = await _supabase.from(DBConstants.messages).insert({

@@ -92,10 +92,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
         oldImageUrl: user.profilePicture,
       );
 
-      if (newUrl == null || newUrl.isEmpty) {
-        throw Exception('Failed to upload image');
-      }
-
       if (!mounted) return;
       setState(() {
         _profileImageUrl = newUrl;
@@ -114,10 +110,11 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
         );
       }
     } catch (e) {
+      // This will now show the *real* Supabase Storage error (unauthorized, bucket missing, RLS, etc.)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error uploading image: $e'),
+            content: Text('Upload failed: $e'),
             backgroundColor: Colors.red,
           ),
         );

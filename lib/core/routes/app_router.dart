@@ -30,10 +30,12 @@ import '../../screens/technician/tech_navigation.dart';
 import '../../screens/technician/tech_home_screen.dart';
 import '../../screens/technician/tech_jobs_screen_new.dart';
 import '../../screens/technician/tech_earnings_screen.dart';
+import '../../screens/technician/tech_ratings_screen.dart';
 import '../../screens/technician/tech_profile_screen.dart';
 import '../../screens/technician/tech_edit_profile_screen.dart';
 import '../../screens/technician/tech_account_settings_screen.dart';
 import '../../screens/technician/tech_notifications_screen.dart';
+import '../../screens/technician/tech_notification_settings_screen.dart';
 import '../../screens/technician/tech_help_support_screen.dart';
 import '../../screens/technician/tech_terms_policies_screen.dart';
 import '../../screens/admin/admin_dashboard_screen.dart';
@@ -248,6 +250,12 @@ class AppRouter {
             name: 'techProfile',
             builder: (context, state) => const TechProfileScreen(),
           ),
+          // Full page ratings inside technician navigation
+          GoRoute(
+            path: '/tech-ratings',
+            name: 'techRatings',
+            builder: (context, state) => const TechRatingsScreen(),
+          ),
         ],
       ),
 
@@ -263,7 +271,14 @@ class AppRouter {
           GoRoute(
             path: '/admin-appointments',
             name: 'adminAppointments',
-            builder: (context, state) => const AdminAppointmentsScreen(),
+            builder: (context, state) {
+              final range = state.uri.queryParameters['range'];
+              final status = state.uri.queryParameters['status'];
+              return AdminAppointmentsScreen(
+                initialRange: range,
+                initialStatus: status,
+              );
+            },
           ),
           GoRoute(
             path: '/admin-technicians',
@@ -298,6 +313,11 @@ class AppRouter {
         path: '/tech-notifications',
         name: 'techNotifications',
         builder: (context, state) => const TechNotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/tech-notification-settings',
+        name: 'techNotificationSettings',
+        builder: (context, state) => const TechNotificationSettingsScreen(),
       ),
       GoRoute(
         path: '/tech-help-support',

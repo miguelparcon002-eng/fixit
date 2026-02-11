@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../providers/ratings_provider.dart';
 import '../../services/ratings_service.dart';
@@ -33,6 +35,17 @@ class AdminReviewsScreen extends ConsumerWidget {
         return Scaffold(
           backgroundColor: AppTheme.backgroundColor,
           appBar: AppBar(
+            leading: IconButton(
+              tooltip: 'Back',
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/admin-home');
+                }
+              },
+            ),
             backgroundColor: Colors.white,
             foregroundColor: AppTheme.textPrimaryColor,
             elevation: 0,
@@ -166,6 +179,17 @@ class AdminReviewsScreen extends ConsumerWidget {
       loading: () => Scaffold(
         backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/admin-home');
+              }
+            },
+          ),
           backgroundColor: Colors.white,
           foregroundColor: AppTheme.textPrimaryColor,
           elevation: 0,
@@ -199,6 +223,17 @@ class AdminReviewsScreen extends ConsumerWidget {
       error: (error, stack) => Scaffold(
         backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/admin-home');
+              }
+            },
+          ),
           backgroundColor: Colors.white,
           foregroundColor: AppTheme.textPrimaryColor,
           elevation: 0,

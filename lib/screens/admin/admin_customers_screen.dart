@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_theme.dart';
-import '../../models/customer_model.dart';
-import '../../providers/customer_provider.dart';
 import '../../core/widgets/app_logo.dart';
+import '../../models/admin_customer_user.dart';
+import '../../providers/admin_customers_provider.dart';
+import 'widgets/admin_customer_details_sheet.dart';
 
 class AdminCustomersScreen extends ConsumerStatefulWidget {
   const AdminCustomersScreen({super.key});
@@ -27,11 +29,22 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final customersAsync = ref.watch(customersProvider);
+    final customersAsync = ref.watch(adminCustomersProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/admin-home');
+            }
+          },
+        ),
         backgroundColor: Colors.white,
         foregroundColor: AppTheme.textPrimaryColor,
         elevation: 0,
@@ -57,7 +70,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.read(customersProvider.notifier).loadCustomers();
+              ref.invalidate(adminCustomersProvider);
             },
           ),
         ],
@@ -168,9 +181,8 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
           // Stats Summary
           customersAsync.when(
             data: (customers) {
-              final activeCount = customers
-                  .where((c) => c.isCurrentlyActive)
-                  .length;
+              final activeCount = customers.where((c) => c.isActive && !c.isSuspended).length;
+              final suspendedCount = customers.where((c) => c.isSuspended).length;
               final totalCount = customers.length;
               return Container(
                 padding: const EdgeInsets.symmetric(
@@ -193,8 +205,14 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                     const SizedBox(width: 12),
                     _StatCard(
                       label: 'Inactive',
-                      value: '${totalCount - activeCount}',
+                      value: '${totalCount - activeCount - suspendedCount}',
                       color: Colors.grey,
+                    ),
+                    const SizedBox(width: 12),
+                    _StatCard(
+                      label: 'Suspended',
+                      value: '$suspendedCount',
+                      color: Colors.red,
                     ),
                   ],
                 ),
@@ -216,7 +234,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                   filteredCustomers = filteredCustomers
                       .where(
                         (c) =>
-                            c.name.toLowerCase().contains(query) ||
+                            c.fullName.toLowerCase().contains(query) ||
                             c.email.toLowerCase().contains(query) ||
                             (c.phone?.contains(query) ?? false),
                       )
@@ -226,20 +244,15 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                 // Status filter
                 if (_selectedFilter == 'active') {
                   filteredCustomers = filteredCustomers
-                      .where((c) => c.isCurrentlyActive)
+                      .where((c) => c.isActive && !c.isSuspended)
                       .toList();
                 } else if (_selectedFilter == 'inactive') {
                   filteredCustomers = filteredCustomers
-                      .where(
-                        (c) =>
-                            !c.isCurrentlyActive &&
-                            c.status != CustomerStatus.suspended,
-                      )
+                      .where((c) => !c.isActive && !c.isSuspended)
                       .toList();
                 } else if (_selectedFilter == 'suspended') {
-                  filteredCustomers = filteredCustomers
-                      .where((c) => c.status == CustomerStatus.suspended)
-                      .toList();
+                  filteredCustomers =
+                      filteredCustomers.where((c) => c.isSuspended).toList();
                 }
 
                 if (filteredCustomers.isEmpty) {
@@ -254,7 +267,12 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                     return _CustomerCard(
                       customer: customer,
                       onTap: () {
-                        context.push('/admin-customer/${customer.id}');
+                        showModalBottomSheet(
+                          context: context,
+                          showDragHandle: true,
+                          isScrollControlled: true,
+                          builder: (_) => AdminCustomerDetailsSheet(customer: customer),
+                        );
                       },
                     );
                   },
@@ -274,7 +292,7 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                     const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: () {
-                        ref.read(customersProvider.notifier).loadCustomers();
+                        ref.invalidate(adminCustomersProvider);
                       },
                       child: const Text('Retry'),
                     ),
@@ -375,7 +393,7 @@ class _StatCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -404,7 +422,7 @@ class _StatCard extends StatelessWidget {
 }
 
 class _CustomerCard extends StatelessWidget {
-  final CustomerModel customer;
+  final AdminCustomerUser customer;
   final VoidCallback onTap;
 
   const _CustomerCard({required this.customer, required this.onTap});
@@ -421,7 +439,7 @@ class _CustomerCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -435,13 +453,13 @@ class _CustomerCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: Colors.blue[100],
-                  backgroundImage: customer.profileImageUrl != null
-                      ? NetworkImage(customer.profileImageUrl!)
+                  backgroundImage: customer.profilePicture != null
+                      ? NetworkImage(customer.profilePicture!)
                       : null,
-                  child: customer.profileImageUrl == null
+                  child: customer.profilePicture == null
                       ? Text(
-                          customer.name.isNotEmpty
-                              ? customer.name[0].toUpperCase()
+                          customer.fullName.isNotEmpty
+                              ? customer.fullName[0].toUpperCase()
                               : '?',
                           style: TextStyle(
                             fontSize: 24,
@@ -459,9 +477,9 @@ class _CustomerCard extends StatelessWidget {
                     width: 14,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: customer.isCurrentlyActive
-                          ? Colors.green
-                          : Colors.grey,
+                      color: customer.isSuspended
+                          ? Colors.red
+                          : (customer.isActive ? Colors.green : Colors.grey),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
@@ -479,7 +497,7 @@ class _CustomerCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          customer.name,
+                          customer.fullName,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -487,22 +505,60 @@ class _CustomerCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (customer.status == CustomerStatus.suspended)
+                      if (customer.isSuspended)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.red[100],
+                            color: Colors.red.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
+                          child: const Text(
                             'Suspended',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.red[700],
-                              fontWeight: FontWeight.w600,
+                              color: Colors.red,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        )
+                      else if (!customer.isActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Inactive',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Active',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.green,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
@@ -518,16 +574,14 @@ class _CustomerCard extends StatelessWidget {
                   Row(
                     children: [
                       _InfoBadge(
-                        icon: Icons.calendar_today,
-                        text: '${customer.totalBookings} bookings',
+                        icon: Icons.phone,
+                        text: customer.phone ?? 'No phone',
                       ),
                       const SizedBox(width: 12),
                       _InfoBadge(
                         icon: Icons.access_time,
-                        text: customer.activityStatus,
-                        color: customer.isCurrentlyActive
-                            ? Colors.green
-                            : Colors.grey,
+                        text: customer.isActive ? 'Active (≤7d)' : 'Inactive (>7d)',
+                        color: customer.isActive ? Colors.green : Colors.grey,
                       ),
                     ],
                   ),

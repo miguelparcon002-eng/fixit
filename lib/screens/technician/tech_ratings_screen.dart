@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../providers/ratings_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -7,6 +9,16 @@ import '../../services/ratings_service.dart';
 
 class TechRatingsScreen extends ConsumerWidget {
   const TechRatingsScreen({super.key});
+
+  void _exit(BuildContext context) {
+    // Prefer popping (go_router will pop if there is a page to go back to)
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    // Fallback: go to technician profile
+    context.go('/tech-profile');
+  }
 
   // Helper to check if rating belongs to this technician
   bool _isRatingForTechnician(String ratingTechnician, String userName) {
@@ -56,6 +68,13 @@ class TechRatingsScreen extends ConsumerWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Exit',
+              onPressed: () => _exit(context),
+              icon: const Icon(Icons.close),
+            ),
+          ],
         ),
         body: const Center(
           child: CircularProgressIndicator(
@@ -76,6 +95,13 @@ class TechRatingsScreen extends ConsumerWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Exit',
+              onPressed: () => _exit(context),
+              icon: const Icon(Icons.close),
+            ),
+          ],
         ),
         body: Center(
           child: Text(
@@ -105,6 +131,13 @@ class TechRatingsScreen extends ConsumerWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Exit',
+            onPressed: () => _exit(context),
+            icon: const Icon(Icons.close),
+          ),
+        ],
       ),
       body: Column(
         children: [

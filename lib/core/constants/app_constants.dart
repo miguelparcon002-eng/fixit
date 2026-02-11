@@ -64,7 +64,8 @@ class AppConstants {
   static const String paymentCOD = 'cod';
 
   // Storage Buckets
-  static const String bucketProfiles = 'profiles';
+  // NOTE: This must match the bucket name in Supabase Storage.
+  static const String bucketProfiles = 'profile-images';
   static const String bucketDocuments = 'documents';
   static const String bucketServices = 'services';
   static const String bucketChats = 'chats';

@@ -4,7 +4,7 @@ import '../services/booking_service.dart';
 import 'auth_provider.dart';
 import '../core/utils/app_logger.dart';
 
-final bookingServiceProvider = Provider((ref) => BookingService());
+final bookingServiceProvider = Provider((ref) => BookingService(ref: ref));
 
 final bookingByIdProvider = FutureProvider.family<BookingModel?, String>((ref, bookingId) async {
   final bookingService = ref.watch(bookingServiceProvider);
