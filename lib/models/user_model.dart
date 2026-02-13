@@ -11,6 +11,7 @@ class UserModel {
   final double? longitude;
   final String? city;
   final String? neighborhood;
+  final String? bio;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final bool? profileSetupComplete;
@@ -28,6 +29,7 @@ class UserModel {
     this.longitude,
     this.city,
     this.neighborhood,
+    this.bio,
     required this.createdAt,
     this.updatedAt,
     this.profileSetupComplete,
@@ -47,6 +49,7 @@ class UserModel {
       longitude: json['longitude'] as double?,
       city: json['city'] as String?,
       neighborhood: json['neighborhood'] as String?,
+      bio: json['bio'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -69,6 +72,7 @@ class UserModel {
       'longitude': longitude,
       'city': city,
       'neighborhood': neighborhood,
+      'bio': bio,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'profile_setup_complete': profileSetupComplete,
@@ -88,6 +92,7 @@ class UserModel {
     double? longitude,
     String? city,
     String? neighborhood,
+    String? bio,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? profileSetupComplete,
@@ -105,6 +110,7 @@ class UserModel {
       longitude: longitude ?? this.longitude,
       city: city ?? this.city,
       neighborhood: neighborhood ?? this.neighborhood,
+      bio: bio ?? this.bio,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       profileSetupComplete: profileSetupComplete ?? this.profileSetupComplete,

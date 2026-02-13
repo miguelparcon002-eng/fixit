@@ -106,10 +106,10 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
         body: Center(child: Text('Error: $e')),
       ),
       data: (user) {
+        // If the auth session exists but the profile is still loading/being created,
+        // don't immediately bounce back to login (this can cause "login twice").
+        // Instead show a loading state and let currentUserProvider retry.
         if (user == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) context.go('/login');
-          });
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );

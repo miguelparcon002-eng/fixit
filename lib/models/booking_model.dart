@@ -162,8 +162,18 @@ class BookingModel {
   /// If you later add a dedicated column (recommended), update this getter.
   bool get isEmergency {
     final notes = diagnosticNotes;
-    if (notes == null || notes.isEmpty) return false;
-    return RegExp(r'Booking Type:\s*EMERGENCY', caseSensitive: false).hasMatch(notes);
+    if (notes == null || notes.trim().isEmpty) return false;
+
+    // Historically, different screens wrote different labels into diagnostic_notes.
+    // Accept any of the known formats so technician/admin UIs stay consistent.
+    final patterns = <RegExp>[
+      RegExp(r'Booking Type:\s*EMERGENCY', caseSensitive: false),
+      RegExp(r'Repair Type:\s*Emergency', caseSensitive: false),
+      RegExp(r'Priority:\s*EMERGENCY', caseSensitive: false),
+      RegExp(r'\bEMERGENCY\b', caseSensitive: false),
+    ];
+
+    return patterns.any((p) => p.hasMatch(notes));
   }
 
   /// Priority used by technician UI chips.

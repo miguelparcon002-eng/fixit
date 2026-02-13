@@ -11,6 +11,7 @@ class ProfileData {
   final String memberSince;
   final List<String> specialties;
   final String? profileImagePath;
+  final String? bio;
 
   ProfileData({
     required this.email,
@@ -19,6 +20,7 @@ class ProfileData {
     required this.memberSince,
     List<String>? specialties,
     this.profileImagePath,
+    this.bio,
   }) : specialties = specialties ?? const [];
 
   ProfileData copyWith({
@@ -28,6 +30,7 @@ class ProfileData {
     String? memberSince,
     List<String>? specialties,
     String? profileImagePath,
+    String? bio,
   }) {
     return ProfileData(
       email: email ?? this.email,
@@ -36,6 +39,7 @@ class ProfileData {
       memberSince: memberSince ?? this.memberSince,
       specialties: specialties ?? this.specialties,
       profileImagePath: profileImagePath ?? this.profileImagePath,
+      bio: bio ?? this.bio,
     );
   }
 }
@@ -59,6 +63,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
         memberSince: data['memberSince']!,
         specialties: specialties,
         profileImagePath: profileImageUrl,
+        bio: data['bio'],
       ));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -98,6 +103,19 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.data(currentData.copyWith(location: location));
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
+    }
+  }
+
+  Future<void> updateBio(String bio) async {
+    final currentData = state.value;
+    if (currentData == null) return;
+
+    try {
+      await _profileService.updateBio(bio);
+      state = AsyncValue.data(currentData.copyWith(bio: bio));
+    } catch (e) {
+      // Keep existing data state, just rethrow so the UI can show a snackbar
+      rethrow;
     }
   }
 

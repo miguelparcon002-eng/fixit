@@ -94,6 +94,10 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
               const _PersonalInfoCard(),
               const SizedBox(height: 20),
 
+              // Bio / About Me
+              const _BioCard(),
+              const SizedBox(height: 20),
+
               // Specialties
               const _SpecialtiesCard(),
               const SizedBox(height: 20),
@@ -177,12 +181,16 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () async {
-                      await ref.read(userSessionServiceProvider).onUserLogout();
-                      await ref.read(authServiceProvider).signOut();
-                      if (context.mounted) {
-                        context.go('/login');
-                      }
+                    onTap: () {
+                      // Navigate away immediately so technician screens don't
+                      // briefly render stream/provider errors during sign-out.
+                      context.go('/login');
+
+                      // Perform logout cleanup after navigation.
+                      Future.microtask(() async {
+                        await ref.read(userSessionServiceProvider).onUserLogout();
+                        await ref.read(authServiceProvider).signOut();
+                      });
                     },
                     borderRadius: BorderRadius.circular(16),
                     child: const Center(
@@ -870,6 +878,170 @@ class _InfoRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _BioCard extends ConsumerWidget {
+  const _BioCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(profileProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: profileAsync.when(
+        data: (profile) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'About Me',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => _showBioDialog(context, ref, profile.bio ?? ''),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
+                    foregroundColor: AppTheme.lightBlue,
+                    padding: const EdgeInsets.all(8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              (profile.bio != null && profile.bio!.isNotEmpty)
+                  ? profile.bio!
+                  : 'No description yet. Tap edit to add a short bio so customers know more about you.',
+              style: TextStyle(
+                fontSize: 14,
+                color: (profile.bio != null && profile.bio!.isNotEmpty)
+                    ? AppTheme.textPrimaryColor
+                    : Colors.grey.shade500,
+                height: 1.5,
+                fontStyle: (profile.bio != null && profile.bio!.isNotEmpty)
+                    ? FontStyle.normal
+                    : FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'About Me',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimaryColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No description yet.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBioDialog(BuildContext context, WidgetRef ref, String currentBio) {
+    final controller = TextEditingController(text: currentBio);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Bio'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          maxLength: 300,
+          decoration: InputDecoration(
+            hintText: 'Tell customers about yourself, your experience, and what makes you great at repairs...',
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await ref.read(profileProvider.notifier).updateBio(controller.text.trim());
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bio updated successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to update bio. Please run the SQL migration first.\n${e.toString()}'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.deepBlue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -39,6 +39,7 @@ class ProfileService {
         'phone': response['contact_number'] ?? 'Not set',
         'location': location,
         'memberSince': memberSince,
+        if (response['bio'] != null) 'bio': response['bio'] as String,
       };
     } catch (e) {
       AppLogger.p('ProfileService: Error loading from Supabase - $e');
@@ -105,6 +106,14 @@ class ProfileService {
           .update(updates)
           .eq('id', _userId!);
     }
+  }
+
+  Future<void> updateBio(String bio) async {
+    if (_userId == null) return;
+    await SupabaseConfig.client
+        .from(DBConstants.users)
+        .update({'bio': bio})
+        .eq('id', _userId!);
   }
 
   Future<void> updateSpecialties(List<String> specialties) async {

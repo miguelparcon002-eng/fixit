@@ -9,8 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../models/redeemed_voucher.dart';
-import '../../services/redeemed_voucher_service.dart';
-
+import '../../services/technician_specialty_service.dart';
 class CreateBookingScreen extends ConsumerStatefulWidget {
   final String serviceId;
   final bool isEmergency;
@@ -33,14 +32,16 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   String? _selectedBrand;
   String? _selectedModel;
   final TextEditingController _modelController = TextEditingController();
-  String? _selectedProblem;
+  Set<String> _selectedProblems = {};
   final TextEditingController _detailsController = TextEditingController();
 
   // Step 2: Time and location
   TimeOfDay _selectedTime = TimeOfDay.now();
   DateTime? _selectedDate;
   final TextEditingController _addressController = TextEditingController();
-  String? _selectedTechnician;
+  String? _selectedTechnicianId;
+  List<Map<String, dynamic>> _techniciansFromDb = [];
+  bool _isTechniciansLoading = false;
 
   // Step 3: Promo code / voucher
   final TextEditingController _promoCodeController = TextEditingController();
@@ -102,20 +103,14 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     'Software Bug',
   ];
 
-  final List<Map<String, dynamic>> _technicians = [
-    {'name': 'MetroFix', 'distance': '1.2km'},
-    {'name': 'Estino', 'distance': '0.47km'},
-    {'name': 'Sarsale', 'distance': '2.4km'},
-    {'name': 'GizmoDoc', 'distance': '0.98km'},
-  ];
-
   @override
   void initState() {
     super.initState();
     _isEmergency = widget.isEmergency;
-    // Load default address and vouchers
+    // Load default address, vouchers, and technicians
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadVouchers();
+      _loadTechnicians();
       try {
         final addressesAsync = ref.read(userAddressesProvider);
         addressesAsync.whenData((addresses) {
@@ -149,6 +144,85 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     }
   }
 
+  Future<void> _loadTechnicians() async {
+    if (!mounted) return;
+    setState(() => _isTechniciansLoading = true);
+
+    try {
+      final supabase = SupabaseConfig.client;
+      final specialtyService = TechnicianSpecialtyService();
+
+      // Fetch all technician users - use select() to get all available columns
+      // This avoids errors if the 'bio' column hasn't been added yet
+      final techRows = await supabase
+          .from('users')
+          .select()
+          .eq('role', 'technician');
+
+      final List<Map<String, dynamic>> results = [];
+
+      for (final row in techRows) {
+        final techId = row['id'] as String;
+
+        // Load specialties (safe - returns empty list on error)
+        List<String> specialtyNames = [];
+        try {
+          final specialties = await specialtyService.getTechnicianSpecialties(techId);
+          specialtyNames = specialties.map((s) => s.specialtyName).toList();
+        } catch (_) {}
+
+        // Load stats (rating, completed jobs, experience)
+        double avgRating = 0.0;
+        int completedJobs = 0;
+        String experience = 'New';
+        try {
+          final statsRow = await supabase
+              .from('app_technician_stats')
+              .select()
+              .eq('technician_id', techId)
+              .maybeSingle();
+          if (statsRow != null) {
+            avgRating = (statsRow['average_rating'] as num?)?.toDouble() ?? 0.0;
+            completedJobs = (statsRow['completed_jobs'] as num?)?.toInt() ?? 0;
+            experience = statsRow['experience'] as String? ?? 'New';
+          }
+        } catch (_) {}
+
+        results.add({
+          'id': techId,
+          'name': row['full_name'] as String? ?? 'Technician',
+          'profilePicture': row['profile_picture'] as String?,
+          'bio': row['bio'] as String?,
+          'verified': row['verified'] as bool? ?? false,
+          'specialties': specialtyNames,
+          'rating': avgRating,
+          'completedJobs': completedJobs,
+          'experience': experience,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _techniciansFromDb = results;
+          _isTechniciansLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isTechniciansLoading = false);
+      }
+    }
+  }
+
+  Map<String, dynamic>? get _selectedTechData {
+    if (_selectedTechnicianId == null) return null;
+    try {
+      return _techniciansFromDb.firstWhere((t) => t['id'] == _selectedTechnicianId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     _modelController.dispose();
@@ -160,22 +234,18 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   }
 
   double _getServicePrice() {
-    if (_selectedDeviceType == null || _selectedProblem == null) return 0.0;
-    final base = _pricing[_selectedDeviceType]?[_selectedProblem] ?? 0.0;
+    if (_selectedDeviceType == null || _selectedProblems.isEmpty) return 0.0;
+    double base = 0.0;
+    for (final problem in _selectedProblems) {
+      base += _pricing[_selectedDeviceType]?[problem] ?? 0.0;
+    }
     return _isEmergency ? base * 1.10 : base;
   }
 
   double _getDistanceFee() {
-    if (_selectedTechnician == null) return 0.0;
-    final tech = _technicians.firstWhere(
-      (t) => t['name'] == _selectedTechnician,
-      orElse: () => {'distance': '0km'},
-    );
-    final distanceStr = tech['distance'] as String;
-    // Parse distance (e.g., "1.2km" -> 1.2)
-    final distance = double.tryParse(distanceStr.replaceAll('km', '')) ?? 0.0;
-    // Calculate fee: 0.1km = ₱5, so 1km = ₱50
-    return (distance / 0.1) * 5;
+    if (_selectedTechnicianId == null) return 0.0;
+    // Flat service call fee
+    return 100.0;
   }
 
   double _calculatePrice() {
@@ -338,9 +408,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           );
           return false;
         }
-        if (_selectedProblem == null) {
+        if (_selectedProblems.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a problem')),
+            const SnackBar(content: Text('Please select at least one problem')),
           );
           return false;
         }
@@ -358,7 +428,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           );
           return false;
         }
-        if (_selectedTechnician == null) {
+        if (_selectedTechnicianId == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Please select a technician')),
           );
@@ -398,96 +468,42 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         'Device: $_selectedDeviceType',
         'Brand: $_selectedBrand',
         'Model: ${_modelController.text.trim()}',
-        'Problem: $_selectedProblem',
-        'Technician: $_selectedTechnician',
+        'Problem: ${_selectedProblems.join(', ')}',
+        'Technician: ${_selectedTechData?['name'] ?? 'N/A'}',
         if (_detailsController.text.trim().isNotEmpty) 'Details: ${_detailsController.text.trim()}',
         if (_appliedPromoCode != null) 'Promo Code: $_appliedPromoCode',
       ].join('\n');
 
-      // Get all users to find a technician
+      // Use the selected technician directly
+      final technicianId = _selectedTechnicianId!;
       final supabase = SupabaseConfig.client;
-      
-      // Try to find a technician user (any user with role 'technician')
-      String technicianId;
-      try {
-        // First, try to find technician with email fixittechnician@gmail.com (Ethan)
-        var techResponse = await supabase
-            .from('users')
-            .select('id, email, full_name, role')
-            .eq('email', 'fixittechnician@gmail.com')
-            .maybeSingle();
-        
-        // If Ethan not found, try any technician
-        if (techResponse == null) {
-          print('Ethan not found, looking for any technician...');
-          techResponse = await supabase
-              .from('users')
-              .select('id, email, full_name, role')
-              .eq('role', 'technician')
-              .limit(1)
-              .maybeSingle();
-        }
-        
-        if (techResponse != null) {
-          technicianId = techResponse['id'] as String;
-          print('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
-        } else {
-          print('❌ No technicians found in database');
-          throw Exception('No technicians available. Please ensure Ethan Estino (fixittechnician@gmail.com) has role="technician" in the users table.');
-        }
-      } catch (e) {
-        print('❌ Error fetching technician: $e');
-        if (e is Exception && e.toString().contains('technician')) {
-          rethrow;
-        }
-        throw Exception('Unable to find technicians. Please check database setup.');
-      }
 
-      // Get or create a service ID
+      // Get or create a service ID for this technician
       String serviceId;
-      try {
-        // First, try to find an existing service for this technician
-        var serviceResponse = await supabase
+      var serviceResponse = await supabase
+          .from('services')
+          .select('id')
+          .eq('technician_id', technicianId)
+          .limit(1)
+          .maybeSingle();
+
+      if (serviceResponse == null) {
+        serviceResponse = await supabase
             .from('services')
-            .select('id, technician_id, service_name')
-            .eq('technician_id', technicianId)
+            .select('id')
             .limit(1)
             .maybeSingle();
-        
-        // If no service for this technician, try to find any service
-        if (serviceResponse == null) {
-          print('No service found for technician $technicianId, checking for any service...');
-          serviceResponse = await supabase
-              .from('services')
-              .select('id, technician_id, service_name')
-              .limit(1)
-              .maybeSingle();
-        }
-        
-        if (serviceResponse != null) {
-          serviceId = serviceResponse['id'] as String;
-          print('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
-        } else {
-          // No service exists at all - this needs manual creation due to RLS
-          print('❌ No services found in database');
-          throw Exception(
-            'No services available. Please create a service for Ethan Estino first.\n\n'
-            'Run this SQL in Supabase:\n'
-            'INSERT INTO public.services (technician_id, service_name, description, category, estimated_duration, is_active)\n'
-            'VALUES (\'$technicianId\', \'General Repair\', \'Device repair service\', \'Repair\', 60, true);'
-          );
-        }
-      } catch (e) {
-        print('❌ Error with service: $e');
-        if (e is Exception) {
-          rethrow;
-        }
-        throw Exception('Unable to access services. Please check database setup.');
+      }
+
+      if (serviceResponse != null) {
+        serviceId = serviceResponse['id'] as String;
+      } else {
+        throw Exception('No services available. Please contact support.');
       }
 
       // Create booking in Supabase using BookingService
       final bookingService = ref.read(bookingServiceProvider);
-      
+
       final createdBooking = await bookingService.createBooking(
         customerId: user.id,
         technicianId: technicianId,
@@ -517,6 +533,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         ref.invalidate(redeemedVouchersProvider);
         ref.invalidate(unusedVouchersProvider);
       }
+
+      // Force refresh bookings so the new booking appears immediately (no hot restart)
+      ref.invalidate(customerBookingsProvider);
+      ref.invalidate(technicianBookingsProvider);
 
       if (!mounted) return;
 
@@ -1031,7 +1051,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                   _selectedBrand = null;
                   _selectedModel = null;
                   _modelController.clear();
-                  _selectedProblem = null;
+                  _selectedProblems.clear();
                 });
               },
               child: Container(
@@ -1200,9 +1220,18 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Select all that apply',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
         const SizedBox(height: 8),
         ..._problems.map((problem) {
-          final isSelected = _selectedProblem == problem;
+          final isSelected = _selectedProblems.contains(problem);
           final price = _selectedDeviceType != null ? (_pricing[_selectedDeviceType]?[problem] ?? 0.0) : 0.0;
 
           return Padding(
@@ -1210,7 +1239,11 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             child: InkWell(
               onTap: () {
                 setState(() {
-                  _selectedProblem = problem;
+                  if (isSelected) {
+                    _selectedProblems.remove(problem);
+                  } else {
+                    _selectedProblems.add(problem);
+                  }
                 });
               },
               borderRadius: BorderRadius.circular(12),
@@ -1227,7 +1260,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      isSelected ? Icons.check_box : Icons.check_box_outline_blank,
                       color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
                     ),
                     const SizedBox(width: 12),
@@ -1332,6 +1365,251 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  void _showTechnicianDetails(Map<String, dynamic> tech) {
+    final name = tech['name'] as String;
+    final bio = tech['bio'] as String?;
+    final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
+    final completedJobs = (tech['completedJobs'] as num?)?.toInt() ?? 0;
+    final experience = tech['experience'] as String? ?? 'New';
+    final specialties = (tech['specialties'] as List<String>?) ?? [];
+    final verified = tech['verified'] as bool? ?? false;
+    final profilePic = tech['profilePicture'] as String?;
+    final initials = name.split(' ')
+        .where((s) => s.isNotEmpty)
+        .take(2)
+        .map((s) => s[0].toUpperCase())
+        .join();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                children: [
+                  // Drag handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  // Profile header
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: AppTheme.deepBlue,
+                    backgroundImage: (profilePic != null && profilePic.isNotEmpty)
+                        ? NetworkImage(profilePic)
+                        : null,
+                    child: (profilePic == null || profilePic.isEmpty)
+                        ? Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 24,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                      if (verified) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, color: AppTheme.deepBlue, size: 20),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      experience,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.deepBlue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Stats row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTechStat(Icons.star, Colors.amber, rating > 0 ? rating.toStringAsFixed(1) : 'N/A', 'Rating'),
+                      const SizedBox(width: 24),
+                      _buildTechStat(Icons.work, AppTheme.deepBlue, '$completedJobs', 'Jobs Done'),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Bio
+                  if (bio != null && bio.isNotEmpty) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'About',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Text(
+                        bio,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textPrimaryColor,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Specialties
+                  if (specialties.isNotEmpty) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Specialties',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: specialties.map((s) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.lightBlue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppTheme.lightBlue.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            s,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.deepBlue,
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Select button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedTechnicianId = tech['id'];
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.deepBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        _selectedTechnicianId == tech['id'] ? 'Selected' : 'Select This Technician',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTechStat(IconData icon, Color color, String value, String label) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimaryColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
       ],
     );
   }
@@ -1471,7 +1749,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Distance fee: ₱5 per 0.1km',
+          'Tap a technician to see their details',
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[600],
@@ -1479,99 +1757,184 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        ..._technicians.map((tech) {
-          final isSelected = _selectedTechnician == tech['name'];
-          final distanceStr = tech['distance'] as String;
-          final distance = double.tryParse(distanceStr.replaceAll('km', '')) ?? 0.0;
-          final distanceFee = (distance / 0.1) * 5;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedTechnician = tech['name'];
-                });
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.1) : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.engineering,
-                        color: isSelected ? Colors.white : Colors.grey.shade600,
-                        size: 24,
-                      ),
+        if (_isTechniciansLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_techniciansFromDb.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                'No technicians available at the moment.',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+            ),
+          )
+        else
+          ..._techniciansFromDb.map((tech) {
+            final isSelected = _selectedTechnicianId == tech['id'];
+            final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
+            final specialties = (tech['specialties'] as List<String>?) ?? [];
+            final experience = tech['experience'] as String? ?? 'New';
+            final profilePic = tech['profilePicture'] as String?;
+            final name = tech['name'] as String;
+            final initials = name.split(' ')
+                .where((s) => s.isNotEmpty)
+                .take(2)
+                .map((s) => s[0].toUpperCase())
+                .join();
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedTechnicianId = tech['id'];
+                  });
+                },
+                onLongPress: () => _showTechnicianDetails(tech),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.1) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
+                      width: isSelected ? 2 : 1,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            tech['name'],
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimaryColor,
+                          // Avatar
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: isSelected ? AppTheme.deepBlue : Colors.grey.shade300,
+                            backgroundImage: (profilePic != null && profilePic.isNotEmpty)
+                                ? NetworkImage(profilePic)
+                                : null,
+                            child: (profilePic == null || profilePic.isEmpty)
+                                ? Text(
+                                    initials,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimaryColor,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (tech['verified'] == true) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.verified, color: AppTheme.deepBlue, size: 16),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.star, size: 14, color: Colors.amber),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      rating > 0 ? rating.toStringAsFixed(1) : 'New',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Icon(Icons.work_outline, size: 13, color: Colors.grey[500]),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      experience,
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Icon(Icons.location_on, size: 14, color: AppTheme.textSecondaryColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${tech['distance']} away',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppTheme.textSecondaryColor,
-                                ),
+                              InkWell(
+                                onTap: () => _showTechnicianDetails(tech),
+                                child: const Icon(Icons.info_outline, color: AppTheme.deepBlue, size: 20),
+                              ),
+                              const SizedBox(height: 4),
+                              Icon(
+                                isSelected ? Icons.check_circle : Icons.circle_outlined,
+                                color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
+                                size: 20,
                               ),
                             ],
                           ),
                         ],
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '+₱${distanceFee.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? AppTheme.deepBlue : Colors.grey[600],
+                      // Specialties chips
+                      if (specialties.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: specialties.take(3).map((s) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.lightBlue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                s,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.deepBlue,
+                                ),
+                              ),
+                            )).toList()
+                            ..addAll(specialties.length > 3 ? [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '+${specialties.length - 3} more',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                ),
+                              ),
+                            ] : []),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Icon(
-                          isSelected ? Icons.check_circle : Icons.circle_outlined,
-                          color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
-                          size: 20,
-                        ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
       ],
     );
   }
@@ -1604,7 +1967,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             _buildReviewItem('Device', _selectedDeviceType ?? ''),
             _buildReviewItem('Brand', _selectedBrand ?? ''),
             _buildReviewItem('Model', _modelController.text),
-            _buildReviewItem('Problem', _selectedProblem ?? ''),
+            _buildReviewItem('Problem(s)', _selectedProblems.join(', ')),
             if (_detailsController.text.isNotEmpty)
               _buildReviewItem('Details', _detailsController.text),
           ],
@@ -1620,7 +1983,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               '${DateFormat('MMM dd, yyyy').format(_selectedDate!)} at ${_selectedTime.format(context)}',
             ),
             _buildReviewItem('Address', _addressController.text),
-            _buildReviewItem('Technician', _selectedTechnician ?? ''),
+            _buildReviewItem('Technician', _selectedTechData?['name'] ?? ''),
           ],
         ),
         const SizedBox(height: 20),
@@ -1831,24 +2194,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'Distance Fee',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppTheme.textPrimaryColor,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '(${_technicians.firstWhere((t) => t['name'] == _selectedTechnician)['distance']})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'Service Call Fee',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textPrimaryColor,
+                    ),
                   ),
                   Text(
                     '₱${distanceFee.toStringAsFixed(0)}',
