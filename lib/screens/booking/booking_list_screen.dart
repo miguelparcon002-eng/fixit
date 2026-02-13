@@ -187,7 +187,11 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   Widget _buildBookingCard(BookingModel booking) {
     final (statusColor, displayStatus) = _getBookingStatus(booking.status);
     final isCompleted = booking.status == 'completed';
+    final isActive = booking.status == 'in_progress';
     final points = isCompleted ? ((booking.finalCost ?? booking.estimatedCost ?? 0.0) / 50).floor() : null;
+    final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
+    // Show payment button on active bookings (always show payment state)
+    final showPay = isActive;
 
     return _BookingCard(
       bookingId: booking.id,
@@ -196,10 +200,13 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       date: _formatDate(booking.scheduledDate),
       time: _formatTime(booking.scheduledDate),
       location: booking.customerAddress ?? 'N/A',
-      total: '₱${(booking.finalCost ?? booking.estimatedCost ?? 0.0).toStringAsFixed(2)}',
+      total: '₱${amount.toStringAsFixed(2)}',
       moreDetails: booking.diagnosticNotes,
       showBookAgain: isCompleted,
       pointsEarned: points,
+      showPayButton: showPay,
+      paymentAmount: amount,
+      paymentStatus: booking.paymentStatus,
     );
   }
 
@@ -235,6 +242,9 @@ class _BookingCard extends ConsumerWidget {
   final String? moreDetails;
   final bool showBookAgain;
   final int? pointsEarned;
+  final bool showPayButton;
+  final double paymentAmount;
+  final String? paymentStatus;
 
   const _BookingCard({
     required this.bookingId,
@@ -247,6 +257,9 @@ class _BookingCard extends ConsumerWidget {
     this.moreDetails,
     this.showBookAgain = false,
     this.pointsEarned,
+    this.showPayButton = false,
+    this.paymentAmount = 0.0,
+    this.paymentStatus,
   });
 
   @override
@@ -325,6 +338,10 @@ class _BookingCard extends ConsumerWidget {
                 const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
               ],
             ),
+            if (showPayButton) ...[
+              const SizedBox(height: 10),
+              _buildPaymentButton(context),
+            ],
             if (pointsEarned != null && pointsEarned! > 0) ...[
               const SizedBox(height: 10),
               Container(
@@ -385,6 +402,35 @@ class _BookingCard extends ConsumerWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentButton(BuildContext context) {
+    final (label, icon, bgColor) = switch (paymentStatus) {
+      'completed' => ('Payment Completed', Icons.check_circle, Colors.green),
+      'submitted' => ('Waiting for Verification', Icons.hourglass_top, Colors.orange),
+      _ => ('Pay Now', Icons.payment, AppTheme.deepBlue),
+    };
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => context.push(
+              '/payment/$bookingId?amount=${paymentAmount.toStringAsFixed(2)}',
+            ),
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: bgColor,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: bgColor.withValues(alpha: 0.85),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/constants/app_constants.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/booking_model.dart';
@@ -822,7 +823,7 @@ class _RequestJobCard extends ConsumerWidget {
                             try {
                               await bookingService.updateBookingStatus(
                                 bookingId: booking.id,
-                                status: 'In Progress',
+                                status: AppConstants.bookingInProgress,
                               );
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -864,7 +865,7 @@ class _RequestJobCard extends ConsumerWidget {
                             try {
                               await bookingService.updateBookingStatus(
                                 bookingId: booking.id,
-                                status: 'Cancelled',
+                                status: AppConstants.bookingCancelled,
                                 cancellationReason: 'Declined by technician',
                               );
                               if (!context.mounted) return;
@@ -1291,7 +1292,7 @@ class _ActiveJobCard extends ConsumerWidget {
                                         try {
                                           await bookingService.updateBookingStatus(
                                             bookingId: booking.id,
-                                            status: 'Completed',
+                                            status: AppConstants.bookingCompleted,
                                           );
                                           if (!context.mounted) return;
                                           ScaffoldMessenger.of(context).showSnackBar(

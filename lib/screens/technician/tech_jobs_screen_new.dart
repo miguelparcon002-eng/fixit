@@ -404,37 +404,79 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
 
-    // Active tab - show adjust price + mark complete
+    // Active tab - show payment status + adjust price + mark complete
     if (selectedTab == _TechJobsTab.active && booking.status == 'in_progress') {
-      return Row(
+      final payStatus = booking.paymentStatus ?? 'pending';
+      final (payLabel, payIcon, payColor) = switch (payStatus) {
+        'completed' => ('Payment Completed', Icons.check_circle, AppTheme.successColor),
+        'submitted' => ('Payment Submitted - Awaiting Verification', Icons.hourglass_top, Colors.orange),
+        _ => ('Payment Pending', Icons.payment, Colors.grey),
+      };
+
+      return Column(
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () => _adjustPrice(context, ref, bookingService),
-              icon: const Icon(Icons.tune, size: 18),
-              label: const Text('Adjust price'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.deepBlue,
-                side: BorderSide(color: Colors.grey.shade300),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+          // Payment status banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: payColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: payColor.withValues(alpha: 0.30)),
+            ),
+            child: Row(
+              children: [
+                Icon(payIcon, size: 18, color: payColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    payLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: payColor,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _completeJob(context, ref, bookingService),
-              icon: const Icon(Icons.check_circle_outline, size: 18),
-              label: const Text('Mark complete'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.successColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _adjustPrice(context, ref, bookingService),
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Adjust price'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.deepBlue,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: payStatus == 'completed'
+                      ? () => _completeJob(context, ref, bookingService)
+                      : null,
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text('Mark complete'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.successColor,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.grey.shade500,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       );

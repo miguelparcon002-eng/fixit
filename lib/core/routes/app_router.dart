@@ -53,6 +53,10 @@ import '../../screens/profile/my_tickets_screen.dart';
 import '../../screens/profile/customer_ticket_detail_screen.dart';
 import '../../screens/admin/admin_customers_screen.dart';
 import '../../screens/admin/admin_customer_detail_screen.dart';
+import '../../screens/admin/admin_payment_settings_screen.dart';
+import '../../screens/admin/admin_earnings_screen.dart';
+import '../../screens/admin/admin_technician_earnings_detail_screen.dart';
+import '../../screens/booking/payment_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -291,6 +295,11 @@ class AppRouter {
             builder: (context, state) => const AdminReviewsScreen(),
           ),
           GoRoute(
+            path: '/admin-earnings',
+            name: 'adminEarnings',
+            builder: (context, state) => const AdminEarningsScreen(),
+          ),
+          GoRoute(
             path: '/admin-reports',
             name: 'adminReports',
             builder: (context, state) => const AdminReportsScreen(),
@@ -405,6 +414,36 @@ class AppRouter {
         builder: (context, state) {
           final ticketId = state.pathParameters['ticketId']!;
           return CustomerTicketDetailScreen(ticketId: ticketId);
+        },
+      ),
+
+      // Payment route
+      GoRoute(
+        path: '/payment/:bookingId',
+        name: 'payment',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          final amount = double.tryParse(
+                  state.uri.queryParameters['amount'] ?? '') ??
+              0.0;
+          return PaymentScreen(bookingId: bookingId, amount: amount);
+        },
+      ),
+
+      // Admin Payment Settings
+      GoRoute(
+        path: '/admin-payment-settings',
+        name: 'adminPaymentSettings',
+        builder: (context, state) => const AdminPaymentSettingsScreen(),
+      ),
+
+      // Admin Earnings Management routes
+      GoRoute(
+        path: '/admin-technician-earnings/:technicianId',
+        name: 'adminTechnicianEarnings',
+        builder: (context, state) {
+          final technicianId = state.pathParameters['technicianId']!;
+          return AdminTechnicianEarningsDetailScreen(technicianId: technicianId);
         },
       ),
 
