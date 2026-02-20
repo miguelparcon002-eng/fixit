@@ -157,6 +157,14 @@ class AdminHomeScreen extends ConsumerWidget {
                   subtitle: 'GCash QR code & details',
                   onTap: () => context.push('/admin-payment-settings'),
                 ),
+                const SizedBox(height: 10),
+                _ActionTile(
+                  icon: Icons.feedback,
+                  color: Colors.orange,
+                  title: 'Feedback & Bug Reports',
+                  subtitle: 'View customer feedback',
+                  onTap: () => context.push('/admin-feedback'),
+                ),
               ],
             ),
           );

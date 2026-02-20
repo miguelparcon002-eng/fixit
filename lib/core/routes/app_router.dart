@@ -18,6 +18,7 @@ import '../../screens/profile/edit_profile_screen.dart';
 import '../../screens/profile/addresses_screen.dart';
 import '../../screens/profile/payment_method_screen.dart';
 import '../../screens/profile/notification_settings_screen.dart';
+import '../../screens/profile/notifications_screen.dart';
 import '../../screens/profile/privacy_security_screen.dart';
 import '../../screens/profile/help_support_screen.dart';
 import '../../screens/profile/live_chat_screen.dart';
@@ -54,6 +55,7 @@ import '../../screens/profile/customer_ticket_detail_screen.dart';
 import '../../screens/admin/admin_customers_screen.dart';
 import '../../screens/admin/admin_customer_detail_screen.dart';
 import '../../screens/admin/admin_payment_settings_screen.dart';
+import '../../screens/admin/admin_feedback_screen.dart';
 import '../../screens/admin/admin_earnings_screen.dart';
 import '../../screens/admin/admin_technician_earnings_detail_screen.dart';
 import '../../screens/booking/payment_screen.dart';
@@ -210,6 +212,11 @@ class AppRouter {
       GoRoute(
         path: '/notifications',
         name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/notification-settings',
+        name: 'notificationSettings',
         builder: (context, state) => const NotificationSettingsScreen(),
       ),
       GoRoute(
@@ -435,6 +442,13 @@ class AppRouter {
         path: '/admin-payment-settings',
         name: 'adminPaymentSettings',
         builder: (context, state) => const AdminPaymentSettingsScreen(),
+      ),
+
+      // Admin Feedback & Bug Reports
+      GoRoute(
+        path: '/admin-feedback',
+        name: 'adminFeedback',
+        builder: (context, state) => const AdminFeedbackScreen(),
       ),
 
       // Admin Earnings Management routes

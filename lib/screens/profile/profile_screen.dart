@@ -25,7 +25,7 @@ class ProfileScreen extends ConsumerWidget {
       backgroundColor: AppTheme.backgroundColor,
       body: userAsync.when(
         data: (user) => user == null
-            ? const Center(child: Text('Not logged in'))
+            ? const SizedBox.shrink()
             : CustomScrollView(
                 slivers: [
                   // Modern gradient header with profile info
@@ -472,7 +472,7 @@ class ProfileScreen extends ConsumerWidget {
                               iconColor: AppTheme.lightBlue,
                               title: 'Notifications',
                               subtitle: 'Alerts & preferences',
-                              onTap: () => context.push('/notifications'),
+                              onTap: () => context.push('/notification-settings'),
                             ),
                             const SizedBox(height: 14),
                             _ModernSettingCard(
@@ -515,14 +515,13 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  // Clear session data first
+                                  // Navigate first so the profile screen is
+                                  // never rendered in its logged-out state.
+                                  context.go('/login');
                                   await ref
                                       .read(userSessionServiceProvider)
                                       .onUserLogout();
                                   await ref.read(authServiceProvider).signOut();
-                                  if (context.mounted) {
-                                    context.go('/login');
-                                  }
                                 },
                                 icon: const Icon(
                                   Icons.logout_rounded,

@@ -593,119 +593,479 @@ class _TechJobCard extends ConsumerWidget {
     WidgetRef ref,
     BookingService bookingService,
   ) async {
-    final adjustmentController = TextEditingController();
     final noteController = TextEditingController();
-
-    double? parseSignedAmount(String input) {
-      final raw = input.replaceAll(',', '').trim();
-      if (raw.isEmpty) return null;
-      // Accept values like: +200, -150, 200, -200.50
-      return double.tryParse(raw);
-    }
+    // Track mutable state outside StatefulBuilder so it survives rebuilds
+    double adjustmentAmount = 0;
+    bool isIncrease = true; // true = increase, false = decrease
+    bool saving = false;
 
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showModalBottomSheet<bool>(
         context: context,
-        builder: (dialogContext) {
-          bool saving = false;
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
           return StatefulBuilder(
-            builder: (dialogContext, setState) {
-              final amount = parseSignedAmount(adjustmentController.text);
+            builder: (sheetContext, setState) {
               final note = noteController.text.trim();
-              final hasValidAmount = amount != null && amount != 0;
+              final hasValidAmount = adjustmentAmount > 0;
               final canSave = !saving && hasValidAmount && note.isNotEmpty;
 
-              return AlertDialog(
-                title: const Text('Adjust price'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Adjustment amount',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: adjustmentController,
-                      enabled: !saving,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      decoration: InputDecoration(
-                        prefixText: '₱',
-                        hintText: '+200 or -150',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        helperText: 'Use + to increase or - to decrease',
-                        errorText: (adjustmentController.text.trim().isEmpty || hasValidAmount)
-                            ? null
-                            : 'Enter a non-zero number (e.g. +200 or -150)',
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Note *',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: noteController,
-                      enabled: !saving,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: 'Why did you adjust the price?',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ],
+              final signedAmount = isIncrease ? adjustmentAmount : -adjustmentAmount;
+              final basePrice = booking.estimatedCost ?? booking.finalCost ?? 0.0;
+              final newPrice = (basePrice + signedAmount).clamp(0.0, double.infinity);
+
+              void stepAmount(double delta) {
+                setState(() {
+                  adjustmentAmount = (adjustmentAmount + delta).clamp(0.0, 99999.0);
+                });
+              }
+
+              void setQuickAmount(double amount) {
+                setState(() => adjustmentAmount = amount);
+              }
+
+              Future<void> save() async {
+                setState(() => saving = true);
+                try {
+                  final reason = noteController.text.trim();
+                  await bookingService.addTechnicianNotes(
+                    bookingId: booking.id,
+                    technicianNotes: 'Price adjustment note: $reason',
+                    priceAdjustment: signedAmount,
+                  );
+                  // Pop the sheet first, then invalidate so the provider
+                  // refresh happens outside the sheet's widget tree.
+                  if (!sheetContext.mounted) return;
+                  Navigator.pop(sheetContext, true);
+                } catch (e) {
+                  if (!sheetContext.mounted) return;
+                  setState(() => saving = false);
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    SnackBar(content: Text('Failed to adjust price: $e')),
+                  );
+                }
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: saving ? null : () => Navigator.pop(dialogContext, false),
-                    child: const Text('Cancel'),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: canSave
-                        ? () async {
-                            setState(() => saving = true);
-                            try {
-                              final signedAmount = parseSignedAmount(adjustmentController.text) ?? 0.0;
-                              final reason = noteController.text.trim();
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Handle bar
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
 
-                              // Persist technician note + adjustment (preserves customer notes)
-                              await bookingService.addTechnicianNotes(
-                                bookingId: booking.id,
-                                technicianNotes: 'Price adjustment note: $reason',
-                                priceAdjustment: signedAmount,
-                              );
+                          // Header
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(Icons.tune_rounded, color: AppTheme.deepBlue, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Adjust Price',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppTheme.textPrimaryColor,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: saving ? null : () => Navigator.pop(sheetContext, false),
+                                icon: const Icon(Icons.close_rounded),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.grey.shade100,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
 
-                              ref.invalidate(technicianBookingsProvider);
-                              if (!dialogContext.mounted) return;
-                              Navigator.pop(dialogContext, true);
-                            } catch (e) {
-                              if (!dialogContext.mounted) return;
-                              setState(() => saving = false);
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                SnackBar(content: Text('Failed to adjust price: $e')),
+                          // Current price display
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Original Price',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondaryColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₱${basePrice.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.textPrimaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Icon(Icons.arrow_forward_rounded, color: Colors.grey.shade400),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Adjusted Price',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondaryColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₱${newPrice.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: hasValidAmount
+                                            ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
+                                            : AppTheme.textPrimaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Increase / Decrease toggle
+                          const Text(
+                            'Adjustment Type',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: saving ? null : () => setState(() => isIncrease = true),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: isIncrease ? AppTheme.errorColor : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: isIncrease ? AppTheme.errorColor : Colors.grey.shade300,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_upward_rounded,
+                                          size: 18,
+                                          color: isIncrease ? Colors.white : Colors.grey.shade600,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Increase',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                            color: isIncrease ? Colors.white : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: saving ? null : () => setState(() => isIncrease = false),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    decoration: BoxDecoration(
+                                      color: !isIncrease ? AppTheme.successColor : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: !isIncrease ? AppTheme.successColor : Colors.grey.shade300,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_downward_rounded,
+                                          size: 18,
+                                          color: !isIncrease ? Colors.white : Colors.grey.shade600,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Decrease',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                            color: !isIncrease ? Colors.white : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Amount stepper
+                          const Text(
+                            'Amount (₱)',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              // Minus button
+                              _StepButton(
+                                icon: Icons.remove_rounded,
+                                color: AppTheme.errorColor,
+                                enabled: !saving && adjustmentAmount > 0,
+                                onTap: () => stepAmount(-50),
+                                onLongPress: () => stepAmount(-100),
+                              ),
+                              const SizedBox(width: 12),
+                              // Amount display / input
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    final inputController = TextEditingController(
+                                      text: adjustmentAmount > 0 ? adjustmentAmount.toStringAsFixed(0) : '',
+                                    );
+                                    await showDialog(
+                                      context: sheetContext,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Enter amount'),
+                                        content: TextField(
+                                          controller: inputController,
+                                          autofocus: true,
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          decoration: const InputDecoration(
+                                            prefixText: '₱ ',
+                                            border: OutlineInputBorder(),
+                                            hintText: '0',
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              final v = double.tryParse(inputController.text.replaceAll(',', '').trim());
+                                              if (v != null && v >= 0) {
+                                                setState(() => adjustmentAmount = v);
+                                              }
+                                              Navigator.pop(ctx);
+                                            },
+                                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.deepBlue, foregroundColor: Colors.white),
+                                            child: const Text('Set'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: hasValidAmount
+                                            ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
+                                            : Colors.grey.shade300,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          '₱${adjustmentAmount.toStringAsFixed(0)}',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                            color: hasValidAmount
+                                                ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
+                                                : Colors.grey.shade400,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to type exact amount',
+                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              // Plus button
+                              _StepButton(
+                                icon: Icons.add_rounded,
+                                color: AppTheme.successColor,
+                                enabled: !saving,
+                                onTap: () => stepAmount(50),
+                                onLongPress: () => stepAmount(100),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Center(
+                            child: Text(
+                              'Tap +/− to step by ₱50 · Hold for ₱100',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Quick presets
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [100, 200, 300, 500, 1000].map((preset) {
+                              final isSelected = adjustmentAmount == preset.toDouble();
+                              return GestureDetector(
+                                onTap: saving ? null : () => setQuickAmount(preset.toDouble()),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
+                                        : Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '₱$preset',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: isSelected ? Colors.white : AppTheme.textSecondaryColor,
+                                    ),
+                                  ),
+                                ),
                               );
-                            }
-                          }
-                        : null,
-                    icon: saving
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.save, size: 18),
-                    label: Text(saving ? 'Saving…' : 'Save'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.deepBlue,
-                      foregroundColor: Colors.white,
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Note field
+                          const Text(
+                            'Reason *',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: noteController,
+                            enabled: !saving,
+                            maxLines: 3,
+                            onChanged: (_) => setState(() {}),
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Additional parts required, labour cost, discount applied…',
+                              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: AppTheme.deepBlue, width: 2),
+                              ),
+                              contentPadding: const EdgeInsets.all(14),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Save button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: canSave ? save : null,
+                              icon: saving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.check_circle_outline_rounded, size: 20),
+                              label: Text(
+                                saving ? 'Saving…' : 'Confirm Adjustment',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: canSave ? AppTheme.deepBlue : Colors.grey.shade300,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: Colors.grey.shade200,
+                                disabledForegroundColor: Colors.grey.shade400,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                elevation: canSave ? 2 : 0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               );
             },
           );
@@ -713,6 +1073,8 @@ class _TechJobCard extends ConsumerWidget {
       );
 
       if (confirmed != true) return;
+      // Invalidate after the sheet is fully closed to avoid _dependents assertion
+      ref.invalidate(technicianBookingsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -721,7 +1083,6 @@ class _TechJobCard extends ConsumerWidget {
         ),
       );
     } finally {
-      adjustmentController.dispose();
       noteController.dispose();
     }
   }
@@ -1050,6 +1411,49 @@ class _ErrorState extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// Step button used in the price adjustment bottom sheet
+class _StepButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final bool enabled;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _StepButton({
+    required this.icon,
+    required this.color,
+    required this.enabled,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      onLongPress: enabled ? onLongPress : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: enabled ? color.withValues(alpha: 0.1) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: enabled ? color.withValues(alpha: 0.4) : Colors.grey.shade200,
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 26,
+          color: enabled ? color : Colors.grey.shade300,
+        ),
+      ),
     );
   }
 }

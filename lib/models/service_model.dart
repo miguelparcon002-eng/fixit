@@ -1,6 +1,6 @@
 class ServiceModel {
   final String id;
-  final String technicianId;
+  final String? technicianId;  // Made nullable
   final String serviceName;
   final String description;
   final String category;
@@ -17,7 +17,7 @@ class ServiceModel {
 
   ServiceModel({
     required this.id,
-    required this.technicianId,
+    this.technicianId,  // Made optional
     required this.serviceName,
     required this.description,
     required this.category,
@@ -36,7 +36,7 @@ class ServiceModel {
   factory ServiceModel.fromJson(Map<String, dynamic> json) {
     return ServiceModel(
       id: json['id'] as String,
-      technicianId: json['technician_id'] as String,
+      technicianId: json['technician_id'] as String?,  // Made nullable
       serviceName: json['service_name'] as String,
       description: json['description'] as String,
       category: json['category'] as String,

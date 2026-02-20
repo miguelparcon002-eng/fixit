@@ -120,20 +120,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 24),
               _RepairTypeOption(
-                icon: Icons.bolt,
-                title: 'Emergency Repair',
-                subtitle: '24/7 Service - Fastest response',
-                color: const Color(0xFFFF6B6B),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/create-booking?type=emergency');
-                },
-              ),
-              const SizedBox(height: 12),
-              _RepairTypeOption(
-                icon: Icons.access_time,
-                title: 'Same Day',
-                subtitle: 'Quick fix - Within 24 hours',
+                icon: Icons.build_circle,
+                title: 'Regular Repair',
+                subtitle: 'Schedule a repair at your convenience',
                 color: const Color(0xFF4ECDC4),
                 onTap: () {
                   Navigator.pop(context);
@@ -142,13 +131,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 12),
               _RepairTypeOption(
-                icon: Icons.calendar_today,
-                title: 'Scheduled',
-                subtitle: 'Plan ahead - Book for later',
-                color: const Color(0xFF9B59B6),
+                icon: Icons.bolt,
+                title: 'Emergency Repair',
+                subtitle: '24/7 Service - Fastest response',
+                color: const Color(0xFFFF6B6B),
                 onTap: () {
                   Navigator.pop(context);
-                  context.push('/create-booking');
+                  context.push('/create-booking?type=emergency');
                 },
               ),
               const SizedBox(height: 16),
@@ -771,17 +760,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         // Featured Shop Cards (Horizontal Scroll)
                         SizedBox(
-                          height: 195,
+                          height: 220,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             padding: EdgeInsets.zero,
                             children: [
                               const _FeaturedShopCard(
-                                shopName: 'TechFix Hub',
-                                ownerName: 'Expert in Screen Repairs',
+                                shopName: 'Screen Fix Pro',
+                                ownerName: 'Screen Replacement Specialist',
                                 rating: 4.8,
                                 reviewCount: 156,
-                                services: ['Screen Repair', 'Battery', 'Water Damage'],
+                                services: ['Screen Replacement', 'LCD Repair', 'Digitizer Fix'],
                                 distance: '0.5 km',
                                 isOpen: true,
                                 openTime: '8 AM - 8 PM',
@@ -790,11 +779,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
-                                shopName: 'Mobile Masters',
-                                ownerName: 'Mobile Specialist',
+                                shopName: 'Battery & Power Hub',
+                                ownerName: 'Battery Replacement Expert',
                                 rating: 4.6,
                                 reviewCount: 98,
-                                services: ['Phone Repair', 'Software Fix', 'Unlocking'],
+                                services: ['Battery Replacement', 'Charging Port', 'Power Issues'],
                                 distance: '1.2 km',
                                 isOpen: true,
                                 openTime: '9 AM - 7 PM',
@@ -803,11 +792,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
-                                shopName: 'Gadget Care Pro',
-                                ownerName: 'Laptop & Gaming Expert',
+                                shopName: 'Laptop Care Center',
+                                ownerName: 'Laptop & PC Specialist',
                                 rating: 4.9,
                                 reviewCount: 203,
-                                services: ['Laptop Repair', 'Gaming Console', 'Upgrades'],
+                                services: ['Laptop Repair', 'Hardware Upgrade', 'Virus Removal'],
                                 distance: '2.0 km',
                                 isOpen: false,
                                 openTime: 'Opens 9 AM',
@@ -816,11 +805,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
-                                shopName: 'QuickFix Station',
-                                ownerName: 'Fast & Reliable',
+                                shopName: 'Water Damage Rescue',
+                                ownerName: 'Water Damage Recovery',
                                 rating: 4.5,
                                 reviewCount: 67,
-                                services: ['Express Service', 'Diagnostics', 'Data Recovery'],
+                                services: ['Water Damage Repair', 'Data Recovery', 'Component Cleaning'],
                                 distance: '2.8 km',
                                 isOpen: true,
                                 openTime: '10 AM - 6 PM',

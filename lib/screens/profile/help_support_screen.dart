@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/support_ticket_provider.dart';
+import '../../services/feedback_service.dart';
 
 class HelpSupportScreen extends ConsumerWidget {
   const HelpSupportScreen({super.key});
@@ -85,8 +88,8 @@ class HelpSupportScreen extends ConsumerWidget {
             title: 'User Guide',
             subtitle: 'Learn how to use FixIt',
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening user guide...')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const _UserGuideScreen()),
               );
             },
           ),
@@ -97,8 +100,8 @@ class HelpSupportScreen extends ConsumerWidget {
             title: 'Video Tutorials',
             subtitle: 'Watch step-by-step guides',
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening video tutorials...')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const _VideoTutorialsScreen()),
               );
             },
           ),
@@ -111,7 +114,7 @@ class HelpSupportScreen extends ConsumerWidget {
             iconColor: AppTheme.primaryCyan,
             title: 'Send Feedback',
             subtitle: 'Help us improve our service',
-            onTap: () => _showFeedbackDialog(context),
+            onTap: () => _showFeedbackDialog(context, ref),
           ),
           const SizedBox(height: 10),
           _SupportOptionTile(
@@ -119,7 +122,7 @@ class HelpSupportScreen extends ConsumerWidget {
             iconColor: AppTheme.errorColor,
             title: 'Report a Bug',
             subtitle: 'Let us know about issues',
-            onTap: () => _showBugReportDialog(context),
+            onTap: () => _showBugReportDialog(context, ref),
           ),
           const SizedBox(height: 10),
           _SupportOptionTile(
@@ -146,179 +149,23 @@ class HelpSupportScreen extends ConsumerWidget {
     );
   }
 
-  void _showFeedbackDialog(BuildContext context) {
-    final TextEditingController feedbackController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Send Feedback',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: feedbackController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Share your thoughts with us...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.black, width: 2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.black, width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        feedbackController.dispose();
-                        Navigator.of(context).pop();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.black, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        feedbackController.dispose();
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Thank you for your feedback!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.deepBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Send'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  void _showFeedbackDialog(BuildContext context, WidgetRef ref) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FeedbackFormScreen(
+          type: 'feedback',
+          ref: ref,
         ),
       ),
     );
   }
 
-  void _showBugReportDialog(BuildContext context) {
-    final TextEditingController bugController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Report a Bug',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: bugController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: 'Describe the issue you encountered...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.black, width: 2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.black, width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        bugController.dispose();
-                        Navigator.of(context).pop();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.black, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        bugController.dispose();
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Bug report submitted!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.deepBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Submit'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  void _showBugReportDialog(BuildContext context, WidgetRef ref) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FeedbackFormScreen(
+          type: 'bug_report',
+          ref: ref,
         ),
       ),
     );
@@ -698,6 +545,748 @@ class _FAQScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _UserGuideScreen extends StatelessWidget {
+  const _UserGuideScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = [
+      _GuideSection(
+        icon: Icons.app_registration,
+        title: 'Getting Started',
+        steps: [
+          'Download and open the FixIt app.',
+          'Create an account using your email or sign up with Google.',
+          'Complete your profile by adding your name, phone number, and address.',
+          'You\'re all set to book your first repair!',
+        ],
+      ),
+      _GuideSection(
+        icon: Icons.calendar_month,
+        title: 'Booking a Repair',
+        steps: [
+          'Tap "Book a Repair" or "Emergency Repair" on the home screen.',
+          'Select the type of damage(s) your device has.',
+          'Provide your device details (brand, model, description).',
+          'Choose your preferred schedule date and time.',
+          'Add your address or use your current location.',
+          'Review and confirm your booking.',
+        ],
+      ),
+      _GuideSection(
+        icon: Icons.payment,
+        title: 'Making a Payment',
+        steps: [
+          'Once your booking is accepted and in progress, a "Pay Now" button will appear.',
+          'Tap "Pay Now" to view the admin\'s GCash QR code.',
+          'Scan the QR code using your GCash app and send the payment.',
+          'Fill in the reference number, sender name, and amount.',
+          'Upload a screenshot of your payment proof.',
+          'Tap "Submit Payment" and wait for admin verification.',
+        ],
+      ),
+      _GuideSection(
+        icon: Icons.track_changes,
+        title: 'Tracking Your Booking',
+        steps: [
+          'Go to the "Bookings" tab to see all your bookings.',
+          'Active bookings show real-time status updates.',
+          'You\'ll see payment status: "Pay Now", "Waiting for Verification", or "Payment Completed".',
+          'Tap on any booking to view full details.',
+        ],
+      ),
+      _GuideSection(
+        icon: Icons.star,
+        title: 'Rating & Reviews',
+        steps: [
+          'After your repair is completed, you can rate your technician.',
+          'Give a star rating (1-5) and leave a written review.',
+          'Your feedback helps other customers choose the right technician.',
+        ],
+      ),
+      _GuideSection(
+        icon: Icons.support_agent,
+        title: 'Getting Help',
+        steps: [
+          'Go to Help & Support from your profile or bottom navigation.',
+          'Submit a support ticket for any issues.',
+          'Track your ticket status in "My Tickets".',
+          'Check FAQs for quick answers to common questions.',
+        ],
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'User Guide',
+          style: TextStyle(
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: sections.length,
+        itemBuilder: (context, index) {
+          final section = sections[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(section.icon, color: AppTheme.deepBlue, size: 20),
+              ),
+              title: Text(
+                section.title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimaryColor,
+                ),
+              ),
+              children: [
+                for (int i = 0; i < section.steps.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppTheme.deepBlue.withValues(alpha: 0.10),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${i + 1}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.deepBlue,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            section.steps[i],
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondaryColor,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GuideSection {
+  final IconData icon;
+  final String title;
+  final List<String> steps;
+
+  const _GuideSection({
+    required this.icon,
+    required this.title,
+    required this.steps,
+  });
+}
+
+class _VideoTutorialsScreen extends StatelessWidget {
+  const _VideoTutorialsScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final tutorials = [
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'How to Create an Account',
+        duration: '2:30',
+        description: 'Learn how to sign up and set up your FixIt profile step by step.',
+        color: AppTheme.deepBlue,
+      ),
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'Booking Your First Repair',
+        duration: '3:45',
+        description: 'A complete walkthrough of how to book a repair service on FixIt.',
+        color: AppTheme.primaryCyan,
+      ),
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'How to Pay via GCash',
+        duration: '2:15',
+        description: 'Step-by-step guide on making payments through GCash QR code.',
+        color: Colors.blue,
+      ),
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'Tracking Your Booking Status',
+        duration: '1:50',
+        description: 'Learn how to check booking progress and payment verification status.',
+        color: AppTheme.lightBlue,
+      ),
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'Rating Your Technician',
+        duration: '1:30',
+        description: 'How to leave a rating and review after your repair is completed.',
+        color: Colors.amber.shade700,
+      ),
+      _VideoTutorial(
+        icon: Icons.play_circle_fill,
+        title: 'Submitting a Support Ticket',
+        duration: '2:00',
+        description: 'Need help? Learn how to submit and track support tickets.',
+        color: AppTheme.errorColor,
+      ),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Video Tutorials',
+          style: TextStyle(
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: tutorials.length,
+        itemBuilder: (context, index) {
+          final tutorial = tutorials[index];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: InkWell(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Playing: ${tutorial.title}'),
+                    backgroundColor: AppTheme.deepBlue,
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: tutorial.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        tutorial.icon,
+                        color: tutorial.color,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tutorial.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            tutorial.description,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondaryColor,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        tutorial.duration,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _VideoTutorial {
+  final IconData icon;
+  final String title;
+  final String duration;
+  final String description;
+  final Color color;
+
+  const _VideoTutorial({
+    required this.icon,
+    required this.title,
+    required this.duration,
+    required this.description,
+    required this.color,
+  });
+}
+
+class _FeedbackFormScreen extends StatefulWidget {
+  final String type; // 'feedback' or 'bug_report'
+  final WidgetRef ref;
+
+  const _FeedbackFormScreen({required this.type, required this.ref});
+
+  @override
+  State<_FeedbackFormScreen> createState() => _FeedbackFormScreenState();
+}
+
+class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
+  final _messageController = TextEditingController();
+  int _selectedRating = 0;
+  bool _submitting = false;
+
+  bool get _isFeedback => widget.type == 'feedback';
+
+  String get _title => _isFeedback ? 'Send Feedback' : 'Report a Bug';
+  String get _subtitle => _isFeedback
+      ? 'Help us improve FixIt by sharing your experience'
+      : 'Let us know what went wrong so we can fix it';
+  IconData get _icon => _isFeedback ? Icons.feedback : Icons.bug_report;
+  Color get _accentColor => _isFeedback ? AppTheme.primaryCyan : AppTheme.errorColor;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFeedback
+              ? 'Please write your feedback before submitting'
+              : 'Please describe the bug before submitting'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      final user = widget.ref.read(currentUserProvider).valueOrNull;
+      final userId = SupabaseConfig.client.auth.currentUser?.id ?? '';
+      final userName = user?.fullName ?? user?.email ?? 'Unknown';
+
+      await FeedbackService.submitFeedback(
+        userId: userId,
+        userName: userName,
+        type: widget.type,
+        message: message,
+        rating: _isFeedback && _selectedRating > 0 ? _selectedRating : null,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFeedback
+              ? 'Thank you for your feedback!'
+              : 'Bug report submitted! We\'ll look into it.'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          _title,
+          style: const TextStyle(
+            color: AppTheme.textPrimaryColor,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _accentColor,
+                    _accentColor.withValues(alpha: 0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(_icon, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Rating section (only for feedback)
+            if (_isFeedback) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'How would you rate your experience?',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Optional - tap a star to rate',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final starIndex = index + 1;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedRating =
+                                  _selectedRating == starIndex ? 0 : starIndex;
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Icon(
+                              starIndex <= _selectedRating
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              size: 40,
+                              color: starIndex <= _selectedRating
+                                  ? Colors.amber
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    if (_selectedRating > 0) ...[
+                      const SizedBox(height: 10),
+                      Center(
+                        child: Text(
+                          switch (_selectedRating) {
+                            1 => 'Poor',
+                            2 => 'Fair',
+                            3 => 'Good',
+                            4 => 'Great',
+                            5 => 'Excellent',
+                            _ => '',
+                          },
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.amber.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Message section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _isFeedback ? Icons.edit_note : Icons.description_outlined,
+                        size: 20,
+                        color: _accentColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isFeedback ? 'Your Feedback' : 'Bug Description',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _messageController,
+                    maxLines: 6,
+                    maxLength: 1000,
+                    decoration: InputDecoration(
+                      hintText: _isFeedback
+                          ? 'Tell us what you think about FixIt. What do you like? What can we improve?'
+                          : 'Please describe the bug in detail:\n- What were you doing?\n- What happened?\n- What did you expect?',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade400,
+                        height: 1.4,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: _accentColor, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (!_isFeedback) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline, size: 20, color: Colors.amber.shade700),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Include steps to reproduce the bug for faster resolution.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // Submit button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _submitting ? null : _submit,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(_isFeedback ? Icons.send : Icons.bug_report, size: 20),
+                label: Text(
+                  _submitting
+                      ? 'Submitting...'
+                      : (_isFeedback ? 'Send Feedback' : 'Submit Bug Report'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: _accentColor.withValues(alpha: 0.5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

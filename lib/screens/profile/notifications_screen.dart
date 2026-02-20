@@ -1,32 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../core/theme/app_theme.dart';
-
-// Provider to track if promo notification should be shown
-final promoNotificationProvider = StateProvider<bool>((ref) => false);
-
-class NotificationItem {
-  final String id;
-  final String title;
-  final String message;
-  final String time;
-  final IconData icon;
-  final Color iconColor;
-  final bool isRead;
-  final String type;
-
-  NotificationItem({
-    required this.id,
-    required this.title,
-    required this.message,
-    required this.time,
-    required this.icon,
-    required this.iconColor,
-    this.isRead = false,
-    required this.type,
-  });
-}
+import '../../providers/notification_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/notification_service.dart';
+import '../../core/utils/notification_icon_mapper.dart';
+import '../../models/notification_model.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -37,114 +18,12 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  List<NotificationItem> _getNotifications() {
-    final showPromo = ref.watch(promoNotificationProvider);
-
-    final baseNotifications = [
-      NotificationItem(
-        id: '1',
-        title: 'Welcome to FixIT! 🎉',
-        message: 'Your account has been successfully created. Book your first repair service and get 10% off!',
-        time: '2 hours ago',
-        icon: Icons.celebration,
-        iconColor: AppTheme.primaryCyan,
-        type: 'welcome',
-      ),
-    ];
-
-    // Add promo notification at the top if claimed
-    if (showPromo) {
-      baseNotifications.insert(0, NotificationItem(
-        id: '0',
-        title: '20% OFF Promo Code! 🎁',
-        message: 'Your promo code FIRST20 is ready to use! Apply it at checkout to get 20% off your first repair.',
-        time: 'Just now',
-        icon: Icons.local_offer,
-        iconColor: AppTheme.warningColor,
-        type: 'promo',
-        isRead: false,
-      ));
-    }
-
-    return baseNotifications;
-  }
+  final NotificationService _notificationService = NotificationService();
 
   @override
   Widget build(BuildContext context) {
-    // Combine all notifications
-    final notifications = [
-      ..._getNotifications(),
-      NotificationItem(
-        id: '2',
-        title: 'Booking Confirmed',
-        message: 'Your iPhone screen repair has been confirmed. Technician Estino will arrive at 2:00 PM today.',
-        time: '5 hours ago',
-        icon: Icons.check_circle,
-        iconColor: AppTheme.successColor,
-        type: 'booking',
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '3',
-        title: 'Special Offer: 20% OFF! 🔥',
-        message: 'Get 20% off on all laptop repairs this weekend. Book now and save big on your repairs!',
-        time: '1 day ago',
-        icon: Icons.local_offer,
-        iconColor: AppTheme.accentPurple,
-        type: 'promotion',
-      ),
-      NotificationItem(
-        id: '4',
-        title: 'New Message from Technician',
-        message: 'Estino sent you a message: "I\'m on my way, will reach in 15 minutes."',
-        time: '1 day ago',
-        icon: Icons.message,
-        iconColor: AppTheme.lightBlue,
-        type: 'message',
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '5',
-        title: 'Service Completed ✅',
-        message: 'Your MacBook Pro repair has been successfully completed. Rate your experience!',
-        time: '2 days ago',
-        icon: Icons.task_alt,
-        iconColor: AppTheme.successColor,
-        type: 'completed',
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '6',
-        title: 'Payment Reminder',
-        message: 'Payment of ₱1,299 is pending for your laptop repair. Please complete the payment.',
-        time: '3 days ago',
-        icon: Icons.payment,
-        iconColor: AppTheme.warningColor,
-        type: 'payment',
-      ),
-      NotificationItem(
-        id: '7',
-        title: 'New Technician Available',
-        message: 'We have 5 certified technicians available in your area. Book a repair service now!',
-        time: '3 days ago',
-        icon: Icons.person_add,
-        iconColor: AppTheme.deepBlue,
-        type: 'info',
-        isRead: true,
-      ),
-      NotificationItem(
-        id: '8',
-        title: 'Feedback Request',
-        message: 'How was your experience with Estino? Your feedback helps us improve our service.',
-        time: '4 days ago',
-        icon: Icons.star_rate,
-        iconColor: AppTheme.warningColor,
-        type: 'feedback',
-        isRead: true,
-      ),
-    ];
-
-    final unreadCount = notifications.where((n) => !n.isRead).length;
+    final notificationsAsync = ref.watch(notificationsProvider);
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
@@ -180,12 +59,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         actions: [
           if (unreadCount > 0)
             TextButton(
-              onPressed: () {
-                setState(() {
-                  for (var notification in notifications) {
-                    notification.isRead == false;
-                  }
-                });
+              onPressed: () async {
+                final user = await ref.read(currentUserProvider.future);
+                if (user != null) {
+                  await _notificationService.markAllAsRead(user.id);
+                  ref.invalidate(notificationsProvider);
+                }
               },
               child: const Text(
                 'Mark all read',
@@ -206,8 +85,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             topRight: Radius.circular(30),
           ),
         ),
-        child: notifications.isEmpty
-            ? Center(
+        child: notificationsAsync.when(
+          data: (notifications) {
+            if (notifications.isEmpty) {
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -227,30 +108,79 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     ),
                   ],
                 ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: notifications.length,
-                itemBuilder: (context, index) {
-                  final notification = notifications[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _NotificationCard(notification: notification),
-                  );
-                },
-              ),
+              );
+            }
+            
+            return ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final notification = notifications[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _NotificationCard(
+                    notification: notification,
+                    onTap: () async {
+                      if (!notification.isRead) {
+                        await _notificationService.markAsRead(notification.id);
+                        ref.invalidate(notificationsProvider);
+                      }
+                      // Navigate to route if specified
+                      if (notification.route != null && context.mounted) {
+                        context.push(notification.route!);
+                      }
+                    },
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 80,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load notifications',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => ref.invalidate(notificationsProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  final NotificationItem notification;
+  final AppNotification notification;
+  final VoidCallback? onTap;
 
-  const _NotificationCard({required this.notification});
+  const _NotificationCard({
+    required this.notification,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final iconData = mapNotificationIcon(notification.type);
+    
     return Container(
       decoration: BoxDecoration(
         color: notification.isRead ? Colors.white : AppTheme.primaryCyan.withValues(alpha: 0.05),
@@ -263,9 +193,7 @@ class _NotificationCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            // Handle notification tap
-          },
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -275,12 +203,12 @@ class _NotificationCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: notification.iconColor.withValues(alpha: 0.1),
+                    color: iconData.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    notification.icon,
-                    color: notification.iconColor,
+                    iconData.icon,
+                    color: iconData.color,
                     size: 24,
                   ),
                 ),
@@ -331,7 +259,7 @@ class _NotificationCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            notification.time,
+                            timeago.format(notification.createdAt),
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],

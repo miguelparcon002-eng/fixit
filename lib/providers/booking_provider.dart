@@ -13,26 +13,46 @@ final bookingByIdProvider = FutureProvider.family<BookingModel?, String>((ref, b
 
 final customerBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
-  final user = ref.watch(currentUserProvider).value;
+  final userAsync = ref.watch(currentUserProvider);
 
-  if (user == null) return Stream.value([]);
-
-  return bookingService.watchCustomerBookings(user.id);
+  // Wait for user to load
+  return userAsync.when(
+    data: (user) {
+      if (user == null) return Stream.value([]);
+      AppLogger.p('📱 CUSTOMER BOOKINGS PROVIDER: Watching bookings for ${user.id}');
+      return bookingService.watchCustomerBookings(user.id);
+    },
+    loading: () => Stream.value([]),
+    error: (_, __) => Stream.value([]),
+  );
 });
 
 final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
-  final user = ref.watch(currentUserProvider).value;
+  final userAsync = ref.watch(currentUserProvider);
 
-  AppLogger.p('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
+  // Wait for user to load
+  return userAsync.when(
+    data: (user) {
+      AppLogger.p('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
+      
+      if (user == null) {
+        AppLogger.p('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
+        return Stream.value([]);
+      }
 
-  if (user == null) {
-    AppLogger.p('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
-    return Stream.value([]);
-  }
-
-  AppLogger.p('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
-  return bookingService.watchTechnicianBookings(user.id);
+      AppLogger.p('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
+      return bookingService.watchTechnicianBookings(user.id);
+    },
+    loading: () {
+      AppLogger.p('⏳ TECHNICIAN BOOKINGS PROVIDER: User loading...');
+      return Stream.value([]);
+    },
+    error: (error, stack) {
+      AppLogger.p('❌ TECHNICIAN BOOKINGS PROVIDER: Error loading user: $error');
+      return Stream.value([]);
+    },
+  );
 });
 
 class BookingsByStatusParams {
