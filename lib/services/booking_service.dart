@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../models/booking_model.dart';
 import '../core/utils/app_logger.dart';
 import '../core/utils/technician_verification_guard.dart';
+import '../services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class BookingService {
@@ -27,6 +28,7 @@ class BookingService {
     double? customerLatitude,
     double? customerLongitude,
     double? estimatedCost,
+    String? paymentMethod,
   }) async {
     final bookingId = _uuid.v4();
 
@@ -41,6 +43,7 @@ class BookingService {
       'customer_latitude': customerLatitude,
       'customer_longitude': customerLongitude,
       'estimated_cost': estimatedCost,
+      'payment_method': paymentMethod,
       'payment_status': 'pending',
     }).select().single();
 
@@ -213,6 +216,20 @@ class BookingService {
         .from(DBConstants.bookings)
         .update(updates)
         .eq('id', bookingId);
+
+    // Notify customer if price was adjusted
+    if (priceAdjustment != null && priceAdjustment != 0) {
+      final newCost = (updates['final_cost'] as num?)?.toDouble()
+          ?? (booking.finalCost ?? booking.estimatedCost ?? 0.0) + priceAdjustment;
+      final direction = priceAdjustment > 0 ? 'increased' : 'decreased';
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'reminder',
+        title: 'Price Updated',
+        message: 'Your service price has been $direction to ₱${newCost.toStringAsFixed(2)}.',
+        data: {'booking_id': bookingId, 'route': '/booking/$bookingId'},
+      );
+    }
   }
 
   Future<List<BookingModel>> getCustomerBookings(String customerId) async {

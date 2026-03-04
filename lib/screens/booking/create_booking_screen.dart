@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,9 @@ import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../models/redeemed_voucher.dart';
 import '../../services/technician_specialty_service.dart';
+import 'package:latlong2/latlong.dart';
+import 'widgets/technician_map_sheet.dart';
+import 'widgets/location_picker_sheet.dart';
 class CreateBookingScreen extends ConsumerStatefulWidget {
   final String serviceId;
   final bool isEmergency;
@@ -39,6 +43,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   DateTime? _selectedDate;
   final TextEditingController _addressController = TextEditingController();
+  LatLng? _pickedLatLng; // exact pinned location from map
   String? _selectedTechnicianId;
   List<Map<String, dynamic>> _techniciansFromDb = [];
   bool _isTechniciansLoading = false;
@@ -46,6 +51,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   // Step 3: Promo code / voucher
   final TextEditingController _promoCodeController = TextEditingController();
   String? _appliedPromoCode;
+  final String _selectedPaymentMethod = 'gcash'; // App only accepts GCash
   double _discountAmount = 0;
   String _discountType = 'none';
   RedeemedVoucher? _appliedVoucher; // The actual voucher object if applied
@@ -122,6 +128,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             if (mounted) {
               setState(() {
                 _addressController.text = defaultAddress.address;
+                if (defaultAddress.latitude != null && defaultAddress.longitude != null) {
+                  _pickedLatLng = LatLng(defaultAddress.latitude!, defaultAddress.longitude!);
+                }
               });
             }
           }
@@ -188,6 +197,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           }
         } catch (_) {}
 
+        // Random distance between 1.0 and 2.0 km, rounded to 1 decimal
+        final rawKm = 1.0 + Random().nextDouble();
+        final distanceKm = (rawKm * 10).round() / 10.0;
+        // ₱5 per 100 meters = ₱50 per km
+        final distanceFee = (distanceKm * 10).round() * 5.0;
+
         results.add({
           'id': techId,
           'name': row['full_name'] as String? ?? 'Technician',
@@ -198,6 +213,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           'rating': avgRating,
           'completedJobs': completedJobs,
           'experience': experience,
+          'distanceKm': distanceKm,
+          'distanceFee': distanceFee,
         });
       }
 
@@ -243,9 +260,15 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   }
 
   double _getDistanceFee() {
-    if (_selectedTechnicianId == null) return 0.0;
-    // Flat service call fee
-    return 100.0;
+    final tech = _selectedTechData;
+    if (tech == null) return 0.0;
+    return (tech['distanceFee'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double _getSelectedDistanceKm() {
+    final tech = _selectedTechData;
+    if (tech == null) return 0.0;
+    return (tech['distanceKm'] as num?)?.toDouble() ?? 0.0;
   }
 
   double _calculatePrice() {
@@ -472,6 +495,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         'Technician: ${_selectedTechData?['name'] ?? 'N/A'}',
         if (_detailsController.text.trim().isNotEmpty) 'Details: ${_detailsController.text.trim()}',
         if (_appliedPromoCode != null) 'Promo Code: $_appliedPromoCode',
+        if (_appliedVoucher != null) 'Redeemed Voucher ID: ${_appliedVoucher!.id}',
+        'Payment Method: GCash',
       ].join('\n');
 
       // Use the selected technician directly
@@ -510,9 +535,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         serviceId: serviceId,
         scheduledDate: scheduledDateTime,
         customerAddress: _addressController.text.trim(),
-        customerLatitude: null, // TODO: Get from address geocoding
-        customerLongitude: null,
+        customerLatitude: _pickedLatLng?.latitude,
+        customerLongitude: _pickedLatLng?.longitude,
         estimatedCost: finalPrice,
+        paymentMethod: _selectedPaymentMethod,
       );
 
       // Update diagnostic notes with booking details
@@ -521,18 +547,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         notes: bookingDetails,
         finalCost: finalPrice,
       );
-
-      // Mark voucher as used if one was applied
-      if (_appliedVoucher != null) {
-        final voucherService = ref.read(redeemedVoucherServiceProvider);
-        await voucherService.markVoucherAsUsed(
-          voucherId: _appliedVoucher!.id,
-          bookingId: createdBooking.id,
-        );
-        // Refresh voucher providers
-        ref.invalidate(redeemedVouchersProvider);
-        ref.invalidate(unusedVouchersProvider);
-      }
 
       // Force refresh bookings so the new booking appears immediately (no hot restart)
       ref.invalidate(customerBookingsProvider);
@@ -1357,7 +1371,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '* Distance fee will be added based on technician selection',
+            '* Distance fee ₱5 per 100m varies per technician location',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
@@ -1366,6 +1380,21 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  void _showTechnicianMap() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TechnicianMapSheet(
+        technicians: _techniciansFromDb,
+        selectedTechnicianId: _selectedTechnicianId,
+        onTechnicianSelected: (id) {
+          setState(() => _selectedTechnicianId = id);
+        },
+      ),
     );
   }
 
@@ -1736,16 +1765,95 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 8),
+        // Pin exact location on map
+        GestureDetector(
+          onTap: () async {
+            final result = await showModalBottomSheet<PickedLocation>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => LocationPickerSheet(
+                initialLocation: _pickedLatLng,
+              ),
+            );
+            if (result != null) {
+              setState(() => _pickedLatLng = result.latLng);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _pickedLatLng != null
+                  ? const Color(0xFF4A5FE0).withValues(alpha: 0.08)
+                  : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _pickedLatLng != null
+                    ? const Color(0xFF4A5FE0).withValues(alpha: 0.4)
+                    : Colors.grey.shade300,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _pickedLatLng != null ? Icons.location_pin : Icons.add_location_alt_outlined,
+                  color: const Color(0xFF4A5FE0),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _pickedLatLng != null
+                        ? 'Pinned: ${_pickedLatLng!.latitude.toStringAsFixed(5)}, ${_pickedLatLng!.longitude.toStringAsFixed(5)}'
+                        : 'Pin exact location on map (optional)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _pickedLatLng != null
+                          ? const Color(0xFF4A5FE0)
+                          : Colors.grey.shade600,
+                      fontWeight: _pickedLatLng != null
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey.shade400,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 20),
 
         // Technician Selection
-        const Text(
-          'Select Technician',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimaryColor,
-          ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Select Technician',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimaryColor,
+                ),
+              ),
+            ),
+            if (!_isTechniciansLoading && _techniciansFromDb.isNotEmpty)
+              TextButton.icon(
+                onPressed: () => _showTechnicianMap(),
+                icon: const Icon(Icons.map_outlined, size: 16),
+                label: const Text('View on Map'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.deepBlue,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -1778,6 +1886,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
             final specialties = (tech['specialties'] as List<String>?) ?? [];
             final experience = tech['experience'] as String? ?? 'New';
+            final distanceKm = (tech['distanceKm'] as num?)?.toDouble() ?? 0.0;
+            final distanceFee = (tech['distanceFee'] as num?)?.toDouble() ?? 0.0;
             final profilePic = tech['profilePicture'] as String?;
             final name = tech['name'] as String;
             final initials = name.split(' ')
@@ -1867,6 +1977,24 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                                     Text(
                                       experience,
                                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on_outlined, size: 13, color: Colors.grey[500]),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${distanceKm.toStringAsFixed(1)} km away',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Icon(Icons.directions_car_outlined, size: 13, color: AppTheme.deepBlue),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '+₱${distanceFee.toStringAsFixed(0)} fee',
+                                      style: const TextStyle(fontSize: 12, color: AppTheme.deepBlue, fontWeight: FontWeight.w600),
                                     ),
                                   ],
                                 ),
@@ -2194,9 +2322,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Service Call Fee',
-                    style: TextStyle(
+                  Text(
+                    'Distance Fee (${_getSelectedDistanceKm().toStringAsFixed(1)} km)',
+                    style: const TextStyle(
                       fontSize: 16,
                       color: AppTheme.textPrimaryColor,
                     ),
@@ -2347,3 +2475,4 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     );
   }
 }
+

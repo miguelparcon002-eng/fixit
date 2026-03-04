@@ -48,6 +48,115 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
+  Future<void> _loginWithGoogle() async {
+    // Show role picker first
+    final role = await _showRolePicker();
+    if (role == null) return; // User dismissed
+
+    setState(() => _isLoading = true);
+    try {
+      final authService = ref.read(authServiceProvider);
+      final userProfile = await authService.signInWithGoogle(role: role);
+      if (userProfile == null) {
+        // User cancelled Google picker
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (!mounted) return;
+      final sessionService = ref.read(userSessionServiceProvider);
+      await sessionService.onUserLogin(userProfile.id);
+
+      if (!mounted) return;
+      final userRole = userProfile.role;
+      if (userRole == 'technician') {
+        context.go('/tech-home');
+      } else if (userRole == 'admin') {
+        context.go('/admin-home');
+      } else {
+        context.go('/home');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google sign-in failed: $e'),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  /// Shows a bottom sheet for the user to pick their role before Google sign-in.
+  /// Returns the selected role string, or null if dismissed.
+  Future<String?> _showRolePicker() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Continue as...',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Select your role before signing in with Google',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            // Customer option
+            _RoleOption(
+              icon: Icons.person_rounded,
+              label: 'Customer',
+              description: 'I need repair services',
+              color: const Color(0xFF4A5FE0),
+              onTap: () => Navigator.of(ctx).pop('customer'),
+            ),
+            const SizedBox(height: 12),
+            // Technician option
+            _RoleOption(
+              icon: Icons.build_rounded,
+              label: 'Technician',
+              description: 'I provide repair services',
+              color: const Color(0xFF17A2B8),
+              onTap: () => Navigator.of(ctx).pop('technician'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _login() async {
     if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -380,9 +489,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 20),
         GestureDetector(
-          onTap: () {
-            // TODO: Implement Google sign in
-          },
+          onTap: _isLoading ? null : _loginWithGoogle,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -485,3 +592,70 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
+class _RoleOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _RoleOption({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: color),
+          ],
+        ),
+      ),
+    );
+  }
+}

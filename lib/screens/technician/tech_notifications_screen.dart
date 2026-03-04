@@ -14,7 +14,8 @@ class TechNotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notificationsAsync = ref.watch(notificationsProvider);
+    final notifications = ref.watch(filteredNotificationsProvider);
+    final notificationsAsync = AsyncData<List<AppNotification>>(notifications);
 
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
 

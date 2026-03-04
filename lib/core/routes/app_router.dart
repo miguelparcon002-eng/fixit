@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../screens/onboarding/onboarding_screen.dart';
 import '../../screens/auth/welcome_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -59,6 +60,7 @@ import '../../screens/admin/admin_feedback_screen.dart';
 import '../../screens/admin/admin_earnings_screen.dart';
 import '../../screens/admin/admin_technician_earnings_detail_screen.dart';
 import '../../screens/booking/payment_screen.dart';
+import '../../screens/booking/shop_booking_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -67,8 +69,26 @@ class AppRouter {
       if (state.matchedLocation == '/onboarding') {
         final prefs = await SharedPreferences.getInstance();
         final completed = prefs.getBool('onboarding_completed') ?? false;
-        if (completed) {
-          return '/welcome';
+        if (!completed) return null; // show onboarding
+
+        // Onboarding done — check for an active session
+        final supabase = Supabase.instance.client;
+        final session = supabase.auth.currentSession;
+        if (session == null) return '/welcome'; // not logged in
+
+        // Session exists — fetch role and go straight to the right home
+        try {
+          final response = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', session.user.id)
+              .maybeSingle();
+          final role = response?['role'] as String?;
+          if (role == 'technician') return '/tech-home';
+          if (role == 'admin') return '/admin-home';
+          return '/home'; // customer (default)
+        } catch (_) {
+          return '/welcome'; // db error → fall back to login
         }
       }
       return null;
@@ -180,6 +200,15 @@ class AppRouter {
         builder: (context, state) {
           final serviceId = state.pathParameters['serviceId']!;
           return CreateBookingScreen(serviceId: serviceId);
+        },
+      ),
+      // Shop booking — ShopInfo passed via GoRouter extra
+      GoRoute(
+        path: '/shop-booking',
+        name: 'shopBooking',
+        builder: (context, state) {
+          final shop = state.extra as ShopInfo;
+          return ShopBookingScreen(shop: shop);
         },
       ),
 

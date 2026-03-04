@@ -203,6 +203,12 @@ class BookingModel {
     return match?.group(1);
   }
 
+  String? get redeemedVoucherId {
+    if (diagnosticNotes == null) return null;
+    final match = RegExp(r'Redeemed Voucher ID: ([\w-]+)').firstMatch(diagnosticNotes!);
+    return match?.group(1);
+  }
+
   String? get discountAmount {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Discount: ([\d.]+%|₱[\d.]+)').firstMatch(diagnosticNotes!);

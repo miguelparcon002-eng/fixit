@@ -77,160 +77,22 @@ class _AdminAppointmentsScreenState
   }
 
   void _showBookingDetails(BuildContext context, AdminBookingView item) {
-    final b = item.booking;
-
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              16 + MediaQuery.of(ctx).viewInsets.bottom,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Booking #${_shortBookingCode(b.id)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.textPrimaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Status: ${b.status.toUpperCase()}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondaryColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  _DetailsSection(
-                    title: 'People',
-                    children: [
-                      _DetailsRow(label: 'Customer', value: item.customerName),
-                      _DetailsRow(label: 'Technician', value: item.technicianName),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  _DetailsSection(
-                    title: 'Service',
-                    children: [
-                      _DetailsRow(label: 'Service', value: item.serviceName),
-                      _DetailsRow(label: 'Service ID', value: b.serviceId),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  _DetailsSection(
-                    title: 'Schedule & Location',
-                    children: [
-                      _DetailsRow(
-                        label: 'Created',
-                        value: b.createdAt.toLocal().toString(),
-                      ),
-                      _DetailsRow(
-                        label: 'Scheduled',
-                        value: b.scheduledDate?.toLocal().toString() ?? '—',
-                      ),
-                      _DetailsRow(
-                        label: 'Address',
-                        value: b.customerAddress ?? '—',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  _DetailsSection(
-                    title: 'Cost & Payment',
-                    children: [
-                      _DetailsRow(
-                        label: 'Estimated cost',
-                        value: b.estimatedCost?.toStringAsFixed(2) ?? '—',
-                      ),
-                      _DetailsRow(
-                        label: 'Final cost',
-                        value: b.finalCost?.toStringAsFixed(2) ?? '—',
-                      ),
-                      _DetailsRow(
-                        label: 'Payment method',
-                        value: b.paymentMethod ?? '—',
-                      ),
-                      _DetailsRow(
-                        label: 'Payment status',
-                        value: b.paymentStatus ?? '—',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  _DetailsSection(
-                    title: 'Notes',
-                    children: [
-                      _DetailsRow(
-                        label: 'Diagnostic notes',
-                        value: (b.diagnosticNotes == null ||
-                                b.diagnosticNotes!.trim().isEmpty)
-                            ? '—'
-                            : b.diagnosticNotes!.trim(),
-                        multiline: true,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            side: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          child: const Text('Close'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            context.go('/booking-detail/${b.id}');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.deepBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: const Text('Open full details'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _BookingDetailSheet(
+        item: item,
+        shortCode: _shortBookingCode(item.booking.id),
+        onOpenFull: () {
+          Navigator.of(ctx).pop();
+          context.go('/booking/${item.booking.id}');
+        },
+      ),
     );
   }
 
@@ -844,7 +706,7 @@ class _DetailsRow extends StatelessWidget {
   }
 }
 
-class _InfoPill extends StatelessWidget { 
+class _InfoPill extends StatelessWidget {
   final IconData icon;
   final String text;
 
@@ -878,6 +740,296 @@ class _InfoPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Booking Detail Bottom Sheet ────────────────────────────────────────────
+
+class _BookingDetailSheet extends StatefulWidget {
+  final AdminBookingView item;
+  final String shortCode;
+  final VoidCallback onOpenFull;
+
+  const _BookingDetailSheet({
+    required this.item,
+    required this.shortCode,
+    required this.onOpenFull,
+  });
+
+  @override
+  State<_BookingDetailSheet> createState() => _BookingDetailSheetState();
+}
+
+class _BookingDetailSheetState extends State<_BookingDetailSheet> {
+  bool _expanded = false;
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'requested':
+      case 'pending':
+        return Colors.orange;
+      case 'in_progress':
+      case 'ongoing':
+        return AppTheme.lightBlue;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _fmt(DateTime? dt) {
+    if (dt == null) return '—';
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final m = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} • $h:$m $period';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = widget.item.booking;
+    final status = booking.status;
+    final statusColor = _statusColor(status);
+    final cost = booking.finalCost ?? booking.estimatedCost;
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.55,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header: status + code ──────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      status.replaceAll('_', ' ').toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Booking #${widget.shortCode}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                  if (booking.isEmergency) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: const Text(
+                        'EMERGENCY',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // ── Key info summary ───────────────────────────────────
+              _DetailsSection(
+                title: 'Summary',
+                children: [
+                  _DetailsRow(label: 'Customer', value: widget.item.customerName),
+                  _DetailsRow(label: 'Technician', value: widget.item.technicianName),
+                  _DetailsRow(label: 'Service', value: widget.item.serviceName),
+                  _DetailsRow(
+                    label: 'Cost',
+                    value: cost != null ? '₱${(cost as num).toStringAsFixed(2)}' : '—',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // ── Expand / collapse button ───────────────────────────
+              InkWell(
+                onTap: () => setState(() => _expanded = !_expanded),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _expanded ? 'Hide details' : 'Show all details',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.deepBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: AppTheme.deepBlue,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Expanded details ───────────────────────────────────
+              if (_expanded) ...[
+                const SizedBox(height: 12),
+                _DetailsSection(
+                  title: 'Schedule',
+                  children: [
+                    _DetailsRow(label: 'Created', value: _fmt(booking.createdAt)),
+                    if (booking.scheduledDate != null)
+                      _DetailsRow(label: 'Scheduled', value: _fmt(booking.scheduledDate)),
+                    if (booking.acceptedAt != null)
+                      _DetailsRow(label: 'Accepted', value: _fmt(booking.acceptedAt)),
+                    if (booking.completedAt != null)
+                      _DetailsRow(label: 'Completed', value: _fmt(booking.completedAt)),
+                    if (booking.cancelledAt != null)
+                      _DetailsRow(label: 'Cancelled', value: _fmt(booking.cancelledAt)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _DetailsSection(
+                  title: 'Location & Payment',
+                  children: [
+                    _DetailsRow(
+                      label: 'Address',
+                      value: booking.customerAddress ?? '—',
+                      multiline: true,
+                    ),
+                    _DetailsRow(label: 'Payment', value: booking.paymentMethod ?? '—'),
+                    _DetailsRow(label: 'Pay Status', value: booking.paymentStatus ?? '—'),
+                    if (booking.estimatedCost != null)
+                      _DetailsRow(
+                        label: 'Est. Cost',
+                        value: '₱${booking.estimatedCost!.toStringAsFixed(2)}',
+                      ),
+                    if (booking.finalCost != null)
+                      _DetailsRow(
+                        label: 'Final Cost',
+                        value: '₱${booking.finalCost!.toStringAsFixed(2)}',
+                      ),
+                  ],
+                ),
+                if (booking.moreDetails != null && booking.moreDetails!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _DetailsSection(
+                    title: 'Notes',
+                    children: [
+                      _DetailsRow(
+                        label: 'Details',
+                        value: booking.moreDetails!,
+                        multiline: true,
+                      ),
+                      if (booking.technicianNotes != null && booking.technicianNotes!.isNotEmpty)
+                        _DetailsRow(
+                          label: 'Tech Notes',
+                          value: booking.technicianNotes!,
+                          multiline: true,
+                        ),
+                    ],
+                  ),
+                ],
+                if (booking.cancellationReason != null) ...[
+                  const SizedBox(height: 12),
+                  _DetailsSection(
+                    title: 'Cancellation',
+                    children: [
+                      _DetailsRow(
+                        label: 'Reason',
+                        value: booking.cancellationReason!,
+                        multiline: true,
+                      ),
+                    ],
+                  ),
+                ],
+                if (booking.rating != null) ...[
+                  const SizedBox(height: 12),
+                  _DetailsSection(
+                    title: 'Rating',
+                    children: [
+                      _DetailsRow(
+                        label: 'Stars',
+                        value: '${'★' * booking.rating!}${'☆' * (5 - booking.rating!)} (${booking.rating}/5)',
+                      ),
+                      if (booking.review != null && booking.review!.isNotEmpty)
+                        _DetailsRow(
+                          label: 'Review',
+                          value: booking.review!,
+                          multiline: true,
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+
+              const SizedBox(height: 20),
+
+              // ── Action button ──────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onOpenFull,
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Open Full Booking'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.deepBlue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

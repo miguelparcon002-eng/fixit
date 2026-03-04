@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
@@ -32,6 +33,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Map<String, dynamic>? _qrSettings;
   bool _loadingQr = true;
   XFile? _proofImage;
+  Uint8List? _proofImageBytes; // used on web
   bool _submitting = false;
   Map<String, dynamic>? _existingPayment;
 
@@ -72,7 +74,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       imageQuality: 85,
     );
     if (image != null) {
-      setState(() => _proofImage = image);
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _proofImage = image;
+          _proofImageBytes = bytes;
+        });
+      } else {
+        setState(() {
+          _proofImage = image;
+          _proofImageBytes = null;
+        });
+      }
     }
   }
 
@@ -669,11 +682,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              File(_proofImage!.path),
-                              height: 200,
-                              fit: BoxFit.contain,
-                            ),
+                            child: kIsWeb
+                                ? Image.memory(
+                                    _proofImageBytes!,
+                                    height: 200,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Image.file(
+                                    File(_proofImage!.path),
+                                    height: 200,
+                                    fit: BoxFit.contain,
+                                  ),
                           ),
                           const SizedBox(height: 10),
                           Row(

@@ -2,10 +2,19 @@ import '../core/config/supabase_config.dart';
 import '../models/notification_model.dart';
 
 /// System-wide admin notification feed.
-///
-/// NOTE: The `public.notifications` table schema is per-user (user_id) but the
-/// admin feed can still display all notifications (useful for monitoring).
 class AdminNotificationsService {
+  /// Realtime stream of all notifications (system-wide for admin monitoring).
+  Stream<List<AppNotification>> watchFeed({int limit = 50}) {
+    return SupabaseConfig.client
+        .from('notifications')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((rows) => rows
+            .take(limit)
+            .map(AppNotification.fromJson)
+            .toList());
+  }
+
   Future<List<AppNotification>> listFeed({int limit = 50}) async {
     final res = await SupabaseConfig.client
         .from('notifications')

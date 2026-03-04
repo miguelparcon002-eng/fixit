@@ -6,13 +6,64 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/rewards_provider.dart';
 import '../../services/booking_service.dart';
+import 'widgets/customer_location_sheet.dart';
 
 // Provider for the initial tab to show in jobs screen
 // 0 = Request, 1 = Active, 2 = Complete, 3 = All
 final techJobsInitialTabProvider = StateProvider<int>((ref) => 0);
 
 enum _TechJobsTab { request, active, complete, all }
+
+// ─── Filter model ─────────────────────────────────────────────────────────────
+
+enum _TechSortOrder { newest, oldest }
+
+class _TechJobFilter {
+  final Set<String> statuses; // empty = all
+  final DateTime? fromDate;
+  final DateTime? toDate;
+  final _TechSortOrder sort;
+  final bool? emergencyOnly; // null = both, true = only emergency, false = only regular
+
+  const _TechJobFilter({
+    this.statuses = const {},
+    this.fromDate,
+    this.toDate,
+    this.sort = _TechSortOrder.newest,
+    this.emergencyOnly,
+  });
+
+  bool get isActive =>
+      statuses.isNotEmpty ||
+      fromDate != null ||
+      toDate != null ||
+      emergencyOnly != null;
+
+  _TechJobFilter copyWith({
+    Set<String>? statuses,
+    DateTime? fromDate,
+    DateTime? toDate,
+    bool clearFrom = false,
+    bool clearTo = false,
+    _TechSortOrder? sort,
+    Object? emergencyOnly = _sentinel,
+  }) {
+    return _TechJobFilter(
+      statuses: statuses ?? this.statuses,
+      fromDate: clearFrom ? null : (fromDate ?? this.fromDate),
+      toDate: clearTo ? null : (toDate ?? this.toDate),
+      sort: sort ?? this.sort,
+      emergencyOnly:
+          identical(emergencyOnly, _sentinel) ? this.emergencyOnly : emergencyOnly as bool?,
+    );
+  }
+
+  static const _sentinel = Object();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class TechJobsScreenNew extends ConsumerStatefulWidget {
   const TechJobsScreenNew({super.key});
@@ -23,6 +74,7 @@ class TechJobsScreenNew extends ConsumerStatefulWidget {
 
 class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
   _TechJobsTab _selectedTab = _TechJobsTab.request;
+  _TechJobFilter _filter = const _TechJobFilter();
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +108,29 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
             onPressed: () => ref.invalidate(technicianBookingsProvider),
             icon: const Icon(Icons.refresh, color: AppTheme.deepBlue),
           ),
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              IconButton(
+                tooltip: 'Filter',
+                onPressed: _openFilterSheet,
+                icon: const Icon(Icons.tune_rounded, color: AppTheme.deepBlue),
+              ),
+              if (_filter.isActive)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       body: SafeArea(
@@ -63,16 +138,90 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: _buildTabs(),
             ),
-            const SizedBox(height: 8),
+            if (_filter.isActive) _buildActiveFilterBanner(),
+            const SizedBox(height: 4),
             Expanded(child: _buildJobsList()),
           ],
         ),
       ),
     );
   }
+
+  // ─── Filter helpers ──────────────────────────────────────────────────────
+
+  Widget _buildActiveFilterBanner() {
+    final parts = <String>[];
+    if (_filter.statuses.isNotEmpty) {
+      parts.add(_filter.statuses.map(_displayStatus).join(', '));
+    }
+    if (_filter.emergencyOnly == true) parts.add('Emergency only');
+    if (_filter.emergencyOnly == false) parts.add('Regular only');
+    if (_filter.fromDate != null) {
+      parts.add('From ${DateFormat('MMM d').format(_filter.fromDate!)}');
+    }
+    if (_filter.toDate != null) {
+      parts.add('To ${DateFormat('MMM d').format(_filter.toDate!)}');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_list, size: 14, color: AppTheme.deepBlue),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              parts.join(' · '),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.deepBlue,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _filter = const _TechJobFilter()),
+            child: const Text(
+              'Clear',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _displayStatus(String s) => switch (s) {
+        'requested' => 'Requested',
+        'accepted' => 'Accepted',
+        'in_progress' => 'In Progress',
+        'completed' => 'Completed',
+        'cancelled' => 'Cancelled',
+        _ => s,
+      };
+
+  Future<void> _openFilterSheet() async {
+    final result = await showModalBottomSheet<_TechJobFilter>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TechFilterSheet(current: _filter),
+    );
+    if (result != null && mounted) {
+      setState(() => _filter = result);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   _TechJobsTab _tabFromInt(int value) {
     return switch (value) {
@@ -151,30 +300,58 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
   }
 
   Widget _buildJobsContent(List<BookingModel> allBookings) {
-    final filtered = _filterBookings(allBookings);
+    // 1. Tab filter
+    List<BookingModel> filtered = _filterBookings(allBookings);
+
+    // 2. Advanced filters
+    if (_filter.statuses.isNotEmpty) {
+      filtered = filtered.where((b) => _filter.statuses.contains(b.status)).toList();
+    }
+    if (_filter.emergencyOnly != null) {
+      filtered = filtered.where((b) => b.isEmergency == _filter.emergencyOnly).toList();
+    }
+    if (_filter.fromDate != null) {
+      final from = DateTime(_filter.fromDate!.year, _filter.fromDate!.month, _filter.fromDate!.day);
+      filtered = filtered.where((b) {
+        final d = b.scheduledDate ?? b.createdAt;
+        return !d.isBefore(from);
+      }).toList();
+    }
+    if (_filter.toDate != null) {
+      final to = DateTime(_filter.toDate!.year, _filter.toDate!.month, _filter.toDate!.day, 23, 59, 59);
+      filtered = filtered.where((b) {
+        final d = b.scheduledDate ?? b.createdAt;
+        return !d.isAfter(to);
+      }).toList();
+    }
 
     if (filtered.isEmpty) {
       final (icon, title, subtitle) = _emptyStateForTab();
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
         children: [
-          _EmptyState(icon: icon, title: title, subtitle: subtitle),
+          _EmptyState(
+            icon: icon,
+            title: _filter.isActive ? 'No results for your filter' : title,
+            subtitle: _filter.isActive ? 'Try adjusting or clearing your filter.' : subtitle,
+          ),
         ],
       );
     }
 
+    // 3. Sort
     final sorted = [...filtered]..sort((a, b) {
-        // Emergency bookings should be prioritized first (especially in Request tab)
+        if (_filter.sort == _TechSortOrder.oldest) {
+          final aDate = a.scheduledDate ?? a.createdAt;
+          final bDate = b.scheduledDate ?? b.createdAt;
+          return aDate.compareTo(bDate);
+        }
+        // Default: emergency first, then newest
         final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
         if (prio != 0) return prio;
-
         final aDate = a.scheduledDate ?? a.createdAt;
         final bDate = b.scheduledDate ?? b.createdAt;
-
-        if (_selectedTab == _TechJobsTab.complete) {
-          return bDate.compareTo(aDate);
-        }
-        return aDate.compareTo(bDate);
+        return bDate.compareTo(aDate);
       });
 
     return ListView.builder(
@@ -442,11 +619,43 @@ class _TechJobCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 10),
+          // Track customer location button — only if coordinates were pinned
+          if (booking.customerLatitude != null && booking.customerLongitude != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => CustomerLocationSheet(
+                      latitude: booking.customerLatitude!,
+                      longitude: booking.customerLongitude!,
+                      customerName: booking.customerAddress ?? 'Customer',
+                      address: booking.customerAddress ?? 'No address provided',
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.location_searching, size: 18),
+                label: const Text('Track Customer Location'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4A5FE0),
+                  side: const BorderSide(color: Color(0xFF4A5FE0)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _adjustPrice(context, ref, bookingService),
+                  onPressed: (payStatus == 'completed' || payStatus == 'submitted')
+                      ? null
+                      : () => _adjustPrice(context, ref, bookingService),
                   icon: const Icon(Icons.tune, size: 18),
                   label: const Text('Adjust price'),
                   style: OutlinedButton.styleFrom(
@@ -524,6 +733,17 @@ class _TechJobCard extends ConsumerWidget {
         bookingId: booking.id,
         status: 'in_progress',
       );
+
+      // Mark the redeemed voucher as used now that the job is accepted
+      final voucherId = booking.redeemedVoucherId;
+      if (voucherId != null) {
+        final voucherService = ref.read(redeemedVoucherServiceProvider);
+        await voucherService.markVoucherAsUsed(
+          voucherId: voucherId,
+          bookingId: booking.id,
+        );
+      }
+
       ref.invalidate(technicianBookingsProvider);
       ref.read(techJobsInitialTabProvider.notifier).state = 1;
       if (!context.mounted) return;
@@ -1414,6 +1634,446 @@ class _ErrorState extends StatelessWidget {
     );
   }
 }
+
+// ─── Tech filter bottom sheet ─────────────────────────────────────────────────
+
+class _TechFilterSheet extends StatefulWidget {
+  final _TechJobFilter current;
+  const _TechFilterSheet({required this.current});
+
+  @override
+  State<_TechFilterSheet> createState() => _TechFilterSheetState();
+}
+
+class _TechFilterSheetState extends State<_TechFilterSheet> {
+  late Set<String> _statuses;
+  late DateTime? _from;
+  late DateTime? _to;
+  late _TechSortOrder _sort;
+  late bool? _emergencyOnly;
+
+  static const _allStatuses = [
+    'requested',
+    'in_progress',
+    'completed',
+    'cancelled',
+  ];
+
+  static const _statusLabels = {
+    'requested': 'Requested',
+    'in_progress': 'Active',
+    'completed': 'Completed',
+    'cancelled': 'Cancelled',
+  };
+
+  static const _statusColors = {
+    'requested': AppTheme.warningColor,
+    'in_progress': AppTheme.accentPurple,
+    'completed': AppTheme.successColor,
+    'cancelled': AppTheme.errorColor,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _statuses = Set.from(widget.current.statuses);
+    _from = widget.current.fromDate;
+    _to = widget.current.toDate;
+    _sort = widget.current.sort;
+    _emergencyOnly = widget.current.emergencyOnly;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Header
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Filter Jobs',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _statuses = {};
+                          _from = null;
+                          _to = null;
+                          _sort = _TechSortOrder.newest;
+                          _emergencyOnly = null;
+                        }),
+                        child: const Text('Reset', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Status chips
+                  _SheetSection(label: 'Status', icon: Icons.label_outline),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _allStatuses.map((s) {
+                      final selected = _statuses.contains(s);
+                      final color = _statusColors[s] ?? Colors.grey;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _statuses = Set.from(_statuses)..remove(s);
+                          } else {
+                            _statuses = Set.from(_statuses)..add(s);
+                          }
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: selected ? color : Colors.grey.shade300,
+                              width: selected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            _statusLabels[s] ?? s,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: selected ? color : AppTheme.textSecondaryColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Job type
+                  _SheetSection(label: 'Job Type', icon: Icons.bolt_outlined),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _TypeToggle(
+                        label: 'All Types',
+                        selected: _emergencyOnly == null,
+                        color: AppTheme.deepBlue,
+                        onTap: () => setState(() => _emergencyOnly = null),
+                      ),
+                      const SizedBox(width: 8),
+                      _TypeToggle(
+                        label: 'Emergency',
+                        selected: _emergencyOnly == true,
+                        color: Colors.red,
+                        onTap: () => setState(() => _emergencyOnly = true),
+                      ),
+                      const SizedBox(width: 8),
+                      _TypeToggle(
+                        label: 'Regular',
+                        selected: _emergencyOnly == false,
+                        color: AppTheme.lightBlue,
+                        onTap: () => setState(() => _emergencyOnly = false),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Date range
+                  _SheetSection(label: 'Date Range', icon: Icons.calendar_today_outlined),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TechDateButton(
+                          label: _from == null ? 'From date' : DateFormat('MMM d, y').format(_from!),
+                          hasValue: _from != null,
+                          onTap: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: _from ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (d != null) setState(() => _from = d);
+                          },
+                          onClear: _from != null ? () => setState(() => _from = null) : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _TechDateButton(
+                          label: _to == null ? 'To date' : DateFormat('MMM d, y').format(_to!),
+                          hasValue: _to != null,
+                          onTap: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: _to ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (d != null) setState(() => _to = d);
+                          },
+                          onClear: _to != null ? () => setState(() => _to = null) : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Sort
+                  _SheetSection(label: 'Sort Order', icon: Icons.sort),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TechSortChip(
+                          label: 'Newest First',
+                          icon: Icons.arrow_downward,
+                          selected: _sort == _TechSortOrder.newest,
+                          onTap: () => setState(() => _sort = _TechSortOrder.newest),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _TechSortChip(
+                          label: 'Oldest First',
+                          icon: Icons.arrow_upward,
+                          selected: _sort == _TechSortOrder.oldest,
+                          onTap: () => setState(() => _sort = _TechSortOrder.oldest),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Apply
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(
+                        context,
+                        _TechJobFilter(
+                          statuses: _statuses,
+                          fromDate: _from,
+                          toDate: _to,
+                          sort: _sort,
+                          emergencyOnly: _emergencyOnly,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.deepBlue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Apply Filter', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetSection extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _SheetSection({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppTheme.textSecondaryColor),
+        const SizedBox(width: 6),
+        Text(label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryColor,
+            )),
+      ],
+    );
+  }
+}
+
+class _TypeToggle extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TypeToggle({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? color.withValues(alpha: 0.15) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? color : Colors.grey.shade300,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? color : AppTheme.textSecondaryColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TechDateButton extends StatelessWidget {
+  final String label;
+  final bool hasValue;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  const _TechDateButton({
+    required this.label,
+    required this.hasValue,
+    required this.onTap,
+    this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: hasValue ? AppTheme.deepBlue.withValues(alpha: 0.08) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasValue ? AppTheme.deepBlue.withValues(alpha: 0.40) : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today, size: 14,
+                color: hasValue ? AppTheme.deepBlue : AppTheme.textSecondaryColor),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: hasValue ? AppTheme.deepBlue : AppTheme.textSecondaryColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(Icons.close, size: 14, color: Colors.red),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TechSortChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TechSortChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.deepBlue : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? AppTheme.deepBlue : Colors.grey.shade300,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 16, color: selected ? Colors.white : AppTheme.textSecondaryColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppTheme.textSecondaryColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Step button used in the price adjustment bottom sheet
 class _StepButton extends StatelessWidget {

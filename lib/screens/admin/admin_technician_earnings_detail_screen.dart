@@ -156,8 +156,9 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
-              // Note: GCash info will be added to schema in future update
-              // For now, admin can contact technician via phone/email for payment details
+              // Weekly Payout Card
+              _WeeklyPayoutCard(earnings: earnings),
+              const SizedBox(height: 16),
 
               // Earnings summary card
               Container(
@@ -420,6 +421,199 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _WeeklyPayoutCard extends StatelessWidget {
+  final dynamic earnings;
+
+  const _WeeklyPayoutCard({required this.earnings});
+
+  /// Days until next Saturday (0 = today is Saturday)
+  int _daysUntilSaturday() {
+    final now = DateTime.now();
+    // DateTime weekday: Monday=1 ... Saturday=6, Sunday=7
+    final daysUntil = (6 - now.weekday + 7) % 7;
+    return daysUntil;
+  }
+
+  String _nextSaturdayLabel() {
+    final days = _daysUntilSaturday();
+    if (days == 0) return 'Today (Saturday)';
+    if (days == 1) return 'Tomorrow';
+    return 'In $days days';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final weekEarnings = (earnings.weekEarnings as double);
+    final platformFee = weekEarnings * 0.03;
+    final netPayout = weekEarnings - platformFee;
+    final daysLeft = _daysUntilSaturday();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF6C47FF), Color(0xFF9B59B6)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6C47FF).withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.calendar_today, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Weekly Payout',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      daysLeft == 0 ? Icons.check_circle : Icons.schedule,
+                      color: Colors.white,
+                      size: 12,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _nextSaturdayLabel(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              children: [
+                _PayoutRow(
+                  label: 'This Week\'s Earnings',
+                  value: '₱${weekEarnings.toStringAsFixed(2)}',
+                  valueColor: Colors.white,
+                  bold: false,
+                ),
+                const SizedBox(height: 10),
+                _PayoutRow(
+                  label: 'Platform Fee (3%)',
+                  value: '- ₱${platformFee.toStringAsFixed(2)}',
+                  valueColor: Colors.red.shade200,
+                  bold: false,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(color: Colors.white.withValues(alpha: 0.3), height: 1),
+                ),
+                _PayoutRow(
+                  label: 'Net Payout (Saturday)',
+                  value: '₱${netPayout.toStringAsFixed(2)}',
+                  valueColor: Colors.white,
+                  bold: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.white.withValues(alpha: 0.8), size: 13),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Technician receives their weekly total every Saturday minus 3% platform fee.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PayoutRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color valueColor;
+  final bool bold;
+
+  const _PayoutRow({
+    required this.label,
+    required this.value,
+    required this.valueColor,
+    required this.bold,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            color: Colors.white.withValues(alpha: bold ? 1.0 : 0.85),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: bold ? 16 : 13,
+            fontWeight: bold ? FontWeight.w900 : FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
+      ],
     );
   }
 }

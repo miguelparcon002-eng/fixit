@@ -6,10 +6,11 @@ import '../services/admin_notifications_service.dart';
 final adminNotificationsServiceProvider =
     Provider((ref) => AdminNotificationsService());
 
+/// Realtime stream of the system-wide notification feed for admin.
 final adminNotificationsFeedProvider =
-    FutureProvider<List<AppNotification>>((ref) async {
+    StreamProvider<List<AppNotification>>((ref) {
   final svc = ref.watch(adminNotificationsServiceProvider);
-  return svc.listFeed(limit: 50);
+  return svc.watchFeed(limit: 50);
 });
 
 final adminUnreadNotificationsCountProvider = Provider<int>((ref) {

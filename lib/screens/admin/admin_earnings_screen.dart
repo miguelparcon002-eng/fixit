@@ -401,6 +401,43 @@ class _TechnicianEarningsCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                // Weekly payout preview (net after 3% fee)
+                Builder(builder: (_) {
+                  final weekEarnings = technician.weekEarnings as double;
+                  final netPayout = weekEarnings * 0.97;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6C47FF).withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF6C47FF).withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: Color(0xFF6C47FF)),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Sat Payout (after 3% fee):',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6C47FF),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '₱${netPayout.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF6C47FF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ],
             ),
           ),

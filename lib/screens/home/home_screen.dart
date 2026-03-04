@@ -3,17 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/notification_icon_mapper.dart';
+import '../../core/utils/time_ago.dart';
+import '../../models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/voucher_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/booking_model.dart';
 import '../../models/redeemed_voucher.dart';
+import '../../services/notification_service.dart';
 import '../../services/voucher_service.dart';
 import '../profile/rewards_screen.dart';
-import '../services/more_services_screen.dart';
 import 'profile_setup_dialog.dart';
+import '../booking/shop_booking_screen.dart';
 
 // Provider to track if promo has been claimed
 final promoClaimedProvider = StateProvider<bool>((ref) => false);
@@ -397,33 +402,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     color: Colors.white,
                                     size: 26,
                                   ),
-                                  onPressed: () => context.push('/notifications'),
+                                  onPressed: () => _showCustomerNotificationsSheet(context, ref),
                                 ),
-                                Positioned(
-                                  right: 10,
-                                  top: 10,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFF6B6B),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 18,
-                                      minHeight: 18,
-                                    ),
-                                    child: const Text(
-                                      '3',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
+                                Builder(builder: (context) {
+                                  final count = ref.watch(unreadNotificationsCountProvider);
+                                  if (count == 0) return const SizedBox.shrink();
+                                  return Positioned(
+                                    right: 10,
+                                    top: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF6B6B),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 2),
                                       ),
-                                      textAlign: TextAlign.center,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 18,
+                                        minHeight: 18,
+                                      ),
+                                      child: Text(
+                                        count > 9 ? '9+' : '$count',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                }),
                               ],
                             ),
                           ),
@@ -454,63 +463,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           fontSize: 15,
                           color: Colors.white.withValues(alpha: 0.9),
                           fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      
-                      // Search Bar with enhanced design
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Search services or technicians...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 14,
-                            ),
-                            prefixIcon: Container(
-                              padding: const EdgeInsets.all(12),
-                              child: Icon(
-                                Icons.search_rounded,
-                                color: const Color(0xFF4A5FE0),
-                                size: 22,
-                              ),
-                            ),
-                            suffixIcon: Container(
-                              margin: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF6C3CE1), Color(0xFF4A5FE0)],
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.tune_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  // Filter action
-                                },
-                              ),
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                          ),
                         ),
                       ),
                     ],
@@ -674,16 +626,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _CategoryCard(
-                                icon: Icons.build_circle,
-                                title: 'All Services',
-                                subtitle: 'View all',
-                                color: const Color(0xFF17A2B8),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => const MoreServicesScreen()),
-                                  );
-                                },
+                                icon: Icons.rocket_launch_rounded,
+                                title: 'More Coming',
+                                subtitle: 'Coming soon',
+                                color: const Color(0xFF9B59B6),
+                                onTap: () => _showComingSoonSheet(context),
                               ),
                             ),
                           ],
@@ -776,6 +723,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 openTime: '8 AM - 8 PM',
                                 gradientColors: [Color(0xFF667eea), Color(0xFF764ba2)],
                                 isFeatured: true,
+                                shopAddress: '123 Repair St, Quezon City',
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
@@ -789,6 +737,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 openTime: '9 AM - 7 PM',
                                 gradientColors: [Color(0xFF11998e), Color(0xFF38ef7d)],
                                 isFeatured: false,
+                                shopAddress: '45 Power Ave, Makati City',
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
@@ -802,6 +751,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 openTime: 'Opens 9 AM',
                                 gradientColors: [Color(0xFFf093fb), Color(0xFFf5576c)],
                                 isFeatured: true,
+                                shopAddress: '78 Tech Blvd, Mandaluyong',
                               ),
                               const SizedBox(width: 16),
                               const _FeaturedShopCard(
@@ -815,6 +765,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 openTime: '10 AM - 6 PM',
                                 gradientColors: [Color(0xFFfc4a1a), Color(0xFFf7b733)],
                                 isFeatured: false,
+                                shopAddress: '22 Recovery Lane, Pasig City',
                               ),
                             ],
                           ),
@@ -918,11 +869,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               const SizedBox(height: 16),
                               _buildServiceFeature(Icons.phone_android, 'Mobile Phone Repairs', 'Screen, Battery, Camera, Water Damage'),
                               const SizedBox(height: 10),
-                              _buildServiceFeature(Icons.laptop, 'Laptop Repairs', 'Screen, Keyboard, RAM/SSD Upgrades'),
+                              _buildServiceFeature(Icons.laptop, 'Laptop Repairs', 'Screen, Keyboard, Motherboard & Component Repair'),
                               const SizedBox(height: 10),
                               _buildServiceFeature(Icons.verified_user, 'Quality Guarantee', '90-Day Warranty on All Repairs'),
                               const SizedBox(height: 10),
-                              _buildServiceFeature(Icons.schedule, 'Fast Service', 'Same-Day & Emergency Repairs Available'),
+                              _buildServiceFeature(Icons.schedule, 'Fast Service', 'Regular & Emergency Repairs Available'),
                             ],
                           ),
                         ),
@@ -985,6 +936,105 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showComingSoonSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F7FA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF9B59B6), Color(0xFF6C3483)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Coming Soon',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9B59B6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'Future Updates',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'We\'re expanding beyond repairs — more service categories are on the way!',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.9,
+                    children: const [
+                      _ComingSoonCard(icon: Icons.kitchen_rounded, label: 'Home Appliances', color: Color(0xFF2ECC71)),
+                      _ComingSoonCard(icon: Icons.ac_unit_rounded, label: 'Air Conditioning', color: Color(0xFF3498DB)),
+                      _ComingSoonCard(icon: Icons.tv_rounded, label: 'TV & Electronics', color: Color(0xFFE67E22)),
+                      _ComingSoonCard(icon: Icons.directions_car_rounded, label: 'Automotive', color: Color(0xFFE74C3C)),
+                      _ComingSoonCard(icon: Icons.plumbing_rounded, label: 'Plumbing', color: Color(0xFF1ABC9C)),
+                      _ComingSoonCard(icon: Icons.electrical_services_rounded, label: 'Electrical', color: Color(0xFFF39C12)),
+                      _ComingSoonCard(icon: Icons.cleaning_services_rounded, label: 'Cleaning', color: Color(0xFF9B59B6)),
+                      _ComingSoonCard(icon: Icons.carpenter_rounded, label: 'Carpentry', color: Color(0xFF795548)),
+                      _ComingSoonCard(icon: Icons.security_rounded, label: 'CCTV & Security', color: Color(0xFF607D8B)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1292,6 +1342,263 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }).toList(),
     );
   }
+
+  void _showCustomerNotificationsSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _CustomerNotificationsSheet(),
+    );
+  }
+}
+
+class _CustomerNotificationsSheet extends ConsumerWidget {
+  const _CustomerNotificationsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final feedAsync = AsyncData<List<AppNotification>>(
+        ref.watch(filteredNotificationsProvider));
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      builder: (_, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF5F7FA),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (unreadCount > 0)
+                    TextButton(
+                      onPressed: () async {
+                        final user = await ref.read(currentUserProvider.future);
+                        if (user == null) return;
+                        await ref
+                            .read(notificationServiceProvider)
+                            .markAllAsRead(user.id);
+                      },
+                      child: const Text('Mark all read'),
+                    ),
+                ],
+              ),
+            ),
+            if (unreadCount > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: feedAsync.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No notifications yet',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final n = items[index];
+                      return _CustomerNotificationCard(
+                        notification: n,
+                        onTap: () async {
+                          final route = n.route;
+                          if (!n.isRead) {
+                            await ref
+                                .read(notificationServiceProvider)
+                                .markAsRead(n.id);
+                          }
+                          if (route != null && route.isNotEmpty && context.mounted) {
+                            Navigator.of(context).pop();
+                            context.push(route);
+                          }
+                        },
+                        onDismiss: () async {
+                          await ref
+                              .read(notificationServiceProvider)
+                              .deleteNotification(n.id);
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Text(
+                    'Error loading notifications: $e',
+                    style: TextStyle(color: Colors.grey.shade700),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerNotificationCard extends StatelessWidget {
+  final AppNotification notification;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _CustomerNotificationCard({
+    required this.notification,
+    required this.onTap,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final mapped = mapNotificationIcon(notification.type);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: notification.isRead
+              ? Colors.white
+              : AppTheme.primaryCyan.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: notification.isRead
+                ? Colors.grey.shade200
+                : AppTheme.primaryCyan.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: mapped.color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(mapped.icon, color: mapped.color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        if (!notification.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.primaryCyan,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      notification.message,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                            const SizedBox(width: 4),
+                            Text(
+                              timeAgo(notification.createdAt),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                        InkWell(
+                          onTap: onDismiss,
+                          child: Icon(Icons.close, size: 18, color: Colors.grey[400]),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // Category Card Widget
@@ -1390,6 +1697,8 @@ class _FeaturedShopCard extends StatelessWidget {
   final String openTime;
   final List<Color> gradientColors;
   final bool isFeatured;
+  final String shopAddress;
+  final String? technicianId;
 
   const _FeaturedShopCard({
     required this.shopName,
@@ -1402,6 +1711,8 @@ class _FeaturedShopCard extends StatelessWidget {
     required this.openTime,
     required this.gradientColors,
     required this.isFeatured,
+    this.shopAddress = 'Metro Manila, Philippines',
+    this.technicianId,
   });
 
   @override
@@ -1764,7 +2075,18 @@ class _FeaturedShopCard extends StatelessWidget {
                           child: ElevatedButton.icon(
                             onPressed: () {
                               Navigator.pop(context);
-                              context.push('/create-booking');
+                              context.push('/shop-booking', extra: ShopInfo(
+                                shopName: shopName,
+                                ownerName: ownerName,
+                                rating: rating,
+                                reviewCount: reviewCount,
+                                services: services,
+                                openTime: openTime,
+                                isOpen: isOpen,
+                                gradientColors: gradientColors,
+                                shopAddress: shopAddress,
+                                technicianId: technicianId,
+                              ));
                             },
                             icon: const Icon(Icons.build, size: 18),
                             label: const Text('Book Repair'),
@@ -2176,6 +2498,89 @@ class _ModernQuickActionCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ComingSoonCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _ComingSoonCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 26),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF9B59B6),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Soon',
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

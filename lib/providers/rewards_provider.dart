@@ -2,53 +2,48 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/reward.dart';
 import '../models/redeemed_voucher.dart';
 import '../services/redeemed_voucher_service.dart';
-import 'booking_provider.dart';
+import '../core/config/supabase_config.dart';
 import 'auth_provider.dart';
 import '../core/utils/app_logger.dart';
 
 // Service provider
 final redeemedVoucherServiceProvider = Provider((ref) => RedeemedVoucherService());
 
-// FutureProvider to calculate reward points from Supabase bookings
+// FutureProvider to calculate reward points — uses direct REST (no Realtime)
+// to avoid RealtimeSubscribeException timeouts.
 final rewardPointsProvider = FutureProvider<int>((ref) async {
   final user = ref.watch(currentUserProvider).value;
-
   if (user == null) return 0;
 
   try {
-    // Get completed bookings from Supabase for this customer
-    final bookingsAsync = await ref.watch(customerBookingsProvider.future);
-    final completedBookings = bookingsAsync.where((b) => b.status == 'completed').toList();
+    // Direct REST query — no Realtime subscription, no timeout risk
+    final rows = await SupabaseConfig.client
+        .from('bookings')
+        .select('final_cost, estimated_cost')
+        .eq('customer_id', user.id)
+        .eq('status', 'completed');
 
-    // Calculate total points earned from completed bookings
     int earnedPoints = 0;
-
-    for (final booking in completedBookings) {
-      final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
-
-      // Calculate points: 1 point per ₱50 spent
-      final pointsForBooking = (amount / 50).floor();
-      earnedPoints += pointsForBooking;
+    for (final row in rows as List) {
+      final amount = (row['final_cost'] as num?)?.toDouble() ??
+          (row['estimated_cost'] as num?)?.toDouble() ??
+          0.0;
+      earnedPoints += (amount / 50).floor();
     }
 
-    // Get redeemed vouchers to calculate spent points
     final voucherService = ref.watch(redeemedVoucherServiceProvider);
     final redeemedVouchers = await voucherService.getUserRedeemedVouchers(user.id);
 
-    // Calculate total points spent on vouchers
     int spentPoints = 0;
     for (final voucher in redeemedVouchers) {
       spentPoints += voucher.pointsCost;
     }
 
-    // Calculate remaining points
-    final remainingPoints = earnedPoints - spentPoints;
-
-    AppLogger.p('RewardPointsProvider: Earned $earnedPoints points, spent $spentPoints points, remaining $remainingPoints points');
-
-    return remainingPoints > 0 ? remainingPoints : 0;
+    final remaining = earnedPoints - spentPoints;
+    AppLogger.p('RewardPointsProvider: earned=$earnedPoints spent=$spentPoints remaining=$remaining');
+    return remaining > 0 ? remaining : 0;
   } catch (e) {
-    AppLogger.p('RewardPointsProvider: Error calculating points from Supabase - $e');
+    AppLogger.p('RewardPointsProvider: Error calculating points - $e');
     return 0;
   }
 });

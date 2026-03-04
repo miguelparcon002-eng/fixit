@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../core/constants/app_constants.dart';
@@ -166,6 +168,76 @@ class AuthService {
     }
 
     return response;
+  }
+
+  /// Sign in with Google. [role] is only used when creating a brand-new profile
+  /// (first-time Google login). Existing users keep their stored role.
+  Future<UserModel?> signInWithGoogle({required String role}) async {
+    // ── REPLACE THIS WITH YOUR WEB CLIENT ID ──────────────────────────────
+    // Get it from: Google Cloud Console → APIs & Services → Credentials
+    // (the Web OAuth 2.0 Client ID, ends in .apps.googleusercontent.com)
+    const webClientId = '67598934942-6t3v0p8u4he36a8evftfva1nu7hsqffd.apps.googleusercontent.com';
+    // ──────────────────────────────────────────────────────────────────────
+
+    final googleSignIn = kIsWeb
+        ? GoogleSignIn(clientId: webClientId)
+        : GoogleSignIn(serverClientId: webClientId);
+
+    // Sign out first to force the account-picker dialog every time
+    await googleSignIn.signOut();
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) return null; // User cancelled
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken == null) {
+      throw Exception('Google sign-in failed: no ID token received. '
+          'Make sure your Web Client ID is correct and SHA-1 is registered.');
+    }
+
+    AppLogger.p('AuthService: Signing in with Google (role: $role)');
+
+    final response = await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+
+    if (response.user == null) {
+      throw Exception('Supabase Google sign-in failed: no user returned');
+    }
+
+    StorageService.setCurrentUser(response.user!.id);
+
+    // Check if the user already has a profile row
+    final existing = await _supabase
+        .from(DBConstants.users)
+        .select()
+        .eq('id', response.user!.id)
+        .maybeSingle();
+
+    if (existing == null) {
+      // First-time Google login — create profile with the selected role
+      final email = response.user!.email ?? '';
+      final metadata = response.user!.userMetadata ?? {};
+      final fullName = (metadata['full_name'] as String?)
+          ?? (metadata['name'] as String?)
+          ?? email.split('@').first;
+
+      await _createUserProfile(
+        userId: response.user!.id,
+        email: email,
+        fullName: fullName,
+        role: role,
+      );
+
+      AppLogger.p('AuthService: Created new Google profile for $email as $role');
+    }
+
+    return getCurrentUserProfile();
   }
 
   Future<void> signOut() async {

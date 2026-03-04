@@ -19,7 +19,11 @@
       "Bash(wc:*)",
       "Bash(for f in lib/screens/booking/booking_list_screen.dart lib/screens/booking/booking_detail_screen.dart lib/screens/booking/booking_device_details_screen.dart lib/screens/booking/widgets/booking_dialog.dart)",
       "Bash(do echo \"=== $f ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(find /c/Users/ferna/fixit/fixit/lib -name \"*.dart\" -exec grep -l \"google_sign_in\\\\|GoogleSignIn\\\\|oauth\" {} ;)",
+      "Bash(ls -la /c/Users/ferna/fixit/fixit/android/app/*.json)",
+      "Bash(where java)",
+      "Bash(grep -l \"user_addresses\\\\|latitude\\\\|longitude\" c:/Users/ferna/fixit/fixit/*.sql)"
     ],
     "deny": [],
     "ask": []

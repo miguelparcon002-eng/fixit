@@ -4,13 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/notification_icon_mapper.dart';
+import '../../core/utils/time_ago.dart';
 import '../../models/booking_model.dart';
+import '../../models/notification_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../providers/address_provider.dart';
 import 'tech_ratings_screen.dart';
 import 'tech_jobs_screen_new.dart';
+import 'widgets/customer_location_sheet.dart';
 
 // Monthly goal provider - can be updated by technician
 final monthlyGoalProvider = StateProvider<double>((ref) => 50000);
@@ -26,100 +31,12 @@ final techDateFilterProvider = StateProvider<TechDateFilter>(
 class TechHomeScreen extends ConsumerWidget {
   const TechHomeScreen({super.key});
 
-  static void _showNotifications(BuildContext context) {
+  static void _showNotifications(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Notifications',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimaryColor,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Mark all as read',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.lightBlue,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            // Notifications List
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: const [
-                  _NotificationItem(
-                    icon: Icons.assignment,
-                    iconColor: AppTheme.lightBlue,
-                    iconBgColor: Color(0xFFE3F2FD),
-                    title: 'New Job Request',
-                    message:
-                        'You have a new job request from John Doe for iPhone screen repair.',
-                    time: '5 mins ago',
-                    isNew: true,
-                  ),
-                  SizedBox(height: 12),
-                  _NotificationItem(
-                    icon: Icons.check_circle,
-                    iconColor: Colors.green,
-                    iconBgColor: Color(0xFFE8F5E9),
-                    title: 'Payment Received',
-                    message:
-                        'Payment of ₱1,500 has been received for Job #12345.',
-                    time: '1 hour ago',
-                    isNew: true,
-                  ),
-                  SizedBox(height: 12),
-                  _NotificationItem(
-                    icon: Icons.star,
-                    iconColor: Colors.orange,
-                    iconBgColor: Color(0xFFFFF3E0),
-                    title: 'New Review',
-                    message: 'Sarah left you a 5-star review!',
-                    time: '3 hours ago',
-                    isNew: false,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (_) => const _TechNotificationsSheet(),
     );
   }
 
@@ -208,13 +125,45 @@ class TechHomeScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () => _showNotifications(context),
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: AppTheme.deepBlue,
-            ),
+          Builder(
+            builder: (context) {
+              final unread = ref.watch(unreadNotificationsCountProvider);
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    tooltip: 'Notifications',
+                    onPressed: () => _showNotifications(context, ref),
+                    icon: const Icon(
+                      Icons.notifications_outlined,
+                      color: AppTheme.deepBlue,
+                    ),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unread > 9 ? '9+' : '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -1036,111 +985,289 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _NotificationItem extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBgColor;
-  final String title;
-  final String message;
-  final String time;
-  final bool isNew;
+class _TechNotificationsSheet extends ConsumerWidget {
+  const _TechNotificationsSheet();
 
-  const _NotificationItem({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBgColor,
-    required this.title,
-    required this.message,
-    required this.time,
-    required this.isNew,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notificationsAsync = AsyncData<List<AppNotification>>(
+        ref.watch(filteredNotificationsProvider));
+    final unreadCount = ref.watch(unreadNotificationsCountProvider);
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimaryColor,
+                    ),
+                  ),
+                  if (unreadCount > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryCyan,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (unreadCount > 0)
+                    TextButton(
+                      onPressed: () async {
+                        final user = await ref.read(currentUserProvider.future);
+                        if (user == null) return;
+                        await ref
+                            .read(notificationServiceProvider)
+                            .markAllAsRead(user.id);
+                      },
+                      child: const Text('Mark all read'),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            if (unreadCount > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondaryColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            // Notifications list
+            Expanded(
+              child: notificationsAsync.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.notifications_none,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No notifications yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: items.length,
+                    separatorBuilder: (context, i) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final n = items[index];
+                      return _TechNotificationCard(
+                        notification: n,
+                        onTap: () async {
+                          final route = n.route;
+                          if (!n.isRead) {
+                            await ref
+                                .read(notificationServiceProvider)
+                                .markAsRead(n.id);
+                          }
+                          if (route != null && route.isNotEmpty && context.mounted) {
+                            Navigator.of(context).pop();
+                            context.go(route);
+                          }
+                        },
+                        onDismiss: () async {
+                          await ref
+                              .read(notificationServiceProvider)
+                              .deleteNotification(n.id);
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Text(
+                    'Error loading notifications: $e',
+                    style: TextStyle(color: Colors.grey.shade700),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TechNotificationCard extends StatelessWidget {
+  final AppNotification notification;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _TechNotificationCard({
+    required this.notification,
+    required this.onTap,
+    required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isNew
-            ? AppTheme.primaryCyan.withValues(alpha: 0.1)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isNew
-              ? AppTheme.lightBlue.withValues(alpha: 0.3)
-              : Colors.grey.shade200,
-          width: isNew ? 2 : 1,
+    final mapped = mapNotificationIcon(notification.type);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: notification.isRead
+              ? Colors.white
+              : AppTheme.primaryCyan.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: notification.isRead
+                ? Colors.grey.shade200
+                : AppTheme.primaryCyan.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimaryColor,
-                        ),
-                      ),
-                    ),
-                    if (isNew)
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: mapped.color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
+                child: Icon(mapped.icon, color: mapped.color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 14,
-                      color: Colors.grey.shade500,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                        ),
+                        if (!notification.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.primaryCyan,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 6),
                     Text(
-                      time,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
+                      notification.message,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondaryColor,
+                        height: 1.4,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                            const SizedBox(width: 4),
+                            Text(
+                              timeAgo(notification.createdAt),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                        InkWell(
+                          onTap: onDismiss,
+                          child: Icon(Icons.close, size: 18, color: Colors.grey[400]),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1273,6 +1400,38 @@ class _SimpleJobCard extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (booking.customerLatitude != null && booking.customerLongitude != null) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => CustomerLocationSheet(
+                                latitude: booking.customerLatitude!,
+                                longitude: booking.customerLongitude!,
+                                customerName: 'Customer',
+                                address: booking.customerAddress!,
+                              ),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4A5FE0).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFF4A5FE0).withValues(alpha: 0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.map_outlined, size: 12, color: Color(0xFF4A5FE0)),
+                                  SizedBox(width: 3),
+                                  Text('Map', style: TextStyle(fontSize: 10, color: Color(0xFF4A5FE0), fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                 ],

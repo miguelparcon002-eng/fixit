@@ -81,23 +81,13 @@ class AdminNotificationsDialog extends ConsumerWidget {
             if (unreadCount > 0)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: Row(
-                  children: [
-                    Text(
-                      '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () => ref.invalidate(adminNotificationsFeedProvider),
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Refresh'),
-                    ),
-                  ],
+                child: Text(
+                  '$unreadCount new notification${unreadCount > 1 ? 's' : ''}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
 
@@ -150,7 +140,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
                               await ref
                                   .read(adminNotificationsServiceProvider)
                                   .markAsRead(notification.id);
-                              ref.invalidate(adminNotificationsFeedProvider);
                             }
 
                             if (route != null && route.isNotEmpty) {
@@ -161,7 +150,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
                             await ref
                                 .read(adminNotificationsServiceProvider)
                                 .deleteNotification(notification.id);
-                            ref.invalidate(adminNotificationsFeedProvider);
                           },
                         ),
                       );
