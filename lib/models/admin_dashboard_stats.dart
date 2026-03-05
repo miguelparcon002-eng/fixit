@@ -5,6 +5,7 @@ class AdminDashboardStats {
   final int bookingsToday;
   final int totalCustomers;
   final int totalTechnicians;
+  final int pendingPayments;
 
   const AdminDashboardStats({
     required this.pendingVerifications,
@@ -13,5 +14,6 @@ class AdminDashboardStats {
     required this.bookingsToday,
     required this.totalCustomers,
     required this.totalTechnicians,
+    required this.pendingPayments,
   });
 }

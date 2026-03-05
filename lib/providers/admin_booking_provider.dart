@@ -19,3 +19,8 @@ final adminBookingsByTechnicianProvider = FutureProvider.family<List<AdminBookin
   final svc = ref.watch(adminBookingServiceProvider);
   return svc.listBookingsForTechnician(technicianId);
 });
+
+final adminBookingsTodayProvider = FutureProvider<List<AdminBookingView>>((ref) async {
+  final svc = ref.watch(adminBookingServiceProvider);
+  return svc.listBookingsToday();
+});

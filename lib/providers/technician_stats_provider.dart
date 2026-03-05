@@ -38,7 +38,7 @@ class TechnicianStats {
     if (completedJobs == 0) return 'New';
     if (completedJobs < 10) return 'Beginner';
     if (completedJobs < 25) return 'Intermediate';
-    if (completedJobs < 50) return 'Experienced';
+    if (completedJobs < 50) return 'Skilled';
     if (completedJobs < 100) return 'Expert';
     return 'Master';
   }

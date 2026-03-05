@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../core/config/supabase_config.dart';
 import '../models/admin_dashboard_stats.dart';
 
@@ -15,24 +16,43 @@ class AdminDashboardService {
         .eq('status', 'pending');
     final pendingVerifications = (pendingVerificationsRows as List).length;
 
-    // Open support tickets
-    final openTicketsRows = await client
-        .from('support_tickets')
-        .select('id')
-        .inFilter('status', ['open', 'in_progress']);
-    final openSupportTickets = (openTicketsRows as List).length;
+    // Open support tickets (stored as JSON blob in local_storage)
+    int openSupportTickets = 0;
+    try {
+      final ticketsRow = await client
+          .from('local_storage')
+          .select('value')
+          .eq('key', 'support_tickets')
+          .maybeSingle();
+      if (ticketsRow != null && ticketsRow['value'] != null) {
+        final List<dynamic> ticketsList = json.decode(ticketsRow['value'] as String);
+        openSupportTickets = ticketsList.where((t) {
+          final status = t['status'] as String?;
+          return status == 'open' || status == 'in_progress';
+        }).length;
+      }
+    } catch (_) {}
 
     // Total bookings
     final totalBookingsRows = await client.from('bookings').select('id');
     final totalBookings = (totalBookingsRows as List).length;
 
+    // Pending payments: submitted by customer, awaiting admin verification
+    final pendingPaymentsRows = await client
+        .from('payments')
+        .select('id')
+        .eq('status', 'pending_verification');
+    final pendingPayments = (pendingPaymentsRows as List).length;
+
     // Bookings today
     final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day).toUtc();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
     final bookingsTodayRows = await client
         .from('bookings')
         .select('id')
-        .gte('created_at', startOfDay.toIso8601String());
+        .gte('created_at', startOfDay.toIso8601String())
+        .lte('created_at', endOfDay.toIso8601String());
     final bookingsToday = (bookingsTodayRows as List).length;
 
     // Users totals by role
@@ -51,6 +71,7 @@ class AdminDashboardService {
       bookingsToday: bookingsToday,
       totalCustomers: totalCustomers,
       totalTechnicians: totalTechnicians,
+      pendingPayments: pendingPayments,
     );
   }
 }

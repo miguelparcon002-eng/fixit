@@ -66,9 +66,13 @@ final userByIdProvider = FutureProvider.family<UserModel?, String>((ref, userId)
         .select()
         .eq('id', userId)
         .maybeSingle();
+    // ignore: avoid_print
+    print('[userByIdProvider] userId=$userId response=$response');
     if (response == null) return null;
     return UserModel.fromJson(response);
-  } catch (_) {
+  } catch (e) {
+    // ignore: avoid_print
+    print('[userByIdProvider] error for $userId: $e');
     return null;
   }
 });

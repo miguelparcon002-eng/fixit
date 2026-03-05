@@ -18,3 +18,18 @@ final pendingVerificationsProvider = StreamProvider<List<VerificationRequestMode
   final verificationService = ref.watch(verificationServiceProvider);
   return verificationService.watchPendingVerifications();
 });
+
+final resubmitVerificationsProvider = StreamProvider<List<VerificationRequestModel>>((ref) {
+  final svc = ref.watch(verificationServiceProvider);
+  return svc.watchVerificationsByStatus('resubmit');
+});
+
+final rejectedVerificationsProvider = StreamProvider<List<VerificationRequestModel>>((ref) {
+  final svc = ref.watch(verificationServiceProvider);
+  return svc.watchVerificationsByStatus('rejected');
+});
+
+final approvedVerificationsProvider = StreamProvider<List<VerificationRequestModel>>((ref) {
+  final svc = ref.watch(verificationServiceProvider);
+  return svc.watchVerificationsByStatus('approved');
+});

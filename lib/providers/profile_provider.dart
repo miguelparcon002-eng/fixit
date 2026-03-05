@@ -106,6 +106,26 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
     }
   }
 
+  Future<void> updateLocationWithCoords({
+    required String address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final currentData = state.value;
+    if (currentData == null) return;
+
+    try {
+      await _profileService.updateLocationWithCoords(
+        address: address,
+        latitude: latitude,
+        longitude: longitude,
+      );
+      state = AsyncValue.data(currentData.copyWith(location: address));
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
   Future<void> updateBio(String bio) async {
     final currentData = state.value;
     if (currentData == null) return;

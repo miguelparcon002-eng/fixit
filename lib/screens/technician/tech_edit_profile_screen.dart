@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/image_upload_service.dart';
+import '../booking/widgets/location_picker_sheet.dart';
 
 class TechEditProfileScreen extends ConsumerStatefulWidget {
   const TechEditProfileScreen({super.key});
@@ -26,6 +28,9 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
   bool _isLoading = false;
   bool _isUploadingImage = false;
   String? _profileImageUrl;
+
+  // Location picked from map
+  LatLng? _pickedLatLng;
 
   @override
   void initState() {
@@ -142,9 +147,17 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       await ref
           .read(profileProvider.notifier)
           .updatePhone(_phoneController.text.trim());
-      await ref
-          .read(profileProvider.notifier)
-          .updateLocation(_locationController.text.trim());
+      if (_pickedLatLng != null) {
+        await ref.read(profileProvider.notifier).updateLocationWithCoords(
+              address: _locationController.text.trim(),
+              latitude: _pickedLatLng!.latitude,
+              longitude: _pickedLatLng!.longitude,
+            );
+      } else {
+        await ref
+            .read(profileProvider.notifier)
+            .updateLocation(_locationController.text.trim());
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -380,17 +393,7 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
                               },
                             ),
                             const SizedBox(height: 14),
-                            _buildTextField(
-                              controller: _locationController,
-                              label: 'Location',
-                              icon: Icons.location_on_outlined,
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your location';
-                                }
-                                return null;
-                              },
-                            ),
+                            _buildLocationPicker(context),
                           ],
                         ),
                       ),
@@ -475,6 +478,101 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Future<void> _openMapPicker(BuildContext context) async {
+    final userAsync = ref.read(currentUserProvider);
+    final user = userAsync.value;
+    final initial = (user?.latitude != null && user?.longitude != null)
+        ? LatLng(user!.latitude!, user.longitude!)
+        : _pickedLatLng;
+
+    final result = await showModalBottomSheet<PickedLocation>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => LocationPickerSheet(initialLocation: initial),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _pickedLatLng = result.latLng;
+        _locationController.text = result.label;
+      });
+    }
+  }
+
+  Widget _buildLocationPicker(BuildContext context) {
+    final hasLocation = _locationController.text.isNotEmpty;
+    final isPinned = _pickedLatLng != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => _openMapPicker(context),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(
+                color: isPinned ? AppTheme.deepBlue : Colors.grey.shade400,
+                width: isPinned ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on_outlined,
+                  color: isPinned ? AppTheme.deepBlue : Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Location',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isPinned ? AppTheme.deepBlue : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasLocation ? _locationController.text : 'Tap to set on map',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: hasLocation
+                              ? AppTheme.textPrimaryColor
+                              : Colors.grey.shade500,
+                          fontStyle: hasLocation ? FontStyle.normal : FontStyle.italic,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  isPinned ? Icons.check_circle : Icons.map_outlined,
+                  color: isPinned ? Colors.green : AppTheme.deepBlue,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isPinned)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              'Location pinned on map',
+              style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+            ),
+          ),
+      ],
     );
   }
 

@@ -54,6 +54,7 @@ import '../../screens/profile/submit_support_ticket_screen.dart';
 import '../../screens/profile/my_tickets_screen.dart';
 import '../../screens/profile/customer_ticket_detail_screen.dart';
 import '../../screens/admin/admin_customers_screen.dart';
+import '../../screens/admin/admin_users_screen.dart';
 import '../../screens/admin/admin_customer_detail_screen.dart';
 import '../../screens/admin/admin_payment_settings_screen.dart';
 import '../../screens/admin/admin_feedback_screen.dart';
@@ -324,6 +325,11 @@ class AppRouter {
             path: '/admin-technicians',
             name: 'adminTechnicians',
             builder: (context, state) => const AdminTechniciansScreen(),
+          ),
+          GoRoute(
+            path: '/admin-users',
+            name: 'adminUsers',
+            builder: (context, state) => const AdminUsersScreen(),
           ),
           GoRoute(
             path: '/admin-reviews',

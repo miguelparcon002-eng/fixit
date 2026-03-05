@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -46,13 +48,6 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Edit profile',
-            onPressed: () => context.go('/tech-edit-profile'),
-            icon: const Icon(Icons.edit_rounded, color: AppTheme.deepBlue),
-          ),
-        ],
       ),
       body: SafeArea(
         bottom: false,
@@ -376,7 +371,7 @@ class _StatsCards extends ConsumerWidget {
       'New': 0,
       'Beginner': 1,
       'Intermediate': 2,
-      'Experienced': 3,
+      'Skilled': 3,
       'Expert': 4,
       'Master': 5,
     };
@@ -386,7 +381,7 @@ class _StatsCards extends ConsumerWidget {
       'New': 0,
       'Beginner': 1,
       'Intermediate': 10,
-      'Experienced': 25,
+      'Skilled': 25,
       'Expert': 50,
       'Master': 100,
     };
@@ -696,6 +691,9 @@ class _PersonalInfoCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
+    final userAsync = ref.watch(currentUserProvider);
+    final lat = userAsync.value?.latitude;
+    final lng = userAsync.value?.longitude;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -756,8 +754,36 @@ class _PersonalInfoCard extends ConsumerWidget {
               icon: Icons.location_on,
               iconColor: Colors.purple,
               label: 'Location',
-              value: profile.location,
+              value: profile.location.isNotEmpty ? profile.location : 'Not set',
             ),
+            if (lat != null && lng != null) ...[
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _showPinnedLocationMap(context, lat, lng),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.purple.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.pin_drop, size: 14, color: Colors.purple),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Pinned: ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                        style: const TextStyle(fontSize: 12, color: Colors.purple),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.open_in_new, size: 12, color: Colors.purple),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             _InfoRow(
               icon: Icons.calendar_today,
@@ -820,6 +846,90 @@ class _PersonalInfoCard extends ConsumerWidget {
               iconColor: Colors.orange,
               label: 'Member Since',
               value: 'January 2022',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPinnedLocationMap(BuildContext context, double lat, double lng) {
+    final point = LatLng(lat, lng);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.55,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Icon(Icons.pin_drop, color: Colors.purple),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Pinned Location',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        Text('${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: point,
+                    initialZoom: 15.0,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.fixit',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: point,
+                          width: 48,
+                          height: 48,
+                          child: const Icon(Icons.location_pin, size: 48, color: Colors.purple),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -903,34 +1013,36 @@ class _BioCard extends ConsumerWidget {
           ),
         ],
       ),
-      child: profileAsync.when(
-        data: (profile) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'About Me',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'About Me',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryColor,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showBioDialog(context, ref, profile.bio ?? ''),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
-                    foregroundColor: AppTheme.lightBlue,
-                    padding: const EdgeInsets.all(8),
-                  ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 20),
+                onPressed: profileAsync.value == null
+                    ? null
+                    : () => _showBioDialog(context, ref, profileAsync.value!.bio ?? ''),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
+                  foregroundColor: AppTheme.lightBlue,
+                  padding: const EdgeInsets.all(8),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          profileAsync.when(
+            data: (profile) => Text(
               (profile.bio != null && profile.bio!.isNotEmpty)
                   ? profile.bio!
                   : 'No description yet. Tap edit to add a short bio so customers know more about you.',
@@ -945,22 +1057,11 @@ class _BioCard extends ConsumerWidget {
                     : FontStyle.italic,
               ),
             ),
-          ],
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'About Me',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimaryColor,
-              ),
+            loading: () => Text(
+              'Loading…',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
             ),
-            const SizedBox(height: 12),
-            Text(
+            error: (e, s) => Text(
               'No description yet.',
               style: TextStyle(
                 fontSize: 14,
@@ -968,8 +1069,8 @@ class _BioCard extends ConsumerWidget {
                 fontStyle: FontStyle.italic,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1096,97 +1197,67 @@ class _SpecialtiesCard extends ConsumerWidget {
           ),
         ],
       ),
-      child: profileAsync.when(
-        data: (profile) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Specialties',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Specialties',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryColor,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showSpecialtiesDialog(context, ref, profile.specialties),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
-                    foregroundColor: AppTheme.lightBlue,
-                    padding: const EdgeInsets.all(8),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (profile.specialties.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'No specialties selected',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: profile.specialties
-                    .map((specialty) => _SpecialtyChip(label: specialty, isSelected: true))
-                    .toList(),
               ),
-          ],
-        ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Specialties',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimaryColor,
-                  ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 20),
+                onPressed: profileAsync.value == null
+                    ? null
+                    : () => _showSpecialtiesDialog(context, ref, profileAsync.value!.specialties),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
+                  foregroundColor: AppTheme.lightBlue,
+                  padding: const EdgeInsets.all(8),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => _showSpecialtiesDialog(context, ref, []),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.lightBlue.withValues(alpha: 0.1),
-                    foregroundColor: AppTheme.lightBlue,
-                    padding: const EdgeInsets.all(8),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          profileAsync.when(
+            data: (profile) => profile.specialties.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No specialties selected',
+                        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      ),
+                    ),
+                  )
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: profile.specialties
+                        .map((s) => _SpecialtyChip(label: s, isSelected: true))
+                        .toList(),
                   ),
-                ),
-              ],
+            loading: () => Text(
+              'Loading…',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
             ),
-            const SizedBox(height: 12),
-            Center(
+            error: (e, s) => Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No specialties selected',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

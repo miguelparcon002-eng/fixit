@@ -53,12 +53,12 @@ class _AdminNavigationState extends State<AdminNavigation> {
                 },
               ),
               _NavItem(
-                icon: Icons.engineering,
-                label: 'Technician',
+                icon: Icons.people_rounded,
+                label: 'Users',
                 isSelected: _currentIndex == 2,
                 onTap: () {
                   setState(() => _currentIndex = 2);
-                  context.go('/admin-technicians');
+                  context.go('/admin-users');
                 },
               ),
               _NavItem(

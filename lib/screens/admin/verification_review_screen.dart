@@ -14,99 +14,268 @@ class VerificationReviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
     final pendingAsync = ref.watch(pendingVerificationsProvider);
+    final resubmitAsync = ref.watch(resubmitVerificationsProvider);
+    final rejectedAsync = ref.watch(rejectedVerificationsProvider);
+    final approvedAsync = ref.watch(approvedVerificationsProvider);
 
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.textPrimaryColor,
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/admin-home');
-            }
-          },
-        ),
-        title: const Text(
-          'Verification Requests',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(pendingVerificationsProvider),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey.shade200),
-        ),
-      ),
-      body: pendingAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Error loading requests:\n$e',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade700),
-            ),
-          ),
-        ),
-        data: (requests) {
-          if (requests.isEmpty) {
-            return Center(
-              child: Text(
-                'No pending verification requests',
-                style: TextStyle(color: Colors.grey.shade700),
-              ),
-            );
-          }
+    final pendingCount = pendingAsync.valueOrNull?.length ?? 0;
+    final resubmitCount = resubmitAsync.valueOrNull?.length ?? 0;
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: requests.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final req = requests[index];
-              return _VerificationCard(
-                request: req,
-                onTap: () async {
-                  final admin = userAsync.valueOrNull;
-                  if (admin == null) return;
-                  if (!context.mounted) return;
+    void openDetails(VerificationRequestModel req) async {
+      final admin = userAsync.valueOrNull;
+      if (admin == null) return;
+      if (!context.mounted) return;
+      await showModalBottomSheet(
+        context: context,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => _VerificationDetailsSheet(
+          request: req,
+          adminId: admin.id,
+        ),
+      );
+    }
 
-                  await showModalBottomSheet(
-                    context: context,
-                    showDragHandle: true,
-                    isScrollControlled: true,
-                    builder: (_) => _VerificationDetailsSheet(
-                      request: req,
-                      adminId: admin.id,
-                    ),
-                  );
-                },
-              );
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.textPrimaryColor,
+          elevation: 0,
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/admin-home');
+              }
             },
-          );
-        },
+          ),
+          title: const Text(
+            'Verification Requests',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ref.invalidate(pendingVerificationsProvider);
+                ref.invalidate(resubmitVerificationsProvider);
+                ref.invalidate(rejectedVerificationsProvider);
+                ref.invalidate(approvedVerificationsProvider);
+              },
+            ),
+          ],
+          bottom: TabBar(
+            labelColor: AppTheme.primaryCyan,
+            unselectedLabelColor: AppTheme.textSecondaryColor,
+            indicatorColor: AppTheme.primaryCyan,
+            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: const TextStyle(fontSize: 12),
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Pending'),
+                    if (pendingCount > 0) ...[
+                      const SizedBox(width: 5),
+                      _TabBadge(count: pendingCount, color: Colors.orange),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Resubmit'),
+                    if (resubmitCount > 0) ...[
+                      const SizedBox(width: 5),
+                      _TabBadge(count: resubmitCount, color: AppTheme.lightBlue),
+                    ],
+                  ],
+                ),
+              ),
+              const Tab(text: 'Rejected'),
+              const Tab(text: 'Approved'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _VerificationList(
+              asyncData: pendingAsync,
+              emptyMessage: 'No pending verification requests',
+              emptyIcon: Icons.pending_actions_rounded,
+              emptyColor: Colors.orange,
+              statusLabel: 'Pending',
+              statusColor: Colors.orange,
+              showActions: true,
+              onTap: openDetails,
+            ),
+            _VerificationList(
+              asyncData: resubmitAsync,
+              emptyMessage: 'No resubmission requests',
+              emptyIcon: Icons.replay_rounded,
+              emptyColor: AppTheme.lightBlue,
+              statusLabel: 'Resubmit',
+              statusColor: AppTheme.lightBlue,
+              showActions: true,
+              onTap: openDetails,
+            ),
+            _VerificationList(
+              asyncData: rejectedAsync,
+              emptyMessage: 'No rejected requests',
+              emptyIcon: Icons.cancel_rounded,
+              emptyColor: Colors.red,
+              statusLabel: 'Rejected',
+              statusColor: Colors.red,
+              showActions: false,
+              onTap: openDetails,
+            ),
+            _VerificationList(
+              asyncData: approvedAsync,
+              emptyMessage: 'No approved requests',
+              emptyIcon: Icons.verified_rounded,
+              emptyColor: AppTheme.successColor,
+              statusLabel: 'Approved',
+              statusColor: AppTheme.successColor,
+              showActions: false,
+              onTap: openDetails,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _TabBadge extends StatelessWidget {
+  final int count;
+  final Color color;
+  const _TabBadge({required this.count, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _VerificationList extends StatelessWidget {
+  final AsyncValue<List<VerificationRequestModel>> asyncData;
+  final String emptyMessage;
+  final IconData emptyIcon;
+  final Color emptyColor;
+  final String statusLabel;
+  final Color statusColor;
+  final bool showActions;
+  final void Function(VerificationRequestModel) onTap;
+
+  const _VerificationList({
+    required this.asyncData,
+    required this.emptyMessage,
+    required this.emptyIcon,
+    required this.emptyColor,
+    required this.statusLabel,
+    required this.statusColor,
+    required this.showActions,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return asyncData.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Error loading requests:\n$e',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+        ),
+      ),
+      data: (requests) {
+        if (requests.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(emptyIcon, size: 48,
+                    color: emptyColor.withValues(alpha: 0.4)),
+                const SizedBox(height: 12),
+                Text(
+                  emptyMessage,
+                  style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: requests.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final req = requests[index];
+            return _VerificationCard(
+              request: req,
+              statusLabel: statusLabel,
+              statusColor: statusColor,
+              showActions: showActions,
+              onTap: () => onTap(req),
+            );
+          },
+        );
+      },
     );
   }
 }
 
 class _VerificationCard extends StatelessWidget {
   final VerificationRequestModel request;
+  final String statusLabel;
+  final Color statusColor;
+  final bool showActions;
   final VoidCallback onTap;
 
-  const _VerificationCard({required this.request, required this.onTap});
+  const _VerificationCard({
+    required this.request,
+    required this.statusLabel,
+    required this.statusColor,
+    required this.showActions,
+    required this.onTap,
+  });
+
+  String _formatDate(DateTime dt) {
+    final local = dt.toLocal();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,10 +301,10 @@ class _VerificationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.12),
+                color: statusColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.verified_user, color: Colors.orange),
+              child: Icon(Icons.verified_user, color: statusColor),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -150,27 +319,67 @@ class _VerificationCard extends StatelessWidget {
                       color: AppTheme.textPrimaryColor,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
-                    'Submitted: ${request.submittedAt.toLocal()}',
+                    'Submitted: ${_formatDate(request.submittedAt)}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondaryColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${request.documents.length} document(s)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondaryColor,
-                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '${request.documents.length} doc(s)',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondaryColor,
+                        ),
+                      ),
+                      if (request.adminNotes != null && request.adminNotes!.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Note: ${request.adminNotes}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: statusColor,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
+              ],
+            ),
           ],
         ),
       ),

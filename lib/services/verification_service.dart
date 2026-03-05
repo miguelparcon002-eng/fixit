@@ -222,4 +222,13 @@ class VerificationService {
         .order('submitted_at', ascending: true)
         .map((data) => data.map((e) => VerificationRequestModel.fromJson(e)).toList());
   }
+
+  Stream<List<VerificationRequestModel>> watchVerificationsByStatus(String status) {
+    return _supabase
+        .from(DBConstants.verificationRequests)
+        .stream(primaryKey: ['id'])
+        .eq('status', status)
+        .order('submitted_at', ascending: false)
+        .map((data) => data.map((e) => VerificationRequestModel.fromJson(e)).toList());
+  }
 }

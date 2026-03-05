@@ -21,6 +21,8 @@ class BookingDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Load booking by ID so this screen works for both Customers and Technicians.
     final bookingAsync = ref.watch(bookingByIdProvider(bookingId));
+    final currentUser = ref.watch(currentUserProvider).value;
+    final isTechnician = currentUser?.role == 'technician';
 
     return bookingAsync.when(
       loading: () => Scaffold(
@@ -87,6 +89,9 @@ class BookingDetailScreen extends ConsumerWidget {
           );
         }
 
+        if (isTechnician) {
+          return _TechBookingDetailView(booking: booking);
+        }
         return _BookingDetailView(booking: booking);
       },
     );
@@ -873,3 +878,448 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+// ─── Technician-specific booking detail view ───────────────────────────────
+
+class _TechBookingDetailView extends ConsumerStatefulWidget {
+  final BookingModel booking;
+  const _TechBookingDetailView({required this.booking});
+
+  @override
+  ConsumerState<_TechBookingDetailView> createState() => _TechBookingDetailViewState();
+}
+
+class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> {
+  bool _isLoading = false;
+
+  BookingModel get booking => widget.booking;
+
+  Future<void> _updateStatus(String newStatus) async {
+    setState(() => _isLoading = true);
+    try {
+      final bookingService = ref.read(bookingServiceProvider);
+      await bookingService.updateBookingStatus(
+        bookingId: booking.id,
+        status: newStatus,
+      );
+      ref.invalidate(bookingByIdProvider(booking.id));
+      ref.invalidate(technicianBookingsProvider);
+      if (!mounted) return;
+      final labels = {
+        'in_progress': 'Job started!',
+        'completed': 'Job marked as completed!',
+        'cancelled': 'Job declined.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(labels[newStatus] ?? 'Status updated.'),
+          backgroundColor: newStatus == 'cancelled' ? Colors.red : AppTheme.successColor,
+        ),
+      );
+      if (newStatus == 'cancelled' || newStatus == 'completed') context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final timeFormat = DateFormat('h:mm a');
+    final bookingDate = booking.scheduledDate != null
+        ? dateFormat.format(booking.scheduledDate!)
+        : 'Not scheduled';
+    final bookingTime = booking.scheduledDate != null
+        ? timeFormat.format(booking.scheduledDate!)
+        : 'Not scheduled';
+
+    final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
+    final location = booking.customerAddress ?? 'No address provided';
+    final estimatedCost = booking.estimatedCost ?? 0.0;
+    final finalCost = booking.finalCost ?? estimatedCost;
+
+    Color statusColor;
+    switch (booking.status.toLowerCase()) {
+      case 'requested':
+        statusColor = Colors.orange;
+        break;
+      case 'accepted':
+      case 'scheduled':
+        statusColor = AppTheme.lightBlue;
+        break;
+      case 'in_progress':
+      case 'ongoing':
+        statusColor = AppTheme.accentPurple;
+        break;
+      case 'completed':
+        statusColor = Colors.green;
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
+
+    final customerUserAsync = ref.watch(userByIdProvider(booking.customerId));
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          'Job #${booking.id.substring(0, 8)}',
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Status banner
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        booking.status.toUpperCase().replaceAll('_', ' '),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Customer Info
+                  _SectionCard(
+                    title: 'Customer',
+                    children: [
+                      customerUserAsync.when(
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => const _InfoRow(icon: Icons.person, label: 'Customer', value: 'Unknown'),
+                        data: (user) => Column(
+                          children: [
+                            _InfoRow(
+                              icon: Icons.person,
+                              label: 'Name',
+                              value: user?.fullName ?? 'Unknown',
+                            ),
+                            if (user?.contactNumber != null) ...[
+                              const SizedBox(height: 12),
+                              _InfoRow(
+                                icon: Icons.phone,
+                                label: 'Contact',
+                                value: user!.contactNumber!,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () => launchUrl(Uri(scheme: 'tel', path: user.contactNumber)),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: AppTheme.deepBlue.withValues(alpha: 0.3)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.call, size: 13, color: AppTheme.deepBlue),
+                                            SizedBox(width: 4),
+                                            Text('Call', style: TextStyle(fontSize: 11, color: AppTheme.deepBlue, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () => launchUrl(Uri(scheme: 'sms', path: user.contactNumber)),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.sms, size: 13, color: Colors.green),
+                                            SizedBox(width: 4),
+                                            Text('SMS', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Device Details
+                  _SectionCard(
+                    title: 'Device Details',
+                    trailing: TextButton.icon(
+                      onPressed: () => context.push('/booking/${booking.id}/device'),
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      label: const Text('View'),
+                    ),
+                    children: [
+                      _InfoRow(
+                        icon: Icons.devices,
+                        label: 'Device Type',
+                        value: parsedNotes.device ?? 'Not specified',
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(
+                        icon: Icons.phone_iphone,
+                        label: 'Model',
+                        value: parsedNotes.model ?? 'Not specified',
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(
+                        icon: Icons.report_problem_outlined,
+                        label: 'Problem',
+                        value: parsedNotes.problem ?? 'Not specified',
+                      ),
+                      if (parsedNotes.details != null && parsedNotes.details!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _InfoRow(
+                          icon: Icons.notes_rounded,
+                          label: 'Notes',
+                          value: parsedNotes.details!.trim(),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Booking Information
+                  _SectionCard(
+                    title: 'Booking Information',
+                    children: [
+                      _InfoRow(
+                        icon: Icons.calendar_today,
+                        label: 'Scheduled Date',
+                        value: bookingDate,
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(
+                        icon: Icons.access_time,
+                        label: 'Scheduled Time',
+                        value: bookingTime,
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(
+                        icon: Icons.location_on,
+                        label: 'Service Location',
+                        value: location,
+                        trailing: (booking.customerLatitude != null && booking.customerLongitude != null)
+                            ? GestureDetector(
+                                onTap: () {
+                                  final customerUser = ref.read(userByIdProvider(booking.customerId)).value;
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => CustomerLocationSheet(
+                                      latitude: booking.customerLatitude!,
+                                      longitude: booking.customerLongitude!,
+                                      customerName: customerUser?.fullName ?? 'Customer',
+                                      address: location,
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4A5FE0).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF4A5FE0).withValues(alpha: 0.3)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.map_outlined, size: 13, color: Color(0xFF4A5FE0)),
+                                      SizedBox(width: 4),
+                                      Text('Map', style: TextStyle(fontSize: 11, color: Color(0xFF4A5FE0), fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                      if (booking.isEmergency) ...[
+                        const SizedBox(height: 12),
+                        const _InfoRow(
+                          icon: Icons.warning_amber_rounded,
+                          label: 'Priority',
+                          value: 'Emergency',
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Payment
+                  _SectionCard(
+                    title: 'Payment',
+                    children: [
+                      _InfoRow(
+                        icon: booking.paymentMethod == 'gcash'
+                            ? Icons.phone_android_rounded
+                            : Icons.payments_rounded,
+                        label: 'Method',
+                        value: booking.paymentMethod == 'gcash'
+                            ? 'GCash'
+                            : booking.paymentMethod == 'cash'
+                                ? 'Cash'
+                                : booking.paymentMethod ?? '—',
+                      ),
+                      const SizedBox(height: 12),
+                      _InfoRow(
+                        icon: Icons.receipt_outlined,
+                        label: 'Payment Status',
+                        value: booking.paymentStatus ?? '—',
+                      ),
+                      if (estimatedCost > 0) ...[
+                        const SizedBox(height: 12),
+                        _InfoRow(
+                          icon: Icons.calculate_outlined,
+                          label: 'Estimated Amount',
+                          value: '₱${estimatedCost.toStringAsFixed(2)}',
+                        ),
+                      ],
+                      if (booking.paymentStatus == 'completed') ...[
+                        if (booking.finalCost != null && booking.finalCost != estimatedCost && estimatedCost > 0) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                finalCost > estimatedCost ? 'Price Increase' : 'Discount',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${finalCost > estimatedCost ? '+' : '-'} ₱${(finalCost - estimatedCost).abs().toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Divider(color: Colors.grey.shade300, height: 1),
+                        ],
+                        const SizedBox(height: 12),
+                        _InfoRow(
+                          icon: Icons.price_check,
+                          label: 'Final Amount',
+                          value: '₱${finalCost.toStringAsFixed(2)}',
+                          valueStyle: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.deepBlue,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Action buttons based on status
+                  if (booking.status == 'requested') ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _updateStatus('cancelled'),
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            label: const Text('Decline', style: TextStyle(color: Colors.red)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(color: Colors.red, width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _updateStatus('in_progress'),
+                            icon: const Icon(Icons.check),
+                            label: const Text('Accept'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.deepBlue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else if (booking.status == 'in_progress') ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: booking.paymentStatus == 'completed'
+                            ? () => _updateStatus('completed')
+                            : null,
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: Text(
+                          booking.paymentStatus == 'completed'
+                              ? 'Mark as Completed'
+                              : 'Awaiting Payment to Complete',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.successColor,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+}

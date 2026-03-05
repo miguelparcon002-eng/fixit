@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
@@ -23,7 +22,7 @@ class AdminAppointmentsScreen extends ConsumerStatefulWidget {
       _AdminAppointmentsScreenState();
 }
 
-enum _TimeRange { day, week, month }
+enum _TimeRange { all, day, week, month }
 
 class _AdminAppointmentsScreenState
     extends ConsumerState<AdminAppointmentsScreen> {
@@ -37,6 +36,7 @@ class _AdminAppointmentsScreenState
     final s = (widget.initialStatus ?? '').toLowerCase();
 
     if (r.isNotEmpty) {
+      if (r == 'all') _timeRange = _TimeRange.all;
       if (r == 'day') _timeRange = _TimeRange.day;
       if (r == 'week') _timeRange = _TimeRange.week;
       if (r == 'month') _timeRange = _TimeRange.month;
@@ -54,7 +54,7 @@ class _AdminAppointmentsScreenState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'all'; // all, requested, in_progress, completed, cancelled
-  _TimeRange _timeRange = _TimeRange.week;
+  _TimeRange _timeRange = _TimeRange.all;
 
   String _shortBookingCode(String id) {
     final compact = id.replaceAll('-', '');
@@ -65,6 +65,8 @@ class _AdminAppointmentsScreenState
   bool _matchesTimeRange(DateTime createdAt) {
     final now = DateTime.now();
     switch (_timeRange) {
+      case _TimeRange.all:
+        return true;
       case _TimeRange.day:
         return createdAt.year == now.year &&
             createdAt.month == now.month &&
@@ -88,10 +90,6 @@ class _AdminAppointmentsScreenState
       builder: (ctx) => _BookingDetailSheet(
         item: item,
         shortCode: _shortBookingCode(item.booking.id),
-        onOpenFull: () {
-          Navigator.of(ctx).pop();
-          context.go('/booking/${item.booking.id}');
-        },
       ),
     );
   }
@@ -206,6 +204,15 @@ class _AdminAppointmentsScreenState
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   _PeriodOption(
+                                    label: 'All',
+                                    isSelected: _timeRange == _TimeRange.all,
+                                    onTap: () {
+                                      setState(() => _timeRange = _TimeRange.all);
+                                      Navigator.of(dialogContext).pop();
+                                    },
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _PeriodOption(
                                     label: 'Day',
                                     isSelected: _timeRange == _TimeRange.day,
                                     onTap: () {
@@ -239,7 +246,7 @@ class _AdminAppointmentsScreenState
                       },
                       icon: const Icon(Icons.date_range_outlined),
                       label: Text(
-                        'Range: ${_timeRange == _TimeRange.day ? 'Day' : _timeRange == _TimeRange.week ? 'Week' : 'Month'}',
+                        'Range: ${_timeRange == _TimeRange.all ? 'All' : _timeRange == _TimeRange.day ? 'Day' : _timeRange == _TimeRange.week ? 'Week' : 'Month'}',
                       ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.textPrimaryColor,
@@ -597,7 +604,7 @@ class _AppointmentCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Service: ${item.serviceName}',
+                    booking.isEmergency ? 'Emergency Repair' : 'Regular Repair',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppTheme.textSecondaryColor,
@@ -749,12 +756,10 @@ class _InfoPill extends StatelessWidget {
 class _BookingDetailSheet extends StatefulWidget {
   final AdminBookingView item;
   final String shortCode;
-  final VoidCallback onOpenFull;
 
   const _BookingDetailSheet({
     required this.item,
     required this.shortCode,
-    required this.onOpenFull,
   });
 
   @override
@@ -865,7 +870,10 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 children: [
                   _DetailsRow(label: 'Customer', value: widget.item.customerName),
                   _DetailsRow(label: 'Technician', value: widget.item.technicianName),
-                  _DetailsRow(label: 'Service', value: widget.item.serviceName),
+                  _DetailsRow(
+                    label: 'Service',
+                    value: booking.isEmergency ? 'Emergency Repair' : 'Regular Repair',
+                  ),
                   _DetailsRow(
                     label: 'Cost',
                     value: cost != null ? '₱${(cost as num).toStringAsFixed(2)}' : '—',
@@ -1004,28 +1012,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
               ],
 
               const SizedBox(height: 20),
-
-              // ── Action button ──────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: widget.onOpenFull,
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('Open Full Booking'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.deepBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         );

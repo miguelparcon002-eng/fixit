@@ -13,6 +13,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/technician_provider.dart';
 import 'tech_ratings_screen.dart';
 import 'tech_jobs_screen_new.dart';
 import 'widgets/customer_location_sheet.dart';
@@ -28,6 +29,12 @@ final techDateFilterProvider = StateProvider<TechDateFilter>(
   (ref) => TechDateFilter.today,
 );
 
+enum CompletionRateFilter { day, week, month, all }
+
+final completionRateFilterProvider = StateProvider<CompletionRateFilter>(
+  (ref) => CompletionRateFilter.day,
+);
+
 class TechHomeScreen extends ConsumerWidget {
   const TechHomeScreen({super.key});
 
@@ -40,12 +47,20 @@ class TechHomeScreen extends ConsumerWidget {
     );
   }
 
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get current user data
     final userAsync = ref.watch(currentUserProvider);
     final userName =
         userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
+    final currentUserId = userAsync.whenOrNull(data: (u) => u?.id);
+
+    // Use the stable userId-keyed notifier that seeds itself from DB once.
+    final isAvailable = currentUserId != null
+        ? (ref.watch(techAvailabilityProviderFamily(currentUserId))
+            .valueOrNull ?? true)
+        : true;
 
     // Use saved addresses (same mechanism customers use) so technicians also
     // see/manage their real "default address".
@@ -183,7 +198,7 @@ class TechHomeScreen extends ConsumerWidget {
           ),
         ),
         data: (allBookings) {
-          // Filter bookings based on selected date range
+          // Filter by scheduledDate for active/completed/earnings cards (unchanged behaviour).
           final filteredBookings = allBookings.where((booking) {
             if (booking.scheduledDate == null) return false;
             final bookingDate = booking.scheduledDate!;
@@ -193,14 +208,15 @@ class TechHomeScreen extends ConsumerWidget {
                 bookingDate.isBefore(endDate);
           }).toList();
 
-          // Calculate stats based on filtered bookings
-          final techScheduledCount = filteredBookings
-              .where(
-                (booking) =>
-                    booking.status == 'requested' ||
-                    booking.status == 'accepted',
-              )
+          // Job Requests count uses createdAt so brand-new requests appear immediately,
+          // even when the customer picked a future repair date.
+          final techScheduledCount = allBookings
+              .where((booking) =>
+                  (booking.status == 'requested' || booking.status == 'accepted') &&
+                  booking.createdAt.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
+                  booking.createdAt.isBefore(endDate))
               .length;
+
           final techActiveCount = filteredBookings
               .where((booking) => booking.status == 'in_progress')
               .length;
@@ -255,11 +271,37 @@ class TechHomeScreen extends ConsumerWidget {
                     .toDouble()
               : (techCompletedCount > 0 ? 100.0 : 0.0);
 
-          // Calculate completion rate
-          final totalJobsInPeriod = filteredBookings.length;
-          final completionRate = totalJobsInPeriod > 0
-              ? (techCompletedCount / totalJobsInPeriod * 100).toDouble()
-              : 0.0;
+
+          // Completion rate with its own independent filter
+          final crFilter = ref.watch(completionRateFilterProvider);
+          DateTime crStart;
+          DateTime crEnd = now;
+          switch (crFilter) {
+            case CompletionRateFilter.day:
+              crStart = todayStart;
+              crEnd = todayStart.add(const Duration(days: 1));
+              break;
+            case CompletionRateFilter.week:
+              crStart = todayStart.subtract(Duration(days: todayStart.weekday - 1));
+              crEnd = crStart.add(const Duration(days: 7));
+              break;
+            case CompletionRateFilter.month:
+              crStart = DateTime(now.year, now.month, 1);
+              crEnd = DateTime(now.year, now.month + 1, 1);
+              break;
+            case CompletionRateFilter.all:
+              crStart = DateTime(2000);
+              crEnd = DateTime(2100);
+              break;
+          }
+          final crBookings = allBookings.where((b) {
+            if (b.scheduledDate == null) return false;
+            return b.scheduledDate!.isAfter(crStart.subtract(const Duration(seconds: 1))) &&
+                b.scheduledDate!.isBefore(crEnd);
+          }).toList();
+          final crCompleted = crBookings.where((b) => b.status == 'completed').length;
+          final crTotal = crBookings.length;
+          final crRate = crTotal > 0 ? (crCompleted / crTotal * 100) : 0.0;
 
           // Calculate weekly data for chart (last 7 days)
           final weeklyData = <double>[];
@@ -324,31 +366,20 @@ class TechHomeScreen extends ConsumerWidget {
               ? (monthlyEarnings / monthlyGoal).clamp(0.0, 1.0)
               : 0.0;
 
-          // Bookings to show in the "Today's Schedule" area.
-          // Previously this only showed `in_progress`, which hides newly-created
-          // bookings (including emergency) that are still `requested`/`accepted`.
-          //
-          // We show all appointments within the selected date range, prioritizing
-          // emergency bookings first.
-          // "Today's Schedule" should always mean *today* (independent of the
-          // selected filter used for stats/cards above).
+          // Bookings to show in "Today's Schedule".
+          // Based on when the booking was CREATED (createdAt), not the scheduled date.
+          // This ensures new requests show up immediately the day they are made.
           final todayEnd = todayStart.add(const Duration(days: 1));
 
           final scheduleBookings = allBookings
               .where((b) {
-                final sd = b.scheduledDate;
-                if (sd == null) return false;
+                final activeStatuses = {
+                  'requested', 'accepted', 'scheduled', 'en_route', 'in_progress'
+                };
+                if (!activeStatuses.contains(b.status)) return false;
 
-                final inToday = sd.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
-                    sd.isBefore(todayEnd);
-
-                if (!inToday) return false;
-
-                return b.status == 'requested' ||
-                    b.status == 'accepted' ||
-                    b.status == 'scheduled' ||
-                    b.status == 'en_route' ||
-                    b.status == 'in_progress';
+                return b.createdAt.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+                    b.createdAt.isBefore(todayEnd);
               })
               .toList();
 
@@ -406,37 +437,29 @@ class TechHomeScreen extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              InkWell(
-                                onTap: () => context.push('/addresses'),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on_outlined,
-                                      size: 16,
-                                      color: AppTheme.textSecondaryColor,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        displayAddress.isNotEmpty
-                                            ? displayAddress
-                                            : 'Location not set',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppTheme.textSecondaryColor,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 16,
+                                    color: AppTheme.textSecondaryColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      displayAddress.isNotEmpty
+                                          ? displayAddress
+                                          : 'Location not set',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textSecondaryColor,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const Icon(
-                                      Icons.chevron_right,
-                                      size: 18,
-                                      color: AppTheme.textSecondaryColor,
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 8),
                               Row(
@@ -595,27 +618,127 @@ class TechHomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Completion Rate card with filter inside
                             Expanded(
-                              child: _MetricCard(
-                                label: 'Completion Rate',
-                                value: '${completionRate.toStringAsFixed(1)}%',
-                                icon: Icons.check_circle,
-                                color: Colors.green,
-                                subtitle:
-                                    '$techCompletedCount of $totalJobsInPeriod jobs',
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Icon + filter button on same row
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(7),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                        ),
+                                        const Spacer(),
+                                        GestureDetector(
+                                          onTap: () {
+                                            showModalBottomSheet(
+                                              context: context,
+                                              backgroundColor: Colors.transparent,
+                                              builder: (_) => _CrFilterSheet(
+                                                current: crFilter,
+                                                onSelect: (f) => ref.read(completionRateFilterProvider.notifier).state = f,
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  switch (crFilter) {
+                                                    CompletionRateFilter.day => 'Day',
+                                                    CompletionRateFilter.week => 'Week',
+                                                    CompletionRateFilter.month => 'Month',
+                                                    CompletionRateFilter.all => 'All',
+                                                  },
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 3),
+                                                const Icon(Icons.arrow_drop_down, color: Colors.green, size: 16),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      '${crRate.toStringAsFixed(1)}%',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Completion Rate',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.textPrimaryColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '$crCompleted of $crTotal jobs',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
+                            // Customer Rating card - tappable, navigates to ratings screen
                             Expanded(
-                              child: _MetricCard(
-                                label: 'Customer Rating',
-                                value: technicianRating > 0
-                                    ? technicianRating.toStringAsFixed(1)
-                                    : 'N/A',
-                                icon: Icons.star,
-                                color: Colors.orange,
-                                subtitle: 'Based on $totalReviews reviews',
+                              child: GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const TechRatingsScreen()),
+                                ),
+                                child: _MetricCard(
+                                  label: 'Customer Rating',
+                                  value: technicianRating > 0
+                                      ? technicianRating.toStringAsFixed(1)
+                                      : 'N/A',
+                                  icon: Icons.star,
+                                  color: Colors.orange,
+                                  subtitle: 'Based on $totalReviews reviews',
+                                ),
                               ),
                             ),
                           ],
@@ -692,14 +815,9 @@ class TechHomeScreen extends ConsumerWidget {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _QuickActionButton(
-                                icon: Icons.location_on,
-                                iconColor: Colors.green,
-                                iconBgColor: Colors.green.withValues(
-                                  alpha: 0.15,
-                                ),
-                                label: 'Mark\nAvailable',
-                                onTap: () {},
+                              child: _AvailabilityToggleButton(
+                                userId: currentUserId,
+                                isAvailable: isAvailable,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1483,6 +1601,374 @@ class _SimpleJobCard extends ConsumerWidget {
     );
   }
 }
+
+class _CrFilterSheet extends StatelessWidget {
+  final CompletionRateFilter current;
+  final ValueChanged<CompletionRateFilter> onSelect;
+
+  const _CrFilterSheet({required this.current, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      (CompletionRateFilter.day, 'Today', Icons.today),
+      (CompletionRateFilter.week, 'This Week', Icons.view_week),
+      (CompletionRateFilter.month, 'This Month', Icons.calendar_month),
+      (CompletionRateFilter.all, 'All Time', Icons.all_inclusive),
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Completion Rate Filter',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+          ),
+          const SizedBox(height: 16),
+          ...options.map((opt) {
+            final (filter, label, icon) = opt;
+            final isSelected = current == filter;
+            return GestureDetector(
+              onTap: () {
+                onSelect(filter);
+                Navigator.pop(context);
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.green.withValues(alpha: 0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? Colors.green : Colors.grey.shade200,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: isSelected ? Colors.green : AppTheme.textSecondaryColor, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected ? Colors.green : AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (isSelected)
+                      const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Availability toggle button ────────────────────────────────────────────────
+
+class _AvailabilityToggleButton extends ConsumerWidget {
+  final String? userId;
+
+  const _AvailabilityToggleButton({required this.userId, required bool isAvailable});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = userId;
+    if (uid == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Use the stable notifier for instant local state updates + DB sync
+    final notifierState = ref.watch(techAvailabilityProviderFamily(uid));
+    final isAvailable = notifierState.valueOrNull ?? true;
+    final isLoading = notifierState.isLoading;
+
+    final iconColor = isAvailable ? Colors.red.shade400 : Colors.green;
+    final iconBgColor = isAvailable
+        ? Colors.red.withValues(alpha: 0.12)
+        : Colors.green.withValues(alpha: 0.12);
+    // If online → show "Go Offline", if offline → show "Go Online"
+    final label = isAvailable ? 'Go\nOffline' : 'Go\nOnline';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+            builder: (_) => _AvailabilitySheet(
+              userId: uid,
+              isAvailable: isAvailable,
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: isLoading
+                    ? SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: iconColor,
+                        ),
+                      )
+                    : Icon(
+                        isAvailable
+                            ? Icons.wifi_tethering_off_rounded
+                            : Icons.wifi_tethering_rounded,
+                        color: iconColor,
+                        size: 18,
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: iconColor,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Availability bottom sheet ──────────────────────────────────────────────────
+
+class _AvailabilitySheet extends ConsumerStatefulWidget {
+  final String userId;
+  final bool isAvailable;
+
+  const _AvailabilitySheet({required this.userId, required this.isAvailable});
+
+  @override
+  ConsumerState<_AvailabilitySheet> createState() => _AvailabilitySheetState();
+}
+
+class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
+  late bool _pendingValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _pendingValue = widget.isAvailable;
+  }
+
+  Future<void> _confirm() async {
+    await ref
+        .read(techAvailabilityProviderFamily(widget.userId).notifier)
+        .setAvailability(_pendingValue);
+
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifierState = ref.watch(techAvailabilityProviderFamily(widget.userId));
+    final isLoading = notifierState.isLoading;
+    final hasError = notifierState.hasError;
+
+    final willBeOnline = _pendingValue;
+    final color = willBeOnline ? Colors.green : Colors.grey.shade600;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Status icon
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                willBeOnline ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_off_rounded,
+                color: color,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                willBeOnline ? 'Go Online' : 'Go Offline',
+                key: ValueKey(willBeOnline),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                willBeOnline
+                    ? 'You will be visible to customers and receive new job requests.'
+                    : 'You will be hidden from the technician list and stop receiving job requests.',
+                key: ValueKey(willBeOnline),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondaryColor,
+                  height: 1.5,
+                ),
+              ),
+            ),
+            if (hasError) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Failed to update. Please try again.',
+                style: TextStyle(fontSize: 12, color: Colors.red.shade600),
+              ),
+            ],
+            const SizedBox(height: 28),
+
+            // Switch row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    willBeOnline ? 'Status: Online' : 'Status: Offline',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  Switch(
+                    value: _pendingValue,
+                    onChanged: isLoading ? null : (v) => setState(() => _pendingValue = v),
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: Colors.green,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: Colors.grey.shade400,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Confirm button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : _confirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Confirm',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(context),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondaryColor),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Date filter tab ──────────────────────────────────────────────────────────
 
 class _DateFilterTab extends StatelessWidget {
   final String label;

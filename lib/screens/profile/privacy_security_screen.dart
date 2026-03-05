@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../auth/privacy_policy_screen.dart';
+import '../auth/terms_conditions_screen.dart';
 
 class PrivacySecurityScreen extends ConsumerStatefulWidget {
   const PrivacySecurityScreen({super.key});
@@ -290,11 +292,10 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                 child: Icon(Icons.chevron_right_rounded,
                     color: Colors.grey.shade500, size: 20),
               ),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening privacy policy...')),
-                );
-              },
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+              ),
             ),
             const SizedBox(height: 10),
             _ModernTile(
@@ -311,11 +312,10 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                 child: Icon(Icons.chevron_right_rounded,
                     color: Colors.grey.shade500, size: 20),
               ),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening terms of service...')),
-                );
-              },
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+              ),
             ),
 
             const SizedBox(height: 24),

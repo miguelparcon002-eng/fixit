@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -32,7 +33,6 @@ class TechEarningsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(currentUserProvider);
     // The card is labeled "This Month", so use month earnings to match bookings.
     final totalEarningsAsync = ref.watch(monthEarningsProvider);
 
@@ -65,27 +65,12 @@ class TechEarningsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              userAsync.when(
-                data: (user) {
-                  return Text(
-                    user?.fullName ?? 'Technician',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textSecondaryColor,
-                    ),
-                  );
-                },
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 4),
               const Text(
                 'Track your income and transaction history',
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondaryColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -244,13 +229,61 @@ class TechEarningsScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               // Transaction History
-              const Text(
-                'Transaction History',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimaryColor,
-                ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final filter = ref.watch(earningsFilterProvider);
+                  return Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Transaction History',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => const _EarningsFilterSheet(),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: filter.isActive ? AppTheme.deepBlue : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: filter.isActive ? AppTheme.deepBlue : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: 16,
+                                color: filter.isActive ? Colors.white : Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                filter.isActive ? 'Filtered' : 'Filter',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: filter.isActive ? Colors.white : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 16),
 
@@ -267,12 +300,20 @@ class TechEarningsScreen extends ConsumerWidget {
                           onTap: () => ref.read(selectedEarningsRangeProvider.notifier).state = EarningsRange.week,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _TabButton(
                           label: 'This Month',
                           isSelected: range == EarningsRange.month,
                           onTap: () => ref.read(selectedEarningsRangeProvider.notifier).state = EarningsRange.month,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _TabButton(
+                          label: 'All',
+                          isSelected: range == EarningsRange.all,
+                          onTap: () => ref.read(selectedEarningsRangeProvider.notifier).state = EarningsRange.all,
                         ),
                       ),
                     ],
@@ -326,7 +367,8 @@ class TechEarningsScreen extends ConsumerWidget {
 
                       return Column(
                         children: transactions.map((booking) {
-                          final dateStr = _formatTransactionDate(booking.createdAt);
+                          final txDate = booking.completedAt ?? booking.scheduledDate ?? booking.createdAt;
+                          final dateStr = _formatTransactionDate(txDate);
 
                           // Use booking id as job id fallback.
                           final jobId = booking.id;
@@ -338,7 +380,7 @@ class TechEarningsScreen extends ConsumerWidget {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _TransactionItem(
                               bookingId: booking.id,
-                              customerName: booking.customerName,
+                              customerId: booking.customerId,
                               service: booking.serviceName,
                               jobId: '#$jobId',
                               date: dateStr,
@@ -464,9 +506,9 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _TransactionItem extends StatelessWidget {
+class _TransactionItem extends ConsumerWidget {
   final String bookingId;
-  final String customerName;
+  final String customerId;
   final String service;
   final String jobId;
   final String date;
@@ -475,7 +517,7 @@ class _TransactionItem extends StatelessWidget {
 
   const _TransactionItem({
     required this.bookingId,
-    required this.customerName,
+    required this.customerId,
     required this.service,
     required this.jobId,
     required this.date,
@@ -484,7 +526,9 @@ class _TransactionItem extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final customerAsync = ref.watch(userByIdProvider(customerId));
+    final customerName = customerAsync.valueOrNull?.fullName ?? '…';
     return GestureDetector(
       onTap: bookingId.isEmpty ? null : () => context.push('/booking/$bookingId'),
       child: Container(
@@ -593,6 +637,325 @@ class _TransactionItem extends StatelessWidget {
         ],
       ),
     ),
+    );
+  }
+}
+
+// ─── Earnings Filter Sheet ─────────────────────────────────────────────────
+
+class _EarningsFilterSheet extends ConsumerStatefulWidget {
+  const _EarningsFilterSheet();
+
+  @override
+  ConsumerState<_EarningsFilterSheet> createState() => _EarningsFilterSheetState();
+}
+
+class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
+  late EarningsFilter _local;
+
+  final _minController = TextEditingController();
+  final _maxController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _local = ref.read(earningsFilterProvider);
+    if (_local.minAmount != null) _minController.text = _local.minAmount!.toStringAsFixed(0);
+    if (_local.maxAmount != null) _maxController.text = _local.maxAmount!.toStringAsFixed(0);
+  }
+
+  @override
+  void dispose() {
+    _minController.dispose();
+    _maxController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final initial = isFrom ? (_local.fromDate ?? DateTime.now()) : (_local.toDate ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked == null) return;
+    setState(() {
+      _local = isFrom
+          ? _local.copyWith(fromDate: picked)
+          : _local.copyWith(toDate: picked);
+    });
+  }
+
+  void _apply() {
+    final min = double.tryParse(_minController.text.trim());
+    final max = double.tryParse(_maxController.text.trim());
+    ref.read(earningsFilterProvider.notifier).state = _local.copyWith(
+      minAmount: min,
+      maxAmount: max,
+      clearMin: min == null,
+      clearMax: max == null,
+    );
+    Navigator.pop(context);
+  }
+
+  void _reset() {
+    ref.read(earningsFilterProvider.notifier).state = const EarningsFilter();
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final df = DateFormat('MMM d, yyyy');
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24, right: 24, top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Filter Transactions',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                ),
+                TextButton(onPressed: _reset, child: const Text('Reset all')),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Date range
+            const Text('Date Range', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _DatePickerTile(
+                    label: 'From',
+                    value: _local.fromDate != null ? df.format(_local.fromDate!) : null,
+                    onTap: () => _pickDate(true),
+                    onClear: _local.fromDate != null
+                        ? () => setState(() => _local = _local.copyWith(clearFrom: true))
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _DatePickerTile(
+                    label: 'To',
+                    value: _local.toDate != null ? df.format(_local.toDate!) : null,
+                    onTap: () => _pickDate(false),
+                    onClear: _local.toDate != null
+                        ? () => setState(() => _local = _local.copyWith(clearTo: true))
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Amount range
+            const Text('Amount Range (₱)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Min',
+                      prefixText: '₱',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _maxController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Max',
+                      prefixText: '₱',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Job type
+            const Text('Job Type', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _ChipOption(
+                  label: 'All',
+                  selected: _local.emergencyOnly == null,
+                  onTap: () => setState(() => _local = _local.copyWith(clearEmergency: true)),
+                ),
+                const SizedBox(width: 8),
+                _ChipOption(
+                  label: 'Regular',
+                  selected: _local.emergencyOnly == false,
+                  onTap: () => setState(() => _local = _local.copyWith(emergencyOnly: false)),
+                ),
+                const SizedBox(width: 8),
+                _ChipOption(
+                  label: 'Emergency',
+                  selected: _local.emergencyOnly == true,
+                  color: Colors.red,
+                  onTap: () => setState(() => _local = _local.copyWith(emergencyOnly: true)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Sort order
+            const Text('Sort By', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ChipOption(
+                  label: 'Newest',
+                  selected: _local.sort == EarningsSortOrder.newest,
+                  onTap: () => setState(() => _local = _local.copyWith(sort: EarningsSortOrder.newest)),
+                ),
+                _ChipOption(
+                  label: 'Oldest',
+                  selected: _local.sort == EarningsSortOrder.oldest,
+                  onTap: () => setState(() => _local = _local.copyWith(sort: EarningsSortOrder.oldest)),
+                ),
+                _ChipOption(
+                  label: 'Highest Amount',
+                  selected: _local.sort == EarningsSortOrder.highest,
+                  onTap: () => setState(() => _local = _local.copyWith(sort: EarningsSortOrder.highest)),
+                ),
+                _ChipOption(
+                  label: 'Lowest Amount',
+                  selected: _local.sort == EarningsSortOrder.lowest,
+                  onTap: () => setState(() => _local = _local.copyWith(sort: EarningsSortOrder.lowest)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _apply,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.deepBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Apply Filters', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DatePickerTile extends StatelessWidget {
+  final String label;
+  final String? value;
+  final VoidCallback onTap;
+  final VoidCallback? onClear;
+
+  const _DatePickerTile({required this.label, required this.value, required this.onTap, this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: value != null ? AppTheme.deepBlue : Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(10),
+          color: value != null ? AppTheme.deepBlue.withValues(alpha: 0.05) : Colors.white,
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calendar_today, size: 14, color: value != null ? AppTheme.deepBlue : Colors.grey.shade500),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                value ?? label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: value != null ? AppTheme.deepBlue : Colors.grey.shade500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (onClear != null)
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(Icons.close, size: 14, color: AppTheme.deepBlue),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChipOption extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _ChipOption({required this.label, required this.selected, required this.onTap, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppTheme.deepBlue;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? c : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? c : Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : Colors.grey.shade600,
+          ),
+        ),
+      ),
     );
   }
 }

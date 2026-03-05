@@ -483,7 +483,8 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
 
   (Color, String) _getBookingStatus(String status) {
     return switch (status) {
-      'requested' || 'accepted' || 'scheduled' => (const Color(0xFFFF9800), 'Scheduled'),
+      'requested' => (const Color(0xFFFF9800), 'Requested'),
+      'accepted' || 'scheduled' => (const Color(0xFFFF9800), 'Scheduled'),
       'in_progress' => (AppTheme.lightBlue, 'In Progress'),
       'completed' => (Colors.green, 'Completed'),
       'cancelled' => (Colors.red, 'Cancelled'),

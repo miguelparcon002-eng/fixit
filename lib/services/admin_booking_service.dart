@@ -51,6 +51,26 @@ class AdminBookingService {
     return list.map(_mapRow).toList();
   }
 
+  Future<List<AdminBookingView>> listBookingsToday() async {
+    final client = SupabaseConfig.client;
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final rows = await client
+        .from('bookings')
+        .select('*, '
+            'customer:users!bookings_customer_id_fkey(full_name, contact_number), '
+            'technician:users!bookings_technician_id_fkey(full_name, contact_number), '
+            'service:services!bookings_service_id_fkey(service_name)')
+        .gte('created_at', startOfDay.toIso8601String())
+        .lte('created_at', endOfDay.toIso8601String())
+        .order('created_at', ascending: false);
+
+    final list = (rows as List).cast<Map<String, dynamic>>();
+    return list.map(_mapRow).toList();
+  }
+
   AdminBookingView _mapRow(Map<String, dynamic> r) {
     final booking = BookingModel.fromJson(r);
     final customer = (r['customer'] as Map?)?.cast<String, dynamic>();

@@ -161,12 +161,23 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       final supabase = SupabaseConfig.client;
       final specialtyService = TechnicianSpecialtyService();
 
-      // Fetch all technician users - use select() to get all available columns
-      // This avoids errors if the 'bio' column hasn't been added yet
-      final techRows = await supabase
+      // Fetch available technician user IDs from technician_profiles first
+      final availableProfiles = await supabase
+          .from('technician_profiles')
+          .select('user_id')
+          .eq('is_available', true);
+      final availableIds = (availableProfiles as List)
+          .map((p) => p['user_id'] as String)
+          .toSet();
+
+      // Fetch all technician users then keep only available ones
+      final allTechRows = await supabase
           .from('users')
           .select()
           .eq('role', 'technician');
+      final techRows = (allTechRows as List)
+          .where((row) => availableIds.contains(row['id'] as String))
+          .toList();
 
       final List<Map<String, dynamic>> results = [];
 
@@ -197,9 +208,22 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           }
         } catch (_) {}
 
-        // Random distance between 1.0 and 2.0 km, rounded to 1 decimal
-        final rawKm = 1.0 + Random().nextDouble();
-        final distanceKm = (rawKm * 10).round() / 10.0;
+        // Use technician's saved lat/lng if available
+        final techLat = (row['latitude'] as num?)?.toDouble();
+        final techLng = (row['longitude'] as num?)?.toDouble();
+
+        // Calculate real distance if both have coordinates, else fallback to random
+        double distanceKm;
+        if (techLat != null && techLng != null && _pickedLatLng != null) {
+          distanceKm = _haversineKm(
+            techLat, techLng,
+            _pickedLatLng!.latitude, _pickedLatLng!.longitude,
+          );
+        } else {
+          final rawKm = 1.0 + Random().nextDouble();
+          distanceKm = (rawKm * 10).round() / 10.0;
+        }
+        distanceKm = double.parse(distanceKm.toStringAsFixed(1));
         // ₱5 per 100 meters = ₱50 per km
         final distanceFee = (distanceKm * 10).round() * 5.0;
 
@@ -215,6 +239,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           'experience': experience,
           'distanceKm': distanceKm,
           'distanceFee': distanceFee,
+          'latitude': techLat,
+          'longitude': techLng,
         });
       }
 
@@ -229,6 +255,14 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         setState(() => _isTechniciansLoading = false);
       }
     }
+  }
+
+  /// Equirectangular approximation — returns distance in km.
+  double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
+    const toRad = pi / 180;
+    final dlat = (lat2 - lat1) * 111.0;
+    final dlng = (lng2 - lng1) * 111.0 * cos((lat1 + lat2) / 2 * toRad);
+    return sqrt(dlat * dlat + dlng * dlng);
   }
 
   Map<String, dynamic>? get _selectedTechData {
@@ -1842,6 +1876,21 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                 ),
               ),
             ),
+            if (_isTechniciansLoading)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              IconButton(
+                onPressed: _loadTechnicians,
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Refresh technicians',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                color: AppTheme.deepBlue,
+              ),
             if (!_isTechniciansLoading && _techniciansFromDb.isNotEmpty)
               TextButton.icon(
                 onPressed: () => _showTechnicianMap(),

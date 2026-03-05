@@ -26,6 +26,7 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
   static const LatLng _sfCenter = LatLng(8.5048, 125.9676);
 
   late final MapController _mapController;
+  late final TextEditingController _addressController;
   LatLng? _pickedLocation;
 
   @override
@@ -33,6 +34,14 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     super.initState();
     _mapController = MapController();
     _pickedLocation = widget.initialLocation;
+    _addressController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    _addressController.dispose();
+    super.dispose();
   }
 
   String _formatLatLng(LatLng loc) =>
@@ -168,18 +177,25 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                         child: Text(
                           'Pinned: ${_formatLatLng(_pickedLocation!)}',
                           style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
                             color: Color(0xFF4A5FE0),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Your technician will navigate to this exact point.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _addressController,
+                    decoration: InputDecoration(
+                      labelText: 'Address label (optional)',
+                      hintText: 'e.g. Brgy. San Francisco, Agusan del Sur',
+                      prefixIcon: const Icon(Icons.edit_location_alt_outlined),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
                   ),
                   const SizedBox(height: 12),
                 ] else ...[
@@ -194,13 +210,15 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                   child: ElevatedButton.icon(
                     onPressed: _pickedLocation == null
                         ? null
-                        : () => Navigator.pop(
+                        : () {
+                            final label = _addressController.text.trim().isNotEmpty
+                                ? _addressController.text.trim()
+                                : _formatLatLng(_pickedLocation!);
+                            Navigator.pop(
                               context,
-                              PickedLocation(
-                                latLng: _pickedLocation!,
-                                label: _formatLatLng(_pickedLocation!),
-                              ),
-                            ),
+                              PickedLocation(latLng: _pickedLocation!, label: label),
+                            );
+                          },
                     icon: const Icon(Icons.check),
                     label: const Text('Confirm Location',
                         style: TextStyle(fontWeight: FontWeight.w700)),
@@ -223,9 +241,4 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     );
   }
 
-  @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
-  }
 }

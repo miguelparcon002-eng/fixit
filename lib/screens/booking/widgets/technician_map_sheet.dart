@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -32,20 +31,19 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
     super.initState();
     _mapController = MapController();
     _focusedTechId = widget.selectedTechnicianId;
-    _techLocations = _generateRandomLocations();
+    _techLocations = _generateLocations();
   }
 
-  Map<String, LatLng> _generateRandomLocations() {
-    final rng = Random(42);
+  Map<String, LatLng> _generateLocations() {
     final Map<String, LatLng> locations = {};
     for (final tech in widget.technicians) {
       final id = tech['id'] as String;
-      final latOffset = (rng.nextDouble() - 0.5) * 0.04;
-      final lngOffset = (rng.nextDouble() - 0.5) * 0.04;
-      locations[id] = LatLng(
-        _sfCenter.latitude + latOffset,
-        _sfCenter.longitude + lngOffset,
-      );
+      final lat = (tech['latitude'] as num?)?.toDouble();
+      final lng = (tech['longitude'] as num?)?.toDouble();
+      if (lat != null && lng != null) {
+        locations[id] = LatLng(lat, lng);
+      }
+      // Technicians without a saved location are omitted from the map
     }
     return locations;
   }

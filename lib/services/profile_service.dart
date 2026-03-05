@@ -84,6 +84,18 @@ class ProfileService {
         .eq('id', _userId!);
   }
 
+  Future<void> updateLocationWithCoords({
+    required String address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (_userId == null) return;
+    await SupabaseConfig.client
+        .from(DBConstants.users)
+        .update({'address': address, 'latitude': latitude, 'longitude': longitude})
+        .eq('id', _userId!);
+  }
+
   Future<void> updateProfile({
     String? email,
     String? phone,
