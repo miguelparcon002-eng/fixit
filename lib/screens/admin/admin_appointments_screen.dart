@@ -594,6 +594,11 @@ class _AppointmentCard extends StatelessWidget {
                   icon: Icons.engineering,
                   text: 'Tech: ${item.technicianName}',
                 ),
+                if (item.serviceName.isNotEmpty)
+                  _InfoPill(
+                    icon: Icons.build_circle_outlined,
+                    text: item.serviceName,
+                  ),
               ],
             ),
             const SizedBox(height: 10),

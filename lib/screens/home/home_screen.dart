@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/notification_icon_mapper.dart';
@@ -13,15 +15,9 @@ import '../../providers/rewards_provider.dart';
 import '../../providers/voucher_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/booking_model.dart';
-import '../../models/redeemed_voucher.dart';
-import '../../services/notification_service.dart';
 import '../../services/voucher_service.dart';
 import '../profile/rewards_screen.dart';
 import 'profile_setup_dialog.dart';
-import '../booking/shop_booking_screen.dart';
-
-// Provider to track if promo has been claimed
-final promoClaimedProvider = StateProvider<bool>((ref) => false);
 
 // Provider to track if setup dialog has been shown this session
 final setupDialogShownProvider = StateProvider<bool>((ref) => false);
@@ -58,16 +54,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final voucherService = VoucherService();
     final isSetupComplete = await voucherService.isProfileSetupComplete(user.id);
 
-    // Additional check: if user account is older than 1 day and setup is not marked complete,
-    // automatically mark it as complete (for existing users migrating to this system)
+    // If not marked complete in DB, check if profile is actually complete
     if (!isSetupComplete) {
-      final userCreatedAt = user.createdAt;
-      final daysSinceCreation = DateTime.now().difference(userCreatedAt).inDays;
+      final hasPhone = (user.contactNumber ?? '').isNotEmpty;
+      final addresses = ref.read(userAddressesProvider).valueOrNull ?? [];
+      final hasAddress = addresses.isNotEmpty;
 
-      if (daysSinceCreation >= 1) {
-        // This is an existing user, mark setup as complete automatically
+      if (hasPhone && hasAddress) {
+        // Profile is already complete — mark it and skip dialog
         await voucherService.markProfileSetupComplete(user.id);
-        return; // Don't show dialog for existing users
+        return;
+      }
+
+      // Also skip for existing accounts older than 1 day
+      final daysSinceCreation = DateTime.now().difference(user.createdAt).inDays;
+      if (daysSinceCreation >= 1) {
+        await voucherService.markProfileSetupComplete(user.id);
+        return;
       }
     }
 
@@ -78,7 +81,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // Show the profile setup dialog
       showDialog(
         context: context,
-        barrierDismissible: false,
+        barrierDismissible: true,
         builder: (context) => ProfileSetupDialog(
           onComplete: () {
             // Refresh providers after setup
@@ -272,24 +275,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final savedAddressCount = ref.watch(savedAddressCountProvider);
     final rewardPointsAsync = ref.watch(rewardPointsProvider);
-    final validVouchersAsync = ref.watch(validVouchersProvider);
-
-    // Check for welcome voucher
-    final validVouchers = validVouchersAsync.valueOrNull ?? [];
-    RedeemedVoucher? welcomeVoucher;
-    if (validVouchers.isNotEmpty) {
-      try {
-        welcomeVoucher = validVouchers.firstWhere(
-          (v) => v.voucherTitle.toLowerCase().contains('welcome') ||
-                 v.voucherTitle.toLowerCase().contains('first') ||
-                 v.voucherTitle.toLowerCase().contains('20'),
-        );
-      } catch (e) {
-        welcomeVoucher = validVouchers.first;
-      }
-    }
-    final hasWelcomeVoucher = welcomeVoucher != null;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: CustomScrollView(
@@ -476,12 +461,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                        // Welcome Voucher Card
-                        if (hasWelcomeVoucher) ...[
-                          _buildWelcomeVoucherCard(welcomeVoucher),
-                          const SizedBox(height: 24),
-                        ],
-
                         // Stats Cards Row - Addresses and Rewards
                         Row(
                           children: [
@@ -707,65 +686,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                         // Featured Shop Cards (Horizontal Scroll)
                         SizedBox(
-                          height: 220,
+                          height: 270,
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             padding: EdgeInsets.zero,
                             children: [
-                              const _FeaturedShopCard(
+                              _FeaturedShopCard(
                                 shopName: 'Screen Fix Pro',
-                                ownerName: 'Screen Replacement Specialist',
+                                ownerName: 'Rodel Macaraeg',
+                                description: 'Your go-to shop for cracked and broken screens. We use high-quality replacement panels and precision tools to restore your phone\'s display to factory condition — fast and affordable.',
                                 rating: 4.8,
                                 reviewCount: 156,
-                                services: ['Screen Replacement', 'LCD Repair', 'Digitizer Fix'],
+                                services: ['Screen Replacement', 'LCD Repair', 'Digitizer Fix', 'Cracked Glass Repair', 'Front Camera Repair', 'Touch Calibration'],
                                 distance: '0.5 km',
-                                isOpen: true,
-                                openTime: '8 AM - 8 PM',
-                                gradientColors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                                openHour: 8,
+                                closeHour: 20,
+                                openTimeLabel: '8 AM - 8 PM',
+                                gradientColors: const [Color(0xFF667eea), Color(0xFF764ba2)],
                                 isFeatured: true,
-                                shopAddress: '123 Repair St, Quezon City',
+                                shopAddress: 'Purok 3, Brgy. Cebolin, San Francisco, Agusan del Sur',
+                                phone: '+63 917 234 5678',
+                                email: 'screenfixpro.sf@gmail.com',
+                                facebook: 'fb.com/screenfixpro.sf',
+                                instagram: '@screenfixpro_sf',
+                                latitude: 8.5063,
+                                longitude: 125.9779,
                               ),
                               const SizedBox(width: 16),
-                              const _FeaturedShopCard(
+                              _FeaturedShopCard(
                                 shopName: 'Battery & Power Hub',
-                                ownerName: 'Battery Replacement Expert',
+                                ownerName: 'Maricel Daguison',
+                                description: 'Specialized in power-related issues for all phone brands. Whether your battery drains too fast, won\'t charge, or your charging port is damaged, we fix it quickly with tested replacement parts.',
                                 rating: 4.6,
                                 reviewCount: 98,
-                                services: ['Battery Replacement', 'Charging Port', 'Power Issues'],
+                                services: ['Battery Replacement', 'Charging Port Repair', 'Power Button Fix', 'Swollen Battery Removal', 'Speaker Repair', 'Headphone Jack Fix'],
                                 distance: '1.2 km',
-                                isOpen: true,
-                                openTime: '9 AM - 7 PM',
-                                gradientColors: [Color(0xFF11998e), Color(0xFF38ef7d)],
+                                openHour: 9,
+                                closeHour: 19,
+                                openTimeLabel: '9 AM - 7 PM',
+                                gradientColors: const [Color(0xFF11998e), Color(0xFF38ef7d)],
                                 isFeatured: false,
-                                shopAddress: '45 Power Ave, Makati City',
+                                shopAddress: 'National Highway, Purok 5, San Francisco, Agusan del Sur',
+                                phone: '+63 928 456 7890',
+                                email: 'batterypowerhub.sf@gmail.com',
+                                facebook: 'fb.com/batterypowerhub',
+                                instagram: '@batterypowerhub_sf',
+                                latitude: 8.5121,
+                                longitude: 125.9834,
                               ),
                               const SizedBox(width: 16),
-                              const _FeaturedShopCard(
+                              _FeaturedShopCard(
                                 shopName: 'Laptop Care Center',
-                                ownerName: 'Laptop & PC Specialist',
+                                ownerName: 'Junrey Estrada',
+                                description: 'Expert laptop and desktop repair shop serving San Francisco. We handle everything from slow systems and virus-infected units to broken keyboards and failed hard drives — no job too big or small.',
                                 rating: 4.9,
                                 reviewCount: 203,
-                                services: ['Laptop Repair', 'Hardware Upgrade', 'Virus Removal'],
+                                services: ['Laptop Screen Repair', 'RAM & SSD Upgrade', 'Virus Removal', 'Keyboard Replacement', 'Motherboard Repair', 'OS Reinstallation'],
                                 distance: '2.0 km',
-                                isOpen: false,
-                                openTime: 'Opens 9 AM',
-                                gradientColors: [Color(0xFFf093fb), Color(0xFFf5576c)],
+                                openHour: 9,
+                                closeHour: 18,
+                                openTimeLabel: '9 AM - 6 PM',
+                                gradientColors: const [Color(0xFFf093fb), Color(0xFFf5576c)],
                                 isFeatured: true,
-                                shopAddress: '78 Tech Blvd, Mandaluyong',
+                                shopAddress: 'Poblacion, San Francisco, Agusan del Sur',
+                                phone: '+63 905 678 9012',
+                                email: 'laptopcarecenter.sf@gmail.com',
+                                facebook: 'fb.com/laptopcarecenter.sf',
+                                instagram: '@laptopcarecenter_sf',
+                                latitude: 8.5088,
+                                longitude: 125.9751,
                               ),
                               const SizedBox(width: 16),
-                              const _FeaturedShopCard(
+                              _FeaturedShopCard(
                                 shopName: 'Water Damage Rescue',
-                                ownerName: 'Water Damage Recovery',
+                                ownerName: 'Noel Bantilan',
+                                description: 'Dropped your phone in water? Don\'t panic — bring it to us immediately. We use ultrasonic cleaning and professional drying techniques to recover water-damaged devices and save your data.',
                                 rating: 4.5,
                                 reviewCount: 67,
-                                services: ['Water Damage Repair', 'Data Recovery', 'Component Cleaning'],
+                                services: ['Water Damage Repair', 'Data Recovery', 'Ultrasonic Cleaning', 'Corrosion Removal', 'Logic Board Drying', 'Full Device Restoration'],
                                 distance: '2.8 km',
-                                isOpen: true,
-                                openTime: '10 AM - 6 PM',
-                                gradientColors: [Color(0xFFfc4a1a), Color(0xFFf7b733)],
+                                openHour: 10,
+                                closeHour: 18,
+                                openTimeLabel: '10 AM - 6 PM',
+                                gradientColors: const [Color(0xFFfc4a1a), Color(0xFFf7b733)],
                                 isFeatured: false,
-                                shopAddress: '22 Recovery Lane, Pasig City',
+                                shopAddress: 'Brgy. Mabuhay, San Francisco, Agusan del Sur',
+                                phone: '+63 936 789 0123',
+                                email: 'waterdamagerescue.sf@gmail.com',
+                                facebook: 'fb.com/waterdamagerescue.sf',
+                                instagram: '@waterdamagerescue_sf',
+                                latitude: 8.5015,
+                                longitude: 125.9812,
                               ),
                             ],
                           ),
@@ -1034,128 +1045,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeVoucherCard(RedeemedVoucher voucher) {
-    final daysLeft = voucher.expiresAt != null
-        ? voucher.expiresAt!.difference(DateTime.now()).inDays
-        : 30;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.card_giftcard,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Welcome Reward!',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              if (daysLeft > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '$daysLeft days left',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '20% Off First Repair',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Get 20% off on your first repair service',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.confirmation_number,
-                  color: Color(0xFF2E7D32),
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Code: FIRST20',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1689,34 +1578,53 @@ class _CategoryCard extends StatelessWidget {
 class _FeaturedShopCard extends StatelessWidget {
   final String shopName;
   final String ownerName;
+  final String description;
   final double rating;
   final int reviewCount;
   final List<String> services;
   final String distance;
-  final bool isOpen;
-  final String openTime;
+  final int openHour;
+  final int closeHour;
+  final String openTimeLabel;
   final List<Color> gradientColors;
   final bool isFeatured;
   final String shopAddress;
+  final String phone;
+  final String email;
+  final String facebook;
+  final String instagram;
+  final double latitude;
+  final double longitude;
   final String? technicianId;
 
   const _FeaturedShopCard({
     required this.shopName,
     required this.ownerName,
+    required this.description,
     required this.rating,
     required this.reviewCount,
     required this.services,
     required this.distance,
-    required this.isOpen,
-    required this.openTime,
+    required this.openHour,
+    required this.closeHour,
+    required this.openTimeLabel,
     required this.gradientColors,
     required this.isFeatured,
-    this.shopAddress = 'Metro Manila, Philippines',
+    required this.shopAddress,
+    required this.phone,
+    required this.email,
+    required this.facebook,
+    required this.instagram,
+    required this.latitude,
+    required this.longitude,
     this.technicianId,
   });
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now().hour;
+    final isOpen = now >= openHour && now < closeHour;
+    final openTime = openTimeLabel;
     return GestureDetector(
       onTap: () {
         showDialog(
@@ -1804,10 +1712,10 @@ class _FeaturedShopCard extends StatelessWidget {
                         color: AppTheme.backgroundColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.description, size: 16, color: AppTheme.deepBlue),
                               SizedBox(width: 8),
@@ -1821,10 +1729,10 @@ class _FeaturedShopCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            'Professional repair shop specializing in mobile devices and laptops. We offer fast, reliable service with genuine parts and experienced technicians. Same-day repairs available for most common issues.',
-                            style: TextStyle(
+                            description,
+                            style: const TextStyle(
                               fontSize: 13,
                               color: AppTheme.textSecondaryColor,
                               height: 1.4,
@@ -1897,6 +1805,126 @@ class _FeaturedShopCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
 
+                    // Location (tappable — shows map)
+                    GestureDetector(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => Container(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                            ),
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.place_rounded, color: AppTheme.deepBlue, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          shopAddress,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.textPrimaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                                    child: FlutterMap(
+                                      options: MapOptions(
+                                        initialCenter: LatLng(latitude, longitude),
+                                        initialZoom: 14,
+                                      ),
+                                      children: [
+                                        TileLayer(
+                                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                          userAgentPackageName: 'com.fixit.app',
+                                        ),
+                                        MarkerLayer(
+                                          markers: [
+                                            Marker(
+                                              point: LatLng(latitude, longitude),
+                                              width: 50,
+                                              height: 50,
+                                              child: Column(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.all(4),
+                                                    decoration: BoxDecoration(
+                                                      color: gradientColors[0],
+                                                      shape: BoxShape.circle,
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: gradientColors[0].withValues(alpha: 0.5),
+                                                          blurRadius: 6,
+                                                          spreadRadius: 2,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: const Icon(Icons.store, color: Colors.white, size: 18),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.lightBlue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.lightBlue.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.place_rounded, size: 18, color: AppTheme.deepBlue),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                shopAddress,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.textSecondaryColor,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.map_outlined, size: 16, color: AppTheme.deepBlue),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     // Contact Information
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -1921,11 +1949,47 @@ class _FeaturedShopCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          _buildInfoRow(Icons.phone, '+63 912 345 6789'),
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri(scheme: 'tel', path: phone);
+                              if (await canLaunchUrl(uri)) await launchUrl(uri);
+                            },
+                            child: _buildInfoRow(Icons.phone, phone),
+                          ),
                           const SizedBox(height: 4),
-                          _buildInfoRow(Icons.email, '$ownerName@fixit.com'),
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri(scheme: 'mailto', path: email);
+                              if (await canLaunchUrl(uri)) await launchUrl(uri);
+                            },
+                            child: _buildInfoRow(Icons.email_outlined, email),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Social Media',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.textPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: () async {
+                              final uri = Uri.parse('https://$facebook');
+                              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            },
+                            child: _buildInfoRow(Icons.facebook_rounded, facebook),
+                          ),
                           const SizedBox(height: 4),
-                          _buildInfoRow(Icons.location_city, 'Metro Manila, Philippines'),
+                          GestureDetector(
+                            onTap: () async {
+                              final handle = instagram.replaceFirst('@', '');
+                              final uri = Uri.parse('https://instagram.com/$handle');
+                              if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            },
+                            child: _buildInfoRow(Icons.camera_alt_outlined, instagram),
+                          ),
                         ],
                       ),
                     ),
@@ -2012,44 +2076,6 @@ class _FeaturedShopCard extends StatelessWidget {
                               ))
                           .toList(),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Pricing Info
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warningColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.attach_money, size: 20, color: AppTheme.warningColor),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Competitive Pricing',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  'Starting from ₱350 • Free diagnostics',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.textSecondaryColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 20),
 
                     // Action Buttons
@@ -2073,26 +2099,14 @@ class _FeaturedShopCard extends StatelessWidget {
                         Expanded(
                           flex: 2,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              context.push('/shop-booking', extra: ShopInfo(
-                                shopName: shopName,
-                                ownerName: ownerName,
-                                rating: rating,
-                                reviewCount: reviewCount,
-                                services: services,
-                                openTime: openTime,
-                                isOpen: isOpen,
-                                gradientColors: gradientColors,
-                                shopAddress: shopAddress,
-                                technicianId: technicianId,
-                              ));
-                            },
-                            icon: const Icon(Icons.build, size: 18),
-                            label: const Text('Book Repair'),
+                            onPressed: null,
+                            icon: const Icon(Icons.access_time_rounded, size: 18),
+                            label: const Text('Coming Soon'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.deepBlue,
+                              backgroundColor: Colors.grey.shade400,
                               foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey.shade400,
+                              disabledForegroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),

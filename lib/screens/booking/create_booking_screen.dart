@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../models/redeemed_voucher.dart';
+import '../../services/notification_service.dart';
 import '../../services/technician_specialty_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'widgets/technician_map_sheet.dart';
@@ -108,6 +109,25 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     'Water damage',
     'Software Bug',
   ];
+
+  // Maps each problem to the technician specialties that cover it
+  static const Map<String, List<String>> _problemToSpecialties = {
+    'Screen Cracked':  ['Screen Repair', 'Display Replacement', 'iPhone Repair', 'Android Repair', 'Samsung Repair', 'Laptop Repair', 'MacBook Repair'],
+    'Battery Drains':  ['Battery Replacement', 'iPhone Repair', 'Android Repair', 'Samsung Repair', 'Laptop Repair', 'MacBook Repair'],
+    'Won\'t power on': ['Motherboard Repair', 'Power Button Repair', 'Charging Port Repair', 'Laptop Repair', 'MacBook Repair', 'iPhone Repair', 'Android Repair'],
+    'Overheating':     ['Cooling System', 'Motherboard Repair', 'Hardware Upgrade', 'Laptop Repair', 'MacBook Repair'],
+    'Water damage':    ['Water Damage Repair', 'Data Recovery', 'Motherboard Repair', 'iPhone Repair', 'Android Repair', 'Laptop Repair', 'MacBook Repair'],
+    'Software Bug':    ['Software Issues', 'Virus Removal', 'Data Recovery', 'SSD/HDD Upgrade'],
+  };
+
+  /// Returns true if the technician has at least one specialty matching the selected problems.
+  bool _isTechnicianRecommended(List<String> techSpecialties) {
+    if (_selectedProblems.isEmpty || techSpecialties.isEmpty) return false;
+    final relevant = _selectedProblems
+        .expand((p) => _problemToSpecialties[p] ?? [])
+        .toSet();
+    return techSpecialties.any((s) => relevant.contains(s));
+  }
 
   @override
   void initState() {
@@ -580,6 +600,26 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         bookingId: createdBooking.id,
         notes: bookingDetails,
         finalCost: finalPrice,
+      );
+
+      // Notify the technician of the new booking request
+      final customerName = user.fullName ?? 'A customer';
+      final problemList = _selectedProblems.join(', ');
+      await NotificationService().sendNotification(
+        userId: technicianId,
+        type: 'booking_request',
+        title: 'New Booking Request',
+        message: '$customerName has requested a repair for: $problemList. Tap to view details.',
+        data: {'booking_id': createdBooking.id, 'route': '/tech-jobs'},
+      );
+
+      // Also notify the customer that their booking was submitted
+      await NotificationService().sendNotification(
+        userId: user.id,
+        type: 'booking_request',
+        title: 'Booking Submitted',
+        message: 'Your booking has been submitted. Please wait for the technician to accept your request.',
+        data: {'booking_id': createdBooking.id, 'route': '/booking/${createdBooking.id}'},
       );
 
       // Force refresh bookings so the new booking appears immediately (no hot restart)
@@ -1930,10 +1970,21 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           )
         else
-          ..._techniciansFromDb.map((tech) {
+          ...(() {
+            final sorted = [..._techniciansFromDb];
+            sorted.sort((a, b) {
+              final aRec = _isTechnicianRecommended((a['specialties'] as List<String>?) ?? []);
+              final bRec = _isTechnicianRecommended((b['specialties'] as List<String>?) ?? []);
+              if (aRec && !bRec) return -1;
+              if (!aRec && bRec) return 1;
+              return 0;
+            });
+            return sorted;
+          }()).map((tech) {
             final isSelected = _selectedTechnicianId == tech['id'];
             final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
             final specialties = (tech['specialties'] as List<String>?) ?? [];
+            final isRecommended = _isTechnicianRecommended(specialties);
             final experience = tech['experience'] as String? ?? 'New';
             final distanceKm = (tech['distanceKm'] as num?)?.toDouble() ?? 0.0;
             final distanceFee = (tech['distanceFee'] as num?)?.toDouble() ?? 0.0;
@@ -2008,6 +2059,31 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                                     if (tech['verified'] == true) ...[
                                       const SizedBox(width: 4),
                                       const Icon(Icons.verified, color: AppTheme.deepBlue, size: 16),
+                                    ],
+                                    if (isRecommended) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.successColor,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.recommend_rounded, color: Colors.white, size: 10),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Recommended',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ],
                                 ),

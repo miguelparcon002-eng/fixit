@@ -23,8 +23,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-
   String _selectedRole = AppConstants.roleCustomer;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -58,7 +56,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _fullNameController.dispose();
-    _phoneController.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -88,7 +85,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
         password: _passwordController.text,
         fullName: _fullNameController.text.trim(),
         role: _selectedRole,
-        contactNumber: _phoneController.text.trim(),
+        contactNumber: '',
       );
 
       if (response.user != null) {
@@ -313,17 +310,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
                 : !v.contains('@')
                     ? 'Invalid email'
                     : null,
-          ),
-          const SizedBox(height: 16),
-
-          // Phone (optional)
-          _fieldLabel('Phone Number'),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            style: const TextStyle(fontSize: 15),
-            decoration: _inputDecoration(hint: 'Enter your phone number', icon: Icons.phone_outlined),
           ),
           const SizedBox(height: 16),
 

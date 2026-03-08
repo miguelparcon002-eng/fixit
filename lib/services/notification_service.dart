@@ -42,6 +42,28 @@ class NotificationService {
     await SupabaseConfig.client.from('notifications').delete().eq('id', id);
   }
 
+  /// Send a verification status email to the technician via Edge Function.
+  Future<void> sendVerificationEmail({
+    required String toEmail,
+    required String technicianName,
+    required String action, // 'approved' | 'rejected' | 'resubmit'
+    String? adminNotes,
+  }) async {
+    try {
+      await SupabaseConfig.client.functions.invoke(
+        'send-verification-email',
+        body: {
+          'to': toEmail,
+          'technicianName': technicianName,
+          'action': action,
+          'adminNotes': adminNotes ?? '',
+        },
+      );
+    } catch (e) {
+      // Non-fatal: in-app notifications still work even if email fails
+    }
+  }
+
   /// Manually send a notification (for client-side events not covered by DB triggers).
   Future<void> sendNotification({
     required String userId,

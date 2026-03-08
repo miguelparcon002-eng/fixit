@@ -231,9 +231,9 @@ class _BookingDetailView extends ConsumerWidget {
       // Notify the technician
       await NotificationService().sendNotification(
         userId: booking.technicianId,
-        type: 'reminder',
+        type: 'booking_cancelled',
         title: 'Booking Cancelled',
-        message: 'A customer cancelled their booking request.',
+        message: 'A customer has cancelled their booking. Reason: $reason',
         data: {'booking_id': booking.id, 'route': '/tech-jobs'},
       );
 

@@ -346,6 +346,11 @@ class AppRouter {
             name: 'adminReports',
             builder: (context, state) => const AdminReportsScreen(),
           ),
+          GoRoute(
+            path: '/admin-support',
+            name: 'adminSupport',
+            builder: (context, state) => const AdminSupportScreen(),
+          ),
         ],
       ),
 
@@ -414,11 +419,6 @@ class AppRouter {
         path: '/verification-review',
         name: 'verificationReview',
         builder: (context, state) => const VerificationReviewScreen(),
-      ),
-      GoRoute(
-        path: '/admin-support',
-        name: 'adminSupport',
-        builder: (context, state) => const AdminSupportScreen(),
       ),
       GoRoute(
         path: '/admin-support/:ticketId',

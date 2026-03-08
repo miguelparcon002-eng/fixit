@@ -48,6 +48,13 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
             color: AppTheme.textPrimaryColor,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh, color: AppTheme.textPrimaryColor),
+            onPressed: () => ref.read(profileProvider.notifier).reload(),
+          ),
+        ],
       ),
       body: SafeArea(
         bottom: false,

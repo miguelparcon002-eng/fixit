@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/config/supabase_config.dart';
 import '../../models/verification_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
+import '../../services/notification_service.dart';
 
 class VerificationReviewScreen extends ConsumerWidget {
   const VerificationReviewScreen({super.key});
@@ -412,13 +414,46 @@ class _VerificationDetailsSheetState
     super.dispose();
   }
 
-  Future<void> _act(Future<void> Function() fn) async {
+  Future<String?> _fetchTechnicianEmail(String userId) async {
+    try {
+      final row = await SupabaseConfig.client
+          .from('users')
+          .select('email')
+          .eq('id', userId)
+          .single();
+      return row['email'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _act(
+    Future<void> Function() fn,
+    String action,
+  ) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       await fn();
+
+      // Send email to technician
+      final email = await _fetchTechnicianEmail(widget.request.userId);
+      if (email != null) {
+        await NotificationService().sendVerificationEmail(
+          toEmail: email,
+          technicianName: widget.request.fullName ?? 'Technician',
+          action: action,
+          adminNotes: _notesController.text.trim().isEmpty
+              ? null
+              : _notesController.text.trim(),
+        );
+      }
+
       if (mounted) {
         ref.invalidate(pendingVerificationsProvider);
+        ref.invalidate(resubmitVerificationsProvider);
+        ref.invalidate(rejectedVerificationsProvider);
+        ref.invalidate(approvedVerificationsProvider);
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -538,7 +573,7 @@ class _VerificationDetailsSheetState
                                 requestId: req.id,
                                 adminId: widget.adminId,
                                 notes: _notesController.text.trim(),
-                              )),
+                              ), 'resubmit'),
                       child: const Text('Resubmit'),
                     ),
                   ),
@@ -553,7 +588,7 @@ class _VerificationDetailsSheetState
                                 notes: _notesController.text.trim().isEmpty
                                     ? 'Rejected'
                                     : _notesController.text.trim(),
-                              )),
+                              ), 'rejected'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -570,7 +605,7 @@ class _VerificationDetailsSheetState
                                 requestId: req.id,
                                 adminId: widget.adminId,
                                 notes: _notesController.text.trim(),
-                              )),
+                              ), 'approved'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,

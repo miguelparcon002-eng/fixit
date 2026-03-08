@@ -146,7 +146,7 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                           return 'Resubmission required: ${req.adminNotes ?? 'Please update your verification documents.'}';
                         }
                         if (req.status == AppConstants.verificationPending) {
-                          return 'Verification submitted. You are in read-only mode until admin approval.';
+                          return 'Your verification is being processed. You are in read-only mode until admin approval.';
                         }
                         if (req.status == AppConstants.verificationRejected) {
                           return 'Verification rejected: ${req.adminNotes ?? 'Please review and resubmit.'}';
@@ -162,24 +162,24 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                       data: (req) {
                         if (req == null) {
                           return TextButton(
-                            onPressed: () => context.go('/verification-submission'),
+                            onPressed: () => context.push('/verification-submission'),
                             child: const Text('Submit verification'),
                           );
                         }
                         if (req.status == AppConstants.verificationResubmit) {
                           return TextButton(
-                            onPressed: () => context.go('/verification-submission'),
+                            onPressed: () => context.push('/verification-submission'),
                             child: const Text('Resubmit now'),
                           );
                         }
                         // Pending/rejected: allow viewing submission screen, but not required.
                         return TextButton(
-                          onPressed: () => context.go('/verification-submission'),
+                          onPressed: () => context.push('/verification-submission'),
                           child: const Text('View submission'),
                         );
                       },
                       orElse: () => TextButton(
-                        onPressed: () => context.go('/verification-submission'),
+                        onPressed: () => context.push('/verification-submission'),
                         child: const Text('Verification'),
                       ),
                     ),

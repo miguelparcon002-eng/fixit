@@ -110,7 +110,7 @@ class AdminHomeScreen extends ConsumerWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.35,
+                  childAspectRatio: 1.4,
                   children: [
                     _StatCard(
                       title: 'Pending\nVerifications',
@@ -143,11 +143,33 @@ class AdminHomeScreen extends ConsumerWidget {
                       color: Colors.red,
                       onTap: () => context.push('/admin-payment-settings'),
                     ),
+                    _StatCard(
+                      title: 'Customers',
+                      value: '${stats.totalCustomers}',
+                      icon: Icons.people,
+                      color: Colors.purple,
+                      onTap: () => context.go('/admin-users'),
+                    ),
+                    _StatCard(
+                      title: 'Technicians',
+                      value: '${stats.totalTechnicians}',
+                      icon: Icons.engineering,
+                      color: Colors.teal,
+                      onTap: () => context.go('/admin-users'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
 
                 _SectionTitle('Management'),
+                const SizedBox(height: 10),
+                _ActionTile(
+                  icon: Icons.support_agent,
+                  color: AppTheme.lightBlue,
+                  title: 'Customer Support',
+                  subtitle: 'View and manage support tickets',
+                  onTap: () => context.go('/admin-support'),
+                ),
                 const SizedBox(height: 10),
                 _ActionTile(
                   icon: Icons.star,

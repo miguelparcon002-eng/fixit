@@ -1,109 +1,104 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/support_ticket_model.dart';
 import '../core/config/supabase_config.dart';
-import 'auth_provider.dart';
 import '../core/utils/app_logger.dart';
+import 'auth_provider.dart';
 
-// Storage key for support tickets
-const String _ticketsStorageKey = 'support_tickets';
-const String _messagesStorageKey = 'ticket_messages';
-const String _tableName = 'local_storage';
-
-// Support Ticket Service
+// Support Ticket Service — reads/writes directly to the `support_tickets` Supabase table
 class SupportTicketService {
-  // Save tickets to Supabase
-  Future<void> saveTickets(List<SupportTicket> tickets) async {
-    try {
-      final jsonData = json.encode(tickets.map((t) => t.toJson()).toList());
+  final _supabase = SupabaseConfig.client;
 
-      final existing = await SupabaseConfig.client
-          .from(_tableName)
+  Future<List<SupportTicket>> loadAllTickets() async {
+    try {
+      final response = await _supabase
+          .from('support_tickets')
           .select()
-          .eq('key', _ticketsStorageKey)
-          .maybeSingle();
-
-      if (existing != null) {
-        await SupabaseConfig.client
-            .from(_tableName)
-            .update({'value': jsonData, 'updated_at': DateTime.now().toIso8601String()})
-            .eq('key', _ticketsStorageKey);
-      } else {
-        await SupabaseConfig.client
-            .from(_tableName)
-            .insert({
-              'key': _ticketsStorageKey,
-              'value': jsonData,
-              'updated_at': DateTime.now().toIso8601String()
-            });
-      }
-      AppLogger.p('SupportTicketService: Saved ${tickets.length} tickets');
+          .order('created_at', ascending: false);
+      return (response as List)
+          .map((json) => SupportTicket.fromJson(json))
+          .toList();
     } catch (e) {
-      AppLogger.p('SupportTicketService: Error saving tickets - $e');
+      AppLogger.p('SupportTicketService: Error loading all tickets - $e');
+      return [];
     }
   }
 
-  // Load tickets from Supabase
-  Future<List<SupportTicket>> loadTickets() async {
+  Future<List<SupportTicket>> loadTicketsForUser(String customerId) async {
     try {
-      final response = await SupabaseConfig.client
-          .from(_tableName)
-          .select('value')
-          .eq('key', _ticketsStorageKey)
-          .maybeSingle();
-
-      if (response != null && response['value'] != null) {
-        final List<dynamic> decoded = json.decode(response['value'] as String);
-        final tickets = decoded.map((item) => SupportTicket.fromJson(item)).toList();
-        AppLogger.p('SupportTicketService: Loaded ${tickets.length} tickets');
-        return tickets;
-      }
-      AppLogger.p('SupportTicketService: No tickets found');
-      return [];
+      final response = await _supabase
+          .from('support_tickets')
+          .select()
+          .eq('customer_id', customerId)
+          .order('created_at', ascending: false);
+      return (response as List)
+          .map((json) => SupportTicket.fromJson(json))
+          .toList();
     } catch (e) {
-      AppLogger.p('SupportTicketService: Error loading tickets - $e');
+      AppLogger.p('SupportTicketService: Error loading user tickets - $e');
       return [];
     }
   }
 
-  // Create a new ticket
   Future<SupportTicket?> createTicket(SupportTicket ticket) async {
     try {
-      final tickets = await loadTickets();
-      tickets.add(ticket);
-      await saveTickets(tickets);
+      final data = {
+        'id': ticket.id,
+        'customer_id': ticket.customerId,
+        'customer_name': ticket.customerName,
+        'customer_email': ticket.customerEmail,
+        'customer_phone': ticket.customerPhone,
+        'subject': ticket.subject,
+        'description': ticket.description,
+        'category': ticket.category,
+        'priority': ticket.priority,
+        'status': ticket.status,
+        'booking_id': ticket.bookingId,
+        'technician_id': ticket.technicianId,
+        'assigned_admin_id': ticket.assignedAdminId,
+        'messages': ticket.messages.map((m) => m.toJson()).toList(),
+        'attachments': ticket.attachments,
+        'created_at': ticket.createdAt.toIso8601String(),
+      };
+      final response = await _supabase
+          .from('support_tickets')
+          .insert(data)
+          .select()
+          .single();
       AppLogger.p('SupportTicketService: Created ticket ${ticket.id}');
-      return ticket;
+      return SupportTicket.fromJson(response);
     } catch (e) {
       AppLogger.p('SupportTicketService: Error creating ticket - $e');
       return null;
     }
   }
 
-  // Update ticket
-  Future<bool> updateTicket(SupportTicket updatedTicket) async {
+  Future<bool> updateTicket(SupportTicket ticket) async {
     try {
-      final tickets = await loadTickets();
-      final index = tickets.indexWhere((t) => t.id == updatedTicket.id);
-      if (index != -1) {
-        tickets[index] = updatedTicket;
-        await saveTickets(tickets);
-        AppLogger.p('SupportTicketService: Updated ticket ${updatedTicket.id}');
-        return true;
-      }
-      return false;
+      await _supabase
+          .from('support_tickets')
+          .update({
+            'subject': ticket.subject,
+            'description': ticket.description,
+            'status': ticket.status,
+            'priority': ticket.priority,
+            'assigned_admin_id': ticket.assignedAdminId,
+            'messages': ticket.messages.map((m) => m.toJson()).toList(),
+            'attachments': ticket.attachments,
+            'updated_at': DateTime.now().toIso8601String(),
+            'resolved_at': ticket.resolvedAt?.toIso8601String(),
+          })
+          .eq('id', ticket.id);
+      AppLogger.p('SupportTicketService: Updated ticket ${ticket.id}');
+      return true;
     } catch (e) {
       AppLogger.p('SupportTicketService: Error updating ticket - $e');
       return false;
     }
   }
 
-  // Delete ticket
   Future<bool> deleteTicket(String ticketId) async {
     try {
-      final tickets = await loadTickets();
-      tickets.removeWhere((t) => t.id == ticketId);
-      await saveTickets(tickets);
+      await _supabase.from('support_tickets').delete().eq('id', ticketId);
       AppLogger.p('SupportTicketService: Deleted ticket $ticketId');
       return true;
     } catch (e) {
@@ -112,74 +107,42 @@ class SupportTicketService {
     }
   }
 
-  // Add message to ticket
   Future<bool> addMessage(String ticketId, TicketMessage message) async {
     try {
-      final tickets = await loadTickets();
-      final index = tickets.indexWhere((t) => t.id == ticketId);
-      if (index != -1) {
-        final ticket = tickets[index];
-        final updatedMessages = [...ticket.messages, message];
-        tickets[index] = ticket.copyWith(
-          messages: updatedMessages,
-          updatedAt: DateTime.now(),
-          status: ticket.status == 'open' ? 'in_progress' : ticket.status,
-        );
-        await saveTickets(tickets);
-        AppLogger.p('SupportTicketService: Added message to ticket $ticketId');
-        return true;
-      }
-      return false;
+      // Fetch current messages, append new one, save back
+      final response = await _supabase
+          .from('support_tickets')
+          .select('messages')
+          .eq('id', ticketId)
+          .single();
+      final existing = (response['messages'] as List?) ?? [];
+      final updated = [...existing, message.toJson()];
+      await _supabase.from('support_tickets').update({
+        'messages': updated,
+        'updated_at': DateTime.now().toIso8601String(),
+        'status': 'in_progress',
+      }).eq('id', ticketId);
+      AppLogger.p('SupportTicketService: Added message to ticket $ticketId');
+      return true;
     } catch (e) {
       AppLogger.p('SupportTicketService: Error adding message - $e');
       return false;
     }
   }
 
-  // Update ticket status
   Future<bool> updateTicketStatus(String ticketId, String status) async {
     try {
-      final tickets = await loadTickets();
-      final index = tickets.indexWhere((t) => t.id == ticketId);
-      if (index != -1) {
-        tickets[index] = tickets[index].copyWith(
-          status: status,
-          updatedAt: DateTime.now(),
-          resolvedAt: status == 'resolved' ? DateTime.now() : null,
-        );
-        await saveTickets(tickets);
-        AppLogger.p('SupportTicketService: Updated status of ticket $ticketId to $status');
-        return true;
-      }
-      return false;
+      await _supabase.from('support_tickets').update({
+        'status': status,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (status == 'resolved')
+          'resolved_at': DateTime.now().toIso8601String(),
+      }).eq('id', ticketId);
+      AppLogger.p('SupportTicketService: Updated status of $ticketId to $status');
+      return true;
     } catch (e) {
       AppLogger.p('SupportTicketService: Error updating status - $e');
       return false;
-    }
-  }
-
-  // Get ticket by ID
-  Future<SupportTicket?> getTicketById(String ticketId) async {
-    try {
-      final tickets = await loadTickets();
-      return tickets.firstWhere(
-        (t) => t.id == ticketId,
-        orElse: () => throw Exception('Ticket not found'),
-      );
-    } catch (e) {
-      AppLogger.p('SupportTicketService: Error getting ticket - $e');
-      return null;
-    }
-  }
-
-  // Get tickets by customer ID
-  Future<List<SupportTicket>> getTicketsByCustomerId(String customerId) async {
-    try {
-      final tickets = await loadTickets();
-      return tickets.where((t) => t.customerId == customerId).toList();
-    } catch (e) {
-      AppLogger.p('SupportTicketService: Error getting customer tickets - $e');
-      return [];
     }
   }
 }
@@ -187,37 +150,28 @@ class SupportTicketService {
 // Provider for the service
 final supportTicketServiceProvider = Provider((ref) => SupportTicketService());
 
-// State notifier for managing tickets
+// State notifier — all tickets (admin view)
 class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
   final SupportTicketService _service;
-  bool _isInitialized = false;
 
   SupportTicketNotifier(this._service) : super([]) {
     _loadTickets();
   }
 
   Future<void> _loadTickets() async {
-    if (_isInitialized) return;
     try {
-      final tickets = await _service.loadTickets();
+      final tickets = await _service.loadAllTickets();
       state = tickets;
-      _isInitialized = true;
     } catch (e) {
       AppLogger.p('SupportTicketNotifier: Error loading tickets - $e');
-      _isInitialized = true;
     }
   }
 
-  Future<void> reload() async {
-    _isInitialized = false;
-    await _loadTickets();
-  }
+  Future<void> reload() async => _loadTickets();
 
   Future<SupportTicket?> createTicket(SupportTicket ticket) async {
     final result = await _service.createTicket(ticket);
-    if (result != null) {
-      state = [...state, result];
-    }
+    if (result != null) state = [result, ...state];
     return result;
   }
 
@@ -231,9 +185,7 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
 
   Future<bool> deleteTicket(String ticketId) async {
     final result = await _service.deleteTicket(ticketId);
-    if (result) {
-      state = state.where((t) => t.id != ticketId).toList();
-    }
+    if (result) state = state.where((t) => t.id != ticketId).toList();
     return result;
   }
 
@@ -271,7 +223,6 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
     return result;
   }
 
-  // Get ticket by ID from state
   SupportTicket? getTicketById(String ticketId) {
     try {
       return state.firstWhere((t) => t.id == ticketId);
@@ -281,39 +232,35 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
   }
 }
 
-// Main provider for all tickets (for admin)
+// Main provider for all tickets (admin)
 final supportTicketsProvider = StateNotifierProvider<SupportTicketNotifier, List<SupportTicket>>(
   (ref) => SupportTicketNotifier(ref.watch(supportTicketServiceProvider)),
 );
 
-// Provider for customer's own tickets
-final customerTicketsProvider = Provider<List<SupportTicket>>((ref) {
-  final user = ref.watch(currentUserProvider).value;
-  final allTickets = ref.watch(supportTicketsProvider);
-
+// Provider for the current user's own tickets only
+final customerTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
+  final user = await ref.watch(currentUserProvider.future);
   if (user == null) return [];
-  return allTickets.where((t) => t.customerId == user.id).toList();
+  final service = ref.watch(supportTicketServiceProvider);
+  return service.loadTicketsForUser(user.id);
 });
 
-// Provider for open tickets count
+// Derived count providers
 final openTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'open').length;
 });
 
-// Provider for in-progress tickets count
 final inProgressTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'in_progress').length;
 });
 
-// Provider for resolved tickets count
 final resolvedTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'resolved' || t.status == 'closed').length;
 });
 
-// Provider for single ticket by ID
 final ticketByIdProvider = Provider.family<SupportTicket?, String>((ref, ticketId) {
   final tickets = ref.watch(supportTicketsProvider);
   try {

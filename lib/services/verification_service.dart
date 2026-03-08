@@ -52,10 +52,15 @@ class VerificationService {
     String? bio,
     List<String>? specialties,
   }) async {
-    final requestId = _uuid.v4();
+    // Check for an existing verification request
+    final existing = await _supabase
+        .from(DBConstants.verificationRequests)
+        .select()
+        .eq('user_id', userId)
+        .order('submitted_at', ascending: false)
+        .maybeSingle();
 
-    final response = await _supabase.from(DBConstants.verificationRequests).insert({
-      'id': requestId,
+    final payload = {
       'user_id': userId,
       'documents': documentUrls,
       'status': AppConstants.verificationPending,
@@ -66,7 +71,83 @@ class VerificationService {
       'shop_name': shopName,
       'bio': bio,
       'specialties': specialties,
-    }).select().single();
+      'submitted_at': DateTime.now().toIso8601String(),
+      'admin_notes': null,
+      'reviewed_at': null,
+      'reviewed_by': null,
+    };
+
+    Map<String, dynamic> response;
+
+    if (existing != null && existing['status'] == AppConstants.verificationResubmit) {
+      // Admin requested resubmission — update the existing record
+      response = await _supabase
+          .from(DBConstants.verificationRequests)
+          .update(payload)
+          .eq('id', existing['id'])
+          .select()
+          .single();
+    } else if (existing != null &&
+        (existing['status'] == AppConstants.verificationPending ||
+         existing['status'] == AppConstants.verificationApproved)) {
+      // Already pending or approved — do not create a duplicate
+      throw Exception(
+        existing['status'] == AppConstants.verificationApproved
+            ? 'Your verification is already approved.'
+            : 'A verification request is already pending review.',
+      );
+    } else {
+      // No prior request (or rejected) — insert a new one
+      payload['id'] = _uuid.v4();
+      response = await _supabase
+          .from(DBConstants.verificationRequests)
+          .insert(payload)
+          .select()
+          .single();
+    }
+
+    // Pre-populate user profile with verification data immediately so the
+    // technician doesn't need to fill in their profile again after approval.
+    try {
+      final userUpdates = <String, dynamic>{};
+      if (fullName != null && fullName.isNotEmpty) userUpdates['full_name'] = fullName;
+      if (contactNumber != null && contactNumber.isNotEmpty) userUpdates['contact_number'] = contactNumber;
+      if (address != null && address.isNotEmpty) userUpdates['address'] = address;
+
+      if (userUpdates.isNotEmpty) {
+        await _supabase.from(DBConstants.users).update(userUpdates).eq('id', userId);
+      }
+
+      // Pre-populate technician profile (bio, specialties, shop, experience)
+      final profileData = <String, dynamic>{'user_id': userId};
+      if (yearsExperience != null) profileData['years_experience'] = yearsExperience;
+      if (shopName != null && shopName.isNotEmpty) profileData['shop_name'] = shopName;
+      if (bio != null && bio.isNotEmpty) profileData['bio'] = bio;
+      if (specialties != null && specialties.isNotEmpty) profileData['specialties'] = specialties;
+
+      if (profileData.length > 1) {
+        final existing = await _supabase
+            .from(DBConstants.technicianProfiles)
+            .select('user_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (existing == null) {
+          profileData['id'] = _uuid.v4();
+          profileData['rating'] = 0.0;
+          profileData['total_jobs'] = 0;
+          profileData['is_available'] = true;
+          await _supabase.from(DBConstants.technicianProfiles).insert(profileData);
+        } else {
+          await _supabase.from(DBConstants.technicianProfiles).update(profileData).eq('user_id', userId);
+        }
+      }
+
+      AppLogger.p('✅ Pre-populated user & technician profile on verification submission for: $userId');
+    } catch (e) {
+      // Non-fatal: verification request was already saved, profile pre-fill failed
+      AppLogger.p('⚠️ Could not pre-populate profile on submission: $e');
+    }
 
     return VerificationRequestModel.fromJson(response);
   }

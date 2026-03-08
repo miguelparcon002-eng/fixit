@@ -12,7 +12,7 @@ class HelpSupportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ticketCount = ref.watch(customerTicketsProvider).length;
+    final ticketCount = ref.watch(customerTicketsProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),

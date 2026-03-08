@@ -126,17 +126,14 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               
-              // Button
+              // Proceed button
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    // First, close the dialog
                     Navigator.of(context, rootNavigator: true).pop();
-                    // Wait a moment for dialog to close
                     await Future.delayed(const Duration(milliseconds: 100));
-                    // Then navigate to verification submission
                     if (context.mounted) {
                       context.push('/verification-submission');
                     }
@@ -153,6 +150,28 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                     'Proceed to Verification',
                     style: TextStyle(
                       fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Maybe later button
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Maybe Later',
+                    style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

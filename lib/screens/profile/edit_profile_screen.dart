@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/image_upload_service.dart';
-import '../booking/widgets/location_picker_sheet.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -21,9 +19,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _fullNameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
-  late TextEditingController _addressController;
-  LatLng? _pickedLatLng;
-
   bool _isLoading = false;
   String? _webImagePath;
   final ImagePicker _picker = ImagePicker();
@@ -34,7 +29,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _fullNameController = TextEditingController();
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
-    _addressController = TextEditingController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userAsync = ref.read(currentUserProvider);
@@ -46,10 +40,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             _fullNameController.text = user.fullName;
             _emailController.text = user.email;
             _phoneController.text = user.contactNumber ?? '';
-            _addressController.text = user.address ?? '';
-            if (user.latitude != null && user.longitude != null) {
-              _pickedLatLng = LatLng(user.latitude!, user.longitude!);
-            }
           });
         }
       });
@@ -71,7 +61,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
     super.dispose();
   }
 
@@ -138,9 +127,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         userId: user.id,
         fullName: _fullNameController.text.trim(),
         contactNumber: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-        latitude: _pickedLatLng?.latitude,
-        longitude: _pickedLatLng?.longitude,
+        address: null,
+        latitude: null,
+        longitude: null,
       );
 
       await ref.read(profileProvider.notifier).updateEmail(_emailController.text.trim());
@@ -332,72 +321,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               }
                               return null;
                             },
-                          ),
-                          const SizedBox(height: 16),
-                          _ModernTextField(
-                            controller: _addressController,
-                            label: 'Home Address',
-                            icon: Icons.home_rounded,
-                          ),
-                          const SizedBox(height: 8),
-                          // Pin exact location
-                          GestureDetector(
-                            onTap: () async {
-                              final result = await showModalBottomSheet<PickedLocation>(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => LocationPickerSheet(
-                                  initialLocation: _pickedLatLng,
-                                ),
-                              );
-                              if (result != null) {
-                                setState(() => _pickedLatLng = result.latLng);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _pickedLatLng != null
-                                    ? const Color(0xFF4A5FE0).withValues(alpha: 0.08)
-                                    : Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _pickedLatLng != null
-                                      ? const Color(0xFF4A5FE0).withValues(alpha: 0.4)
-                                      : Colors.grey.shade300,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _pickedLatLng != null
-                                        ? Icons.location_pin
-                                        : Icons.add_location_alt_outlined,
-                                    color: const Color(0xFF4A5FE0),
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      _pickedLatLng != null
-                                          ? 'Pinned: ${_pickedLatLng!.latitude.toStringAsFixed(5)}, ${_pickedLatLng!.longitude.toStringAsFixed(5)}'
-                                          : 'Pin exact location on map (optional)',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: _pickedLatLng != null
-                                            ? const Color(0xFF4A5FE0)
-                                            : Colors.grey.shade600,
-                                        fontWeight: _pickedLatLng != null
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 18),
-                                ],
-                              ),
-                            ),
                           ),
                         ],
                       ),

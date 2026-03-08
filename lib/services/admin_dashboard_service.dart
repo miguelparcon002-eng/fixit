@@ -1,4 +1,3 @@
-import 'dart:convert';
 import '../core/config/supabase_config.dart';
 import '../models/admin_dashboard_stats.dart';
 
@@ -16,21 +15,14 @@ class AdminDashboardService {
         .eq('status', 'pending');
     final pendingVerifications = (pendingVerificationsRows as List).length;
 
-    // Open support tickets (stored as JSON blob in local_storage)
+    // Open support tickets
     int openSupportTickets = 0;
     try {
-      final ticketsRow = await client
-          .from('local_storage')
-          .select('value')
-          .eq('key', 'support_tickets')
-          .maybeSingle();
-      if (ticketsRow != null && ticketsRow['value'] != null) {
-        final List<dynamic> ticketsList = json.decode(ticketsRow['value'] as String);
-        openSupportTickets = ticketsList.where((t) {
-          final status = t['status'] as String?;
-          return status == 'open' || status == 'in_progress';
-        }).length;
-      }
+      final openTicketsRows = await client
+          .from('support_tickets')
+          .select('id')
+          .or('status.eq.open,status.eq.in_progress');
+      openSupportTickets = (openTicketsRows as List).length;
     } catch (_) {}
 
     // Total bookings

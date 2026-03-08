@@ -19,13 +19,14 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(supportTicketsProvider.notifier).reload();
+      ref.invalidate(customerTicketsProvider);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final allTickets = ref.watch(customerTicketsProvider);
+    final ticketsAsync = ref.watch(customerTicketsProvider);
+    final allTickets = ticketsAsync.valueOrNull ?? [];
 
     List<SupportTicket> filteredTickets;
     switch (_selectedFilter) {
@@ -141,7 +142,8 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
                 : RefreshIndicator(
                     color: AppTheme.deepBlue,
                     onRefresh: () async {
-                      await ref.read(supportTicketsProvider.notifier).reload();
+                      ref.invalidate(customerTicketsProvider);
+                      await ref.read(customerTicketsProvider.future);
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),

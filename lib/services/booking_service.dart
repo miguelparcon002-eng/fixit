@@ -224,9 +224,9 @@ class BookingService {
       final direction = priceAdjustment > 0 ? 'increased' : 'decreased';
       await NotificationService().sendNotification(
         userId: booking.customerId,
-        type: 'reminder',
+        type: 'price_updated',
         title: 'Price Updated',
-        message: 'Your service price has been $direction to ₱${newCost.toStringAsFixed(2)}.',
+        message: 'Your repair cost has been $direction to ₱${newCost.toStringAsFixed(2)} by the technician.',
         data: {'booking_id': bookingId, 'route': '/booking/$bookingId'},
       );
     }

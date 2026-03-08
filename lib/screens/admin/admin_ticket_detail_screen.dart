@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../core/widgets/app_logo.dart';
+import '../../services/notification_service.dart';
 
 class AdminTicketDetailScreen extends ConsumerStatefulWidget {
   final String ticketId;
@@ -94,6 +95,19 @@ class _AdminTicketDetailScreenState
       await ref
           .read(supportTicketsProvider.notifier)
           .addMessage(widget.ticketId, message);
+
+      // Notify customer of admin reply
+      final ticket = ref.read(ticketByIdProvider(widget.ticketId));
+      if (ticket != null) {
+        await NotificationService().sendNotification(
+          userId: ticket.customerId,
+          type: 'support_reply',
+          title: 'Support Reply',
+          message: 'Admin replied to your ticket: "${ticket.subject}"',
+          data: {'ticket_id': widget.ticketId, 'route': '/my-tickets'},
+        );
+      }
+
       _replyController.clear();
 
       // Scroll to bottom
@@ -132,9 +146,22 @@ class _AdminTicketDetailScreenState
   }
 
   Future<void> _updateStatus(String newStatus) async {
+    final ticket = ref.read(ticketByIdProvider(widget.ticketId));
     await ref
         .read(supportTicketsProvider.notifier)
         .updateTicketStatus(widget.ticketId, newStatus);
+
+    // Notify customer of status change
+    if (ticket != null) {
+      final statusLabel = newStatus.replaceAll('_', ' ');
+      await NotificationService().sendNotification(
+        userId: ticket.customerId,
+        type: 'support_update',
+        title: 'Ticket Status Updated',
+        message: 'Your support ticket "${ticket.subject}" is now $statusLabel.',
+        data: {'ticket_id': widget.ticketId, 'route': '/my-tickets'},
+      );
+    }
 
     if (mounted) {
       Navigator.pop(context);

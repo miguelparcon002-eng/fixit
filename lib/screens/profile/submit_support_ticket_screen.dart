@@ -149,7 +149,13 @@ class _SubmitSupportTicketScreenState
         ],
       );
 
-      await ref.read(supportTicketsProvider.notifier).createTicket(ticket);
+      final service = ref.read(supportTicketServiceProvider);
+      final created = await service.createTicket(ticket);
+
+      if (created == null) throw Exception('Failed to save ticket');
+
+      // Refresh the customer's ticket list
+      ref.invalidate(customerTicketsProvider);
 
       if (mounted) {
         _showSuccessDialog(ticketId);

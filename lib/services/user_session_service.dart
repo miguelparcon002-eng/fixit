@@ -1,7 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/address_provider.dart';
 import '../providers/booking_provider.dart';
+import '../providers/profile_provider.dart';
+import '../providers/ratings_provider.dart';
 import '../providers/rewards_provider.dart';
+import '../providers/support_ticket_provider.dart';
+import '../providers/technician_stats_provider.dart';
 import '../providers/voucher_provider.dart';
 import '../providers/earnings_provider.dart';
 import '../providers/auth_provider.dart';
@@ -81,6 +85,14 @@ class UserSessionService {
 
       // Refresh user profile
       _ref.invalidate(currentUserProvider);
+      _ref.invalidate(profileProvider);
+
+      // Reload technician stats and ratings
+      _ref.invalidate(technicianStatsProvider);
+      _ref.invalidate(ratingsProvider);
+
+      // Reload support tickets
+      _ref.invalidate(supportTicketsProvider);
 
       AppLogger.p('UserSessionService: All user data reloaded');
     } catch (e) {
@@ -92,6 +104,7 @@ class UserSessionService {
   void _invalidateAllProviders() {
     // Invalidate auth
     _ref.invalidate(currentUserProvider);
+    _ref.invalidate(profileProvider);
 
     // Invalidate bookings
     _ref.invalidate(customerBookingsProvider);
@@ -114,6 +127,13 @@ class UserSessionService {
     _ref.invalidate(weekEarningsProvider);
     _ref.invalidate(monthEarningsProvider);
     _ref.invalidate(transactionsProvider);
+
+    // Invalidate technician stats and ratings
+    _ref.invalidate(technicianStatsProvider);
+    _ref.invalidate(ratingsProvider);
+
+    // Invalidate support tickets
+    _ref.invalidate(supportTicketsProvider);
 
     AppLogger.p('UserSessionService: All providers invalidated');
   }

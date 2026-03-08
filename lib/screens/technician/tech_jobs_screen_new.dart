@@ -8,6 +8,7 @@ import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../services/booking_service.dart';
+import '../../services/notification_service.dart';
 import 'widgets/customer_location_sheet.dart';
 
 // Provider for the initial tab to show in jobs screen
@@ -734,6 +735,14 @@ class _TechJobCard extends ConsumerWidget {
         status: 'in_progress',
       );
 
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_accepted',
+        title: 'Booking Accepted',
+        message: 'Your booking has been accepted by the technician and is now in progress.',
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+
       // Mark the redeemed voucher as used now that the job is accepted
       final voucherId = booking.redeemedVoucherId;
       if (voucherId != null) {
@@ -792,6 +801,15 @@ class _TechJobCard extends ConsumerWidget {
         bookingId: booking.id,
         status: 'cancelled',
       );
+
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_declined',
+        title: 'Booking Declined',
+        message: 'Unfortunately, the technician was unable to accept your booking. Please try booking another technician.',
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+
       ref.invalidate(technicianBookingsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1317,6 +1335,15 @@ class _TechJobCard extends ConsumerWidget {
         bookingId: booking.id,
         status: 'completed',
       );
+
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_completed',
+        title: 'Booking Completed',
+        message: 'Your repair has been completed! Please rate your experience with the technician.',
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+
       ref.invalidate(technicianBookingsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

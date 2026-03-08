@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/rewards_provider.dart';
+import '../../providers/address_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/user_session_service.dart';
 import '../../services/redeemed_voucher_service.dart';
@@ -720,8 +721,12 @@ class _ProfileCompletionBar extends ConsumerWidget {
     if (profile.profileImagePath != null &&
         profile.profileImagePath!.isNotEmpty)
       completedFields++;
-    // Check if user has at least one address (you may need to add this check based on your data)
-    completedFields++; // Assuming address is optional for now
+    final addressesAsync = ref.watch(userAddressesProvider);
+    final hasAddress = addressesAsync.maybeWhen(
+      data: (list) => list.isNotEmpty,
+      orElse: () => false,
+    );
+    if (hasAddress) completedFields++;
 
     final completionPercentage = (completedFields / totalFields * 100).round();
 
@@ -849,7 +854,11 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
     final hasProfileImage =
         profile.profileImagePath != null &&
         profile.profileImagePath!.isNotEmpty;
-    final hasAddress = true; // Assuming complete for now
+    final addressesAsync = ref.watch(userAddressesProvider);
+    final hasAddress = addressesAsync.maybeWhen(
+      data: (list) => list.isNotEmpty,
+      orElse: () => false,
+    );
 
     final isComplete = completionPercentage == 100;
 
@@ -861,9 +870,10 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
           topRight: Radius.circular(28),
         ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12),
@@ -1051,6 +1061,7 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
             ),
           const SizedBox(height: 20),
         ],
+      ),
       ),
     );
   }
