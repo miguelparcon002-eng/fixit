@@ -76,9 +76,8 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
             builder: (context) => VerificationResubmitDialog(
               verificationRequest: verificationRequest,
             ),
-          ).then((_) {
-            _dialogShown = false;
-          });
+          );
+          // Do NOT reset _dialogShown so the dialog doesn't re-trigger on rebuild
         }
       },
       loading: () {
@@ -149,7 +148,7 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                           return 'Your verification is being processed. You are in read-only mode until admin approval.';
                         }
                         if (req.status == AppConstants.verificationRejected) {
-                          return 'Verification rejected: ${req.adminNotes ?? 'Please review and resubmit.'}';
+                          return 'Verification rejected: ${req.adminNotes ?? 'Contact support for more information.'}';
                         }
                         return 'Your technician account is in read-only mode until verification is approved.';
                       },
@@ -172,7 +171,11 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                             child: const Text('Resubmit now'),
                           );
                         }
-                        // Pending/rejected: allow viewing submission screen, but not required.
+                        if (req.status == AppConstants.verificationRejected) {
+                          // Rejected: no action available until admin allows resubmission
+                          return const SizedBox.shrink();
+                        }
+                        // Pending: allow viewing submission
                         return TextButton(
                           onPressed: () => context.push('/verification-submission'),
                           child: const Text('View submission'),

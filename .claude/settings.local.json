@@ -26,7 +26,9 @@
       "Bash(grep -l \"user_addresses\\\\|latitude\\\\|longitude\" c:/Users/ferna/fixit/fixit/*.sql)",
       "Bash(dart analyze lib/screens/admin/admin_reports_screen.dart lib/services/admin_reports_service.dart lib/providers/admin_reports_provider.dart)",
       "Bash(dart analyze lib/screens/admin/admin_home_screen.dart lib/providers/admin_booking_provider.dart lib/services/admin_booking_service.dart)",
-      "Bash(dart analyze lib/screens/admin/verification_review_screen.dart lib/providers/verification_provider.dart lib/services/verification_service.dart)"
+      "Bash(dart analyze lib/screens/admin/verification_review_screen.dart lib/providers/verification_provider.dart lib/services/verification_service.dart)",
+      "Bash(supabase --version)",
+      "Bash(dart --version)"
     ],
     "deny": [],
     "ask": []

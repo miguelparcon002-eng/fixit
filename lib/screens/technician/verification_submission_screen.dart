@@ -43,6 +43,7 @@ class _VerificationSubmissionScreenState
   final Set<String> _selectedSpecialties = {};
   bool _isSubmitting = false;
   bool _isLeavingDialogOpen = false;
+  bool _isEditingPending = false;
   LatLng? _pinnedLocation;
 
   // Step tracking: 0 = Personal, 1 = Professional, 2 = Documents
@@ -58,10 +59,39 @@ class _VerificationSubmissionScreenState
   Future<void> _loadUserData() async {
     final user = await ref.read(currentUserProvider.future);
     if (user != null) {
+      _fullNameController.text = user.fullName;
+      _contactNumberController.text = user.contactNumber ?? '';
+      _addressController.text = user.address ?? '';
+    }
+
+    // Also pre-fill from existing verification request if available
+    final verificationReq = await ref.read(userVerificationRequestProvider.future);
+    if (verificationReq != null && mounted) {
       setState(() {
-        _fullNameController.text = user.fullName;
-        _contactNumberController.text = user.contactNumber ?? '';
-        _addressController.text = user.address ?? '';
+        _isEditingPending = verificationReq.status == AppConstants.verificationPending ||
+            verificationReq.status == AppConstants.verificationResubmit;
+        if (verificationReq.fullName != null && verificationReq.fullName!.isNotEmpty) {
+          _fullNameController.text = verificationReq.fullName!;
+        }
+        if (verificationReq.contactNumber != null && verificationReq.contactNumber!.isNotEmpty) {
+          _contactNumberController.text = verificationReq.contactNumber!;
+        }
+        if (verificationReq.address != null && verificationReq.address!.isNotEmpty) {
+          _addressController.text = verificationReq.address!;
+        }
+        if (verificationReq.shopName != null) {
+          _shopNameController.text = verificationReq.shopName!;
+        }
+        if (verificationReq.bio != null) {
+          _bioController.text = verificationReq.bio!;
+        }
+        if (verificationReq.specialties != null && verificationReq.specialties!.isNotEmpty) {
+          _selectedSpecialties.addAll(verificationReq.specialties!);
+        }
+        if (verificationReq.yearsExperience != null && verificationReq.yearsExperience! > 0) {
+          _expYears = verificationReq.yearsExperience! ~/ 12;
+          _expMonths = verificationReq.yearsExperience! % 12;
+        }
       });
     }
   }
@@ -321,86 +351,6 @@ class _VerificationSubmissionScreenState
 
   @override
   Widget build(BuildContext context) {
-    final verificationAsync = ref.watch(userVerificationRequestProvider);
-    final verificationReq = verificationAsync.valueOrNull;
-
-    // If already pending, show a status screen instead of the form
-    if (verificationReq != null &&
-        verificationReq.status == AppConstants.verificationPending) {
-      return PopScope(
-        canPop: true,
-        child: Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
-          appBar: AppBar(
-            backgroundColor: AppTheme.deepBlue,
-            foregroundColor: Colors.white,
-            title: const Text('Verification Status'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
-            ),
-          ),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.pending_actions,
-                        color: Colors.orange, size: 64),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Verification Under Review',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimaryColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Your verification is being processed by our admin team. You will be notified via email once it is reviewed.\n\nThis usually takes 24–48 hours.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      height: 1.6,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => context.go('/tech-home'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.deepBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Back to Home',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
@@ -1051,7 +1001,9 @@ class _VerificationSubmissionScreenState
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        isLast ? 'Submit for Verification' : 'Continue',
+                        isLast
+                            ? (_isEditingPending ? 'Update Submission' : 'Submit for Verification')
+                            : 'Continue',
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700),
                       ),

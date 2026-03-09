@@ -250,6 +250,33 @@ class AuthService {
     await _supabase.auth.resetPasswordForEmail(email);
   }
 
+  Future<void> sendOtp(String email) async {
+    await _supabase.auth.signInWithOtp(
+      email: email,
+      shouldCreateUser: false,
+    );
+  }
+
+  Future<void> verifyOtp({
+    required String email,
+    required String token,
+  }) async {
+    final response = await _supabase.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.email,
+    );
+    if (response.session == null) {
+      throw Exception('OTP verification failed. Please try again.');
+    }
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await _supabase.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
   Future<void> updateProfile({
     required String userId,
     String? fullName,

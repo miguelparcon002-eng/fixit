@@ -12,10 +12,21 @@ class AdminNavigation extends StatefulWidget {
 }
 
 class _AdminNavigationState extends State<AdminNavigation> {
-  int _currentIndex = 0;
+  int _indexFromRoute(String location) {
+    if (location.startsWith('/admin-home')) return 0;
+    if (location.startsWith('/admin-appointments')) return 1;
+    if (location.startsWith('/admin-users') ||
+        location.startsWith('/admin-customers') ||
+        location.startsWith('/admin-technicians')) return 2;
+    if (location.startsWith('/admin-reports')) return 3;
+    return 0;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.toString();
+    final currentIndex = _indexFromRoute(location);
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
@@ -37,38 +48,26 @@ class _AdminNavigationState extends State<AdminNavigation> {
               _NavItem(
                 icon: Icons.dashboard,
                 label: 'Dashboard',
-                isSelected: _currentIndex == 0,
-                onTap: () {
-                  setState(() => _currentIndex = 0);
-                  context.go('/admin-home');
-                },
+                isSelected: currentIndex == 0,
+                onTap: () => context.go('/admin-home'),
               ),
               _NavItem(
                 icon: Icons.calendar_today,
                 label: 'Appointment',
-                isSelected: _currentIndex == 1,
-                onTap: () {
-                  setState(() => _currentIndex = 1);
-                  context.go('/admin-appointments');
-                },
+                isSelected: currentIndex == 1,
+                onTap: () => context.go('/admin-appointments'),
               ),
               _NavItem(
                 icon: Icons.people_rounded,
                 label: 'Users',
-                isSelected: _currentIndex == 2,
-                onTap: () {
-                  setState(() => _currentIndex = 2);
-                  context.go('/admin-users');
-                },
+                isSelected: currentIndex == 2,
+                onTap: () => context.go('/admin-users'),
               ),
               _NavItem(
                 icon: Icons.bar_chart,
                 label: 'Report',
-                isSelected: _currentIndex == 3,
-                onTap: () {
-                  setState(() => _currentIndex = 3);
-                  context.go('/admin-reports');
-                },
+                isSelected: currentIndex == 3,
+                onTap: () => context.go('/admin-reports'),
               ),
             ],
           ),

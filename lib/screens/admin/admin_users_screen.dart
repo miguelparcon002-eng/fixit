@@ -363,7 +363,7 @@ class _CustomersTab extends ConsumerWidget {
 
 enum _TechSort { experience, createdAt, jobsDone }
 
-enum _TechVerifiedFilter { all, verified, unverified }
+enum _TechVerifiedFilter { all, verified, unverified, suspended }
 
 class _TechniciansTab extends ConsumerStatefulWidget {
   const _TechniciansTab();
@@ -384,6 +384,8 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return 'Verified';
       case _TechVerifiedFilter.unverified:
         return 'Unverified';
+      case _TechVerifiedFilter.suspended:
+        return 'Suspended';
     }
   }
 
@@ -407,6 +409,8 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return items.where((t) => t.verified).toList();
       case _TechVerifiedFilter.unverified:
         return items.where((t) => !t.verified).toList();
+      case _TechVerifiedFilter.suspended:
+        return items.where((t) => t.isSuspended).toList();
     }
   }
 
@@ -461,6 +465,16 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
                 onTap: () {
                   setState(
                       () => _verifiedFilter = _TechVerifiedFilter.unverified);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+              const SizedBox(height: 8),
+              _TechFilterOption(
+                label: 'Suspended',
+                isSelected: _verifiedFilter == _TechVerifiedFilter.suspended,
+                onTap: () {
+                  setState(
+                      () => _verifiedFilter = _TechVerifiedFilter.suspended);
                   Navigator.of(ctx).pop();
                 },
               ),

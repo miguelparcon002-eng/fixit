@@ -79,8 +79,10 @@ class VerificationService {
 
     Map<String, dynamic> response;
 
-    if (existing != null && existing['status'] == AppConstants.verificationResubmit) {
-      // Admin requested resubmission — update the existing record
+    if (existing != null &&
+        (existing['status'] == AppConstants.verificationResubmit ||
+         existing['status'] == AppConstants.verificationPending)) {
+      // Update the existing record (resubmission or technician editing pending)
       response = await _supabase
           .from(DBConstants.verificationRequests)
           .update(payload)
@@ -88,16 +90,15 @@ class VerificationService {
           .select()
           .single();
     } else if (existing != null &&
-        (existing['status'] == AppConstants.verificationPending ||
-         existing['status'] == AppConstants.verificationApproved)) {
-      // Already pending or approved — do not create a duplicate
-      throw Exception(
-        existing['status'] == AppConstants.verificationApproved
-            ? 'Your verification is already approved.'
-            : 'A verification request is already pending review.',
-      );
+         existing['status'] == AppConstants.verificationApproved) {
+      // Already approved — do not allow overwrite
+      throw Exception('Your verification is already approved.');
+    } else if (existing != null &&
+         existing['status'] == AppConstants.verificationRejected) {
+      // Rejected — cannot resubmit unless admin changes status to resubmit
+      throw Exception('Your verification was rejected. You cannot resubmit unless an admin allows it.');
     } else {
-      // No prior request (or rejected) — insert a new one
+      // No prior request — insert a new one
       payload['id'] = _uuid.v4();
       response = await _supabase
           .from(DBConstants.verificationRequests)

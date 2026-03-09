@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createTransport } from 'npm:nodemailer@6.9.9';
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
+const GMAIL_USER = Deno.env.get('GMAIL_USER') ?? '';
+const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD') ?? '';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -101,27 +103,22 @@ serve(async (req) => {
       });
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
+    const transporter = createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: GMAIL_USER,
+        pass: GMAIL_APP_PASSWORD,
       },
-      body: JSON.stringify({
-        from: 'FixIT <noreply@fixit.com>',
-        to: [to],
-        subject,
-        html: bodyHtml,
-      }),
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      return new Response(JSON.stringify({ error: err }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    await transporter.sendMail({
+      from: `FixIT <${GMAIL_USER}>`,
+      to,
+      subject,
+      html: bodyHtml,
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },

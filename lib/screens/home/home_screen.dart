@@ -56,19 +56,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // If not marked complete in DB, check if profile is actually complete
     if (!isSetupComplete) {
+      final hasName = (user.fullName ?? '').isNotEmpty;
       final hasPhone = (user.contactNumber ?? '').isNotEmpty;
       final addresses = ref.read(userAddressesProvider).valueOrNull ?? [];
       final hasAddress = addresses.isNotEmpty;
 
-      if (hasPhone && hasAddress) {
-        // Profile is already complete — mark it and skip dialog
+      if (hasName && hasPhone && hasAddress) {
+        // Core profile fields are complete — mark it and skip dialog
         await voucherService.markProfileSetupComplete(user.id);
         return;
       }
 
       // Also skip for existing accounts older than 1 day
-      final daysSinceCreation = DateTime.now().difference(user.createdAt).inDays;
-      if (daysSinceCreation >= 1) {
+      final hoursSinceCreation = DateTime.now().difference(user.createdAt).inHours;
+      if (hoursSinceCreation >= 24) {
         await voucherService.markProfileSetupComplete(user.id);
         return;
       }

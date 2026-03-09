@@ -11,7 +11,7 @@ import 'widgets/admin_technician_details_sheet.dart';
 
 enum _TechnicianSort { experience, createdAt, jobsDone }
 
-enum _VerifiedFilter { all, verified, unverified }
+enum _VerifiedFilter { all, verified, unverified, suspended }
 
 class AdminTechniciansScreen extends ConsumerStatefulWidget {
   const AdminTechniciansScreen({super.key});
@@ -34,6 +34,8 @@ class _AdminTechniciansScreenState
         return 'Verified';
       case _VerifiedFilter.unverified:
         return 'Unverified';
+      case _VerifiedFilter.suspended:
+        return 'Suspended';
     }
   }
 
@@ -105,6 +107,15 @@ class _AdminTechniciansScreenState
                     Navigator.of(dialogContext).pop();
                   },
                 ),
+                const SizedBox(height: 8),
+                _SortOption(
+                  label: 'Suspended',
+                  isSelected: _verifiedFilter == _VerifiedFilter.suspended,
+                  onTap: () {
+                    setState(() => _verifiedFilter = _VerifiedFilter.suspended);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
               ],
             ),
           ),
@@ -121,6 +132,8 @@ class _AdminTechniciansScreenState
         return items.where((t) => t.verified).toList();
       case _VerifiedFilter.unverified:
         return items.where((t) => !t.verified).toList();
+      case _VerifiedFilter.suspended:
+        return items.where((t) => t.isSuspended).toList();
     }
   }
 

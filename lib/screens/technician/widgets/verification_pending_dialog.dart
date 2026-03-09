@@ -517,7 +517,7 @@ class VerificationRejectedDialog extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigator.of(context, rootNavigator: true).pop();
                     context.push('/verification-submission');
                   },
                   style: ElevatedButton.styleFrom(
@@ -652,7 +652,7 @@ class VerificationResubmitDialog extends StatelessWidget {
                 height: 48,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigator.of(context, rootNavigator: true).pop();
                     context.push('/verification-submission');
                   },
                   style: ElevatedButton.styleFrom(

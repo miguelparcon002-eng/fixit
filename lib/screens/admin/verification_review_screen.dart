@@ -22,8 +22,10 @@ class VerificationReviewScreen extends ConsumerWidget {
 
     final pendingCount = pendingAsync.valueOrNull?.length ?? 0;
     final resubmitCount = resubmitAsync.valueOrNull?.length ?? 0;
+    final rejectedCount = rejectedAsync.valueOrNull?.length ?? 0;
+    final approvedCount = approvedAsync.valueOrNull?.length ?? 0;
 
-    void openDetails(VerificationRequestModel req) async {
+    void openDetails(VerificationRequestModel req, {bool showActions = false, bool showAllowResubmit = false}) async {
       final admin = userAsync.valueOrNull;
       if (admin == null) return;
       if (!context.mounted) return;
@@ -34,6 +36,8 @@ class VerificationReviewScreen extends ConsumerWidget {
         builder: (_) => _VerificationDetailsSheet(
           request: req,
           adminId: admin.id,
+          showActions: showActions,
+          showAllowResubmit: showAllowResubmit,
         ),
       );
     }
@@ -104,8 +108,30 @@ class VerificationReviewScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Tab(text: 'Rejected'),
-              const Tab(text: 'Approved'),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Rejected'),
+                    if (rejectedCount > 0) ...[
+                      const SizedBox(width: 5),
+                      _TabBadge(count: rejectedCount, color: Colors.red),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Approved'),
+                    if (approvedCount > 0) ...[
+                      const SizedBox(width: 5),
+                      _TabBadge(count: approvedCount, color: AppTheme.successColor),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -119,7 +145,7 @@ class VerificationReviewScreen extends ConsumerWidget {
               statusLabel: 'Pending',
               statusColor: Colors.orange,
               showActions: true,
-              onTap: openDetails,
+              onTap: (req) => openDetails(req, showActions: true),
             ),
             _VerificationList(
               asyncData: resubmitAsync,
@@ -128,8 +154,8 @@ class VerificationReviewScreen extends ConsumerWidget {
               emptyColor: AppTheme.lightBlue,
               statusLabel: 'Resubmit',
               statusColor: AppTheme.lightBlue,
-              showActions: true,
-              onTap: openDetails,
+              showActions: false,
+              onTap: (req) => openDetails(req, showActions: false),
             ),
             _VerificationList(
               asyncData: rejectedAsync,
@@ -139,7 +165,7 @@ class VerificationReviewScreen extends ConsumerWidget {
               statusLabel: 'Rejected',
               statusColor: Colors.red,
               showActions: false,
-              onTap: openDetails,
+              onTap: (req) => openDetails(req, showAllowResubmit: true),
             ),
             _VerificationList(
               asyncData: approvedAsync,
@@ -149,7 +175,7 @@ class VerificationReviewScreen extends ConsumerWidget {
               statusLabel: 'Approved',
               statusColor: AppTheme.successColor,
               showActions: false,
-              onTap: openDetails,
+              onTap: (req) => openDetails(req, showActions: false),
             ),
           ],
         ),
@@ -392,10 +418,14 @@ class _VerificationCard extends StatelessWidget {
 class _VerificationDetailsSheet extends ConsumerStatefulWidget {
   final VerificationRequestModel request;
   final String adminId;
+  final bool showActions;
+  final bool showAllowResubmit;
 
   const _VerificationDetailsSheet({
     required this.request,
     required this.adminId,
+    required this.showActions,
+    this.showAllowResubmit = false,
   });
 
   @override
@@ -436,26 +466,41 @@ class _VerificationDetailsSheetState
     try {
       await fn();
 
-      // Send email to technician
-      final email = await _fetchTechnicianEmail(widget.request.userId);
-      if (email != null) {
-        await NotificationService().sendVerificationEmail(
-          toEmail: email,
-          technicianName: widget.request.fullName ?? 'Technician',
-          action: action,
-          adminNotes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
-        );
-      }
-
       if (mounted) {
         ref.invalidate(pendingVerificationsProvider);
         ref.invalidate(resubmitVerificationsProvider);
         ref.invalidate(rejectedVerificationsProvider);
         ref.invalidate(approvedVerificationsProvider);
-        Navigator.of(context).pop();
+        Navigator.of(context, rootNavigator: true).pop();
       }
+
+      // Send email in background — don't await so it doesn't block the UI
+      final notes = _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim();
+      final requestUserId = widget.request.userId;
+      final requestFullName = widget.request.fullName;
+      _fetchTechnicianEmail(requestUserId).then((email) {
+        if (email != null) {
+          return NotificationService().sendVerificationEmail(
+            toEmail: email,
+            technicianName: requestFullName ?? 'Technician',
+            action: action,
+            adminNotes: notes,
+          );
+        }
+      }).catchError((e) {
+        // Show email error as a snackbar so it's visible during testing
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Email error: $e'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -550,71 +595,94 @@ class _VerificationDetailsSheetState
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              _Section(
-                title: 'Admin notes (optional)',
-                child: TextField(
-                  controller: _notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText: 'Add notes for the technician…',
-                    border: OutlineInputBorder(),
+              if (widget.showActions) ...[
+                const SizedBox(height: 12),
+                _Section(
+                  title: 'Admin notes (optional)',
+                  child: TextField(
+                    controller: _notesController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Add notes for the technician…',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _busy
-                          ? null
-                          : () => _act(() => service.requestResubmission(
-                                requestId: req.id,
-                                adminId: widget.adminId,
-                                notes: _notesController.text.trim(),
-                              ), 'resubmit'),
-                      child: const Text('Resubmit'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _busy
-                          ? null
-                          : () => _act(() => service.rejectVerification(
-                                requestId: req.id,
-                                adminId: widget.adminId,
-                                notes: _notesController.text.trim().isEmpty
-                                    ? 'Rejected'
-                                    : _notesController.text.trim(),
-                              ), 'rejected'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _act(() => service.requestResubmission(
+                                  requestId: req.id,
+                                  adminId: widget.adminId,
+                                  notes: _notesController.text.trim(),
+                                ), 'resubmit'),
+                        child: const Text('Resubmit'),
                       ),
-                      child: const Text('Reject'),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _busy
-                          ? null
-                          : () => _act(() => service.approveVerification(
-                                requestId: req.id,
-                                adminId: widget.adminId,
-                                notes: _notesController.text.trim(),
-                              ), 'approved'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _act(() => service.rejectVerification(
+                                  requestId: req.id,
+                                  adminId: widget.adminId,
+                                  notes: _notesController.text.trim().isEmpty
+                                      ? 'Rejected'
+                                      : _notesController.text.trim(),
+                                ), 'rejected'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                        ),
+                        child: const Text('Reject'),
                       ),
-                      child: const Text('Approve'),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _act(() => service.approveVerification(
+                                  requestId: req.id,
+                                  adminId: widget.adminId,
+                                  notes: _notesController.text.trim(),
+                                ), 'approved'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Approve'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (widget.showAllowResubmit) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _act(() => service.requestResubmission(
+                              requestId: req.id,
+                              adminId: widget.adminId,
+                              notes: '',
+                            ), 'resubmit'),
+                    icon: const Icon(Icons.replay_rounded),
+                    label: const Text('Allow Resubmission'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.lightBlue,
+                      foregroundColor: Colors.white,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ],
           ),
         ),

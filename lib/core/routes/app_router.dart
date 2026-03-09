@@ -6,6 +6,7 @@ import '../../screens/auth/welcome_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
 import '../../screens/auth/role_selection_screen.dart';
+import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/home/main_navigation.dart';
 import '../../screens/booking/booking_list_screen.dart';
@@ -77,13 +78,18 @@ class AppRouter {
         final session = supabase.auth.currentSession;
         if (session == null) return '/welcome'; // not logged in
 
-        // Session exists — fetch role and go straight to the right home
+        // Session exists — fetch role and suspension status
         try {
           final response = await supabase
               .from('users')
-              .select('role')
+              .select('role, is_suspended')
               .eq('id', session.user.id)
               .maybeSingle();
+          final isSuspended = response?['is_suspended'] as bool? ?? false;
+          if (isSuspended) {
+            await supabase.auth.signOut();
+            return '/welcome';
+          }
           final role = response?['role'] as String?;
           if (role == 'technician') return '/tech-home';
           if (role == 'admin') return '/admin-home';
@@ -128,6 +134,11 @@ class AppRouter {
         path: '/signup',
         name: 'signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
       // Main navigation with bottom nav

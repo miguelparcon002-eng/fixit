@@ -15,6 +15,7 @@ class UserModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final bool? profileSetupComplete;
+  final bool isSuspended;
 
   UserModel({
     required this.id,
@@ -33,6 +34,7 @@ class UserModel {
     required this.createdAt,
     this.updatedAt,
     this.profileSetupComplete,
+    this.isSuspended = false,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -55,6 +57,7 @@ class UserModel {
           ? DateTime.parse(json['updated_at'] as String)
           : null,
       profileSetupComplete: json['profile_setup_complete'] as bool?,
+      isSuspended: json['is_suspended'] as bool? ?? false,
     );
   }
 
@@ -96,6 +99,7 @@ class UserModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? profileSetupComplete,
+    bool? isSuspended,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -114,6 +118,7 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       profileSetupComplete: profileSetupComplete ?? this.profileSetupComplete,
+      isSuspended: isSuspended ?? this.isSuspended,
     );
   }
 }

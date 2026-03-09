@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../models/notification_model.dart';
+import '../core/utils/app_logger.dart';
 
 class NotificationService {
   /// Realtime stream — emits a new list whenever any notification
@@ -49,18 +50,19 @@ class NotificationService {
     required String action, // 'approved' | 'rejected' | 'resubmit'
     String? adminNotes,
   }) async {
-    try {
-      await SupabaseConfig.client.functions.invoke(
-        'send-verification-email',
-        body: {
-          'to': toEmail,
-          'technicianName': technicianName,
-          'action': action,
-          'adminNotes': adminNotes ?? '',
-        },
-      );
-    } catch (e) {
-      // Non-fatal: in-app notifications still work even if email fails
+    final response = await SupabaseConfig.client.functions.invoke(
+      'send-verification-email',
+      body: {
+        'to': toEmail,
+        'technicianName': technicianName,
+        'action': action,
+        'adminNotes': adminNotes ?? '',
+      },
+    );
+    AppLogger.p('📧 Email function response: status=${response.status} data=${response.data}');
+    // Surface any error from the edge function
+    if (response.status != 200) {
+      throw Exception('Email send failed (status ${response.status}): ${response.data}');
     }
   }
 
