@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/ratings_provider.dart';
@@ -78,6 +79,13 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: () {
+              ref.invalidate(customerBookingsProvider);
+            },
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.deepBlue),
+          ),
           Stack(
             alignment: Alignment.topRight,
             children: [
@@ -393,15 +401,30 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
     );
   }
 
-  void _showRatingDialogFor(BuildContext context, BookingModel booking, String customerName) {
+  Future<void> _showRatingDialogFor(BuildContext context, BookingModel booking, String customerName) async {
     int rating = 0;
     final reviewController = TextEditingController();
-    final technicianName = ref.read(userByIdProvider(booking.technicianId)).value?.fullName ?? 'Technician';
+
+    // Fetch technician name directly from Supabase to guarantee it's loaded
+    String technicianName = 'Technician';
+    try {
+      final row = await SupabaseConfig.client
+          .from('users')
+          .select('full_name')
+          .eq('id', booking.technicianId)
+          .single();
+      technicianName = row['full_name'] as String? ?? 'Technician';
+    } catch (_) {
+      // Fallback to cached provider value if Supabase fetch fails
+      technicianName = ref.read(userByIdProvider(booking.technicianId)).value?.fullName ?? 'Technician';
+    }
+
+    if (!context.mounted) return;
 
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (builderContext, setS) => AlertDialog(
           title: const Column(
             children: [
               Icon(Icons.star_rate, size: 48, color: Colors.amber),
@@ -444,7 +467,7 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (rating == 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(builderContext).showSnackBar(
                     const SnackBar(content: Text('Please select a rating'), backgroundColor: Colors.orange),
                   );
                   return;
@@ -460,13 +483,61 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                   device: 'Device',
                   bookingId: booking.id,
                 );
-                await ref.read(ratingsProvider.notifier).addRating(newRating);
-                Navigator.pop(dialogContext);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Thank you for your rating!'), backgroundColor: Colors.green),
-                  );
+                // Save rating with technician_id so Supabase trigger auto-updates stats
+                try {
+                  await SupabaseConfig.client.from('app_ratings').insert({
+                    'customer_name': customerName,
+                    'technician': technicianName,
+                    'technician_id': booking.technicianId,
+                    'rating': rating,
+                    'review': reviewController.text,
+                    'date': DateFormat('MM/dd/yyyy').format(DateTime.now()),
+                    'service': 'Repair Service',
+                    'device': 'Device',
+                  });
+                } catch (_) {
+                  // Fallback: insert without technician_id if column doesn't exist yet
+                  await ref.read(ratingsProvider.notifier).addRating(newRating);
                 }
+
+                // Also write rating directly on the booking row
+                try {
+                  await SupabaseConfig.client
+                      .from('bookings')
+                      .update({'rating': rating, 'review': reviewController.text.isNotEmpty ? reviewController.text : null})
+                      .eq('id', booking.id);
+                } catch (e) {
+                  debugPrint('Failed to update booking rating: $e');
+                }
+
+                // Recalculate and persist technician average from app_ratings (same source as ratings screen)
+                try {
+                  final rows = await SupabaseConfig.client
+                      .from('app_ratings')
+                      .select('rating')
+                      .ilike('technician', technicianName);
+                  final vals = (rows as List).map((r) => (r['rating'] as num).toInt()).toList();
+                  if (vals.isNotEmpty) {
+                    final avg = vals.reduce((a, b) => a + b) / vals.length;
+                    await SupabaseConfig.client
+                        .from('app_technician_stats')
+                        .upsert({
+                          'technician_id': booking.technicianId,
+                          'average_rating': avg,
+                          'total_reviews': vals.length,
+                          'updated_at': DateTime.now().toIso8601String(),
+                        }, onConflict: 'technician_id');
+                  }
+                } catch (e) {
+                  debugPrint('Failed to update technician stats: $e');
+                }
+
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Thank you for your rating!'), backgroundColor: Colors.green),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.deepBlue,

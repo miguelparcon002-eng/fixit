@@ -56,7 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // If not marked complete in DB, check if profile is actually complete
     if (!isSetupComplete) {
-      final hasName = (user.fullName ?? '').isNotEmpty;
+      final hasName = user.fullName.isNotEmpty;
       final hasPhone = (user.contactNumber ?? '').isNotEmpty;
       final addresses = ref.read(userAddressesProvider).valueOrNull ?? [];
       final hasAddress = addresses.isNotEmpty;
@@ -1596,7 +1596,6 @@ class _FeaturedShopCard extends StatelessWidget {
   final String instagram;
   final double latitude;
   final double longitude;
-  final String? technicianId;
 
   const _FeaturedShopCard({
     required this.shopName,
@@ -1618,7 +1617,6 @@ class _FeaturedShopCard extends StatelessWidget {
     required this.instagram,
     required this.latitude,
     required this.longitude,
-    this.technicianId,
   });
 
   @override

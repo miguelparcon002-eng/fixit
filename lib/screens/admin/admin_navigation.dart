@@ -17,7 +17,7 @@ class _AdminNavigationState extends State<AdminNavigation> {
     if (location.startsWith('/admin-appointments')) return 1;
     if (location.startsWith('/admin-users') ||
         location.startsWith('/admin-customers') ||
-        location.startsWith('/admin-technicians')) return 2;
+        location.startsWith('/admin-technicians')) { return 2; }
     if (location.startsWith('/admin-reports')) return 3;
     return 0;
   }

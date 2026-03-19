@@ -75,8 +75,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       if (pickedFile != null) {
         setState(() => _isLoading = true);
-        final user = await ref.read(currentUserProvider.future);
-        if (user == null) throw Exception('User not found');
+        final user = (await ref.read(currentUserProvider.future))!;
 
         final oldImageUrl = user.profilePicture;
         final newImageUrl = await ImageUploadService.uploadAndSaveProfileImage(
@@ -85,24 +84,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           oldImageUrl: oldImageUrl,
         );
 
-        if (newImageUrl != null) {
-          setState(() => _webImagePath = newImageUrl);
-          await ref.read(profileProvider.notifier).updateProfileImage(newImageUrl);
-          ref.invalidate(currentUserProvider);
+        setState(() => _webImagePath = newImageUrl);
+        await ref.read(profileProvider.notifier).updateProfileImage(newImageUrl);
+        ref.invalidate(currentUserProvider);
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile picture updated!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        } else {
-          throw Exception('Failed to upload image');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
-      }
+            }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -120,8 +115,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      final user = await ref.read(currentUserProvider.future);
-      if (user == null) throw Exception('User not found');
+      final user = (await ref.read(currentUserProvider.future))!;
 
       await authService.updateProfile(
         userId: user.id,

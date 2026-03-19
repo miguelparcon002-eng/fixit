@@ -114,7 +114,7 @@ class _PlatformMetric extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withValues(alpha: 0.9),
           ),
         ),
         const SizedBox(height: 4),
@@ -131,7 +131,7 @@ class _PlatformMetric extends StatelessWidget {
           subtitle,
           style: TextStyle(
             fontSize: 10,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
           ),
         ),
       ],
@@ -257,7 +257,7 @@ class _TechnicianEarningsCard extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -339,10 +339,10 @@ class _TechnicianEarningsCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.successColor.withOpacity(0.08),
+                    color: AppTheme.successColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppTheme.successColor.withOpacity(0.2),
+                      color: AppTheme.successColor.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
@@ -619,7 +619,7 @@ class _CustomerSpendingCard extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -632,7 +632,7 @@ class _CustomerSpendingCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: AppTheme.deepBlue.withOpacity(0.1),
+                backgroundColor: AppTheme.deepBlue.withValues(alpha: 0.1),
                 child: Text(
                   customer.customerName[0].toUpperCase(),
                   style: const TextStyle(
@@ -672,10 +672,10 @@ class _CustomerSpendingCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.deepBlue.withOpacity(0.08),
+              color: AppTheme.deepBlue.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: AppTheme.deepBlue.withOpacity(0.2),
+                color: AppTheme.deepBlue.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -803,7 +803,7 @@ class _PlatformOverviewCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.deepBlue.withOpacity(0.3),
+              color: AppTheme.deepBlue.withValues(alpha: 0.3),
               blurRadius: 15,
               offset: const Offset(0, 5),
             ),
@@ -817,7 +817,7 @@ class _PlatformOverviewCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -868,7 +868,7 @@ class _PlatformOverviewCard extends StatelessWidget {
               '${overview.totalCompletedBookings} completed bookings',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -876,10 +876,10 @@ class _PlatformOverviewCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
+                color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.25),
+                  color: Colors.white.withValues(alpha: 0.25),
                 ),
               ),
               child: Row(
@@ -894,7 +894,7 @@ class _PlatformOverviewCard extends StatelessWidget {
                   Container(
                     width: 1,
                     height: 40,
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                   ),
                   Expanded(
                     child: _PlatformMetric(
@@ -906,7 +906,7 @@ class _PlatformOverviewCard extends StatelessWidget {
                   Container(
                     width: 1,
                     height: 40,
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha: 0.25),
                   ),
                   Expanded(
                     child: _PlatformMetric(

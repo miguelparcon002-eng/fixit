@@ -253,10 +253,6 @@ class TechHomeScreen extends ConsumerWidget {
                 (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
               );
 
-          final prevCompletedCount = prevFilteredBookings
-              .where((booking) => booking.status == 'completed')
-              .length;
-
           // Calculate trends
           final earningsTrend = prevPeriodEarnings > 0
               ? ((periodEarnings - prevPeriodEarnings) /
@@ -264,13 +260,6 @@ class TechHomeScreen extends ConsumerWidget {
                         100)
                     .toDouble()
               : (periodEarnings > 0 ? 100.0 : 0.0);
-          final completedTrend = prevCompletedCount > 0
-              ? ((techCompletedCount - prevCompletedCount) /
-                        prevCompletedCount *
-                        100)
-                    .toDouble()
-              : (techCompletedCount > 0 ? 100.0 : 0.0);
-
 
           // Completion rate with its own independent filter
           final crFilter = ref.watch(completionRateFilterProvider);

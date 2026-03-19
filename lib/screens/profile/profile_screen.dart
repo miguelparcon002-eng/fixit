@@ -10,7 +10,6 @@ import '../../providers/rewards_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/user_session_service.dart';
-import '../../services/redeemed_voucher_service.dart';
 import '../../models/booking_model.dart';
 import '../../models/reward.dart';
 
@@ -716,11 +715,13 @@ class _ProfileCompletionBar extends ConsumerWidget {
     // Check completed fields
     if (user.fullName.isNotEmpty) completedFields++;
     if (user.email.isNotEmpty) completedFields++;
-    if (user.contactNumber != null && user.contactNumber!.isNotEmpty)
+    if (user.contactNumber != null && user.contactNumber!.isNotEmpty) {
       completedFields++;
+    }
     if (profile.profileImagePath != null &&
-        profile.profileImagePath!.isNotEmpty)
+        profile.profileImagePath!.isNotEmpty) {
       completedFields++;
+    }
     final addressesAsync = ref.watch(userAddressesProvider);
     final hasAddress = addressesAsync.maybeWhen(
       data: (list) => list.isNotEmpty,
@@ -2212,11 +2213,11 @@ class _QuickStatsSection extends ConsumerWidget {
                 ],
               ),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox(),
+              error: (_, _) => const SizedBox(),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const SizedBox(),
+          error: (_, _) => const SizedBox(),
         ),
       ],
     );
@@ -2411,7 +2412,7 @@ class _RecentActivitySection extends ConsumerWidget {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => Container(
+          error: (_, _) => Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,

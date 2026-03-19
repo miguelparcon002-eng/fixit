@@ -1,15 +1,31 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/supabase_config.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'services/fcm_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Supabase is required across the app (auth, storage, db)
   await SupabaseConfig.initialize();
+
+  // Firebase push notifications — Android & iOS only.
+  // Web/Windows don't have google-services.json config so we skip them.
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await FCMService.initialize();
+    } catch (e) {
+      debugPrint('FCM init failed (non-fatal): $e');
+    }
+  }
 
   runApp(const ProviderScope(child: FixItApp()));
 }

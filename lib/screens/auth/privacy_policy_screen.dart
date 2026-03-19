@@ -399,7 +399,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                                     children: [
                                       _buildContactItem(Icons.email_rounded, 'privacy@fixit.ph'),
                                       const SizedBox(height: 10),
-                                      _buildContactItem(Icons.phone_rounded, '+63 XXX XXX XXXX'),
+                                      _buildContactItem(Icons.phone_rounded, '+63 917 123 4567'),
                                       const SizedBox(height: 10),
                                       _buildContactItem(Icons.location_on_rounded, 'San Francisco, Agusan del Sur'),
                                     ],

@@ -9,6 +9,7 @@ import '../providers/technician_stats_provider.dart';
 import '../providers/voucher_provider.dart';
 import '../providers/earnings_provider.dart';
 import '../providers/auth_provider.dart';
+import 'fcm_service.dart';
 import 'storage_service.dart';
 import '../core/utils/app_logger.dart';
 
@@ -27,6 +28,9 @@ class UserSessionService {
     // Set the current user for storage isolation
     StorageService.setCurrentUser(userId);
 
+    // Save FCM token so this device receives push notifications
+    await FCMService.saveTokenForUser(userId);
+
     // Reload all user-specific providers
     await _reloadAllUserData();
   }
@@ -35,6 +39,10 @@ class UserSessionService {
   /// This clears all cached data and resets providers.
   Future<void> onUserLogout() async {
     AppLogger.p('UserSessionService: User logged out');
+
+    // Remove FCM token so this device stops receiving pushes
+    final userId = StorageService.currentUserId;
+    if (userId != null) await FCMService.clearTokenForUser(userId);
 
     // Clear storage user context
     StorageService.setCurrentUser(null);

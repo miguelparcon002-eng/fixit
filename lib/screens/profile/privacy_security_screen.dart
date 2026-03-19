@@ -204,7 +204,7 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                   setState(() => _twoFactorAuth = value);
                   _saveToggle(_k2FA, value);
                 },
-                activeColor: Colors.white,
+                activeThumbColor: Colors.white,
                 activeTrackColor: AppTheme.primaryCyan,
                 inactiveThumbColor: Colors.white,
                 inactiveTrackColor: Colors.grey.shade300,
@@ -223,7 +223,7 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                   setState(() => _biometricLogin = value);
                   _saveToggle(_kBio, value);
                 },
-                activeColor: Colors.white,
+                activeThumbColor: Colors.white,
                 activeTrackColor: AppTheme.successColor,
                 inactiveThumbColor: Colors.white,
                 inactiveTrackColor: Colors.grey.shade300,
@@ -251,7 +251,7 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                   setState(() => _shareDataWithTechnicians = value);
                   _saveToggle(_kShare, value);
                 },
-                activeColor: Colors.white,
+                activeThumbColor: Colors.white,
                 activeTrackColor: AppTheme.lightBlue,
                 inactiveThumbColor: Colors.white,
                 inactiveTrackColor: Colors.grey.shade300,
@@ -270,7 +270,7 @@ class _PrivacySecurityScreenState extends ConsumerState<PrivacySecurityScreen> {
                   setState(() => _allowLocationTracking = value);
                   _saveToggle(_kLocation, value);
                 },
-                activeColor: Colors.white,
+                activeThumbColor: Colors.white,
                 activeTrackColor: AppTheme.warningColor,
                 inactiveThumbColor: Colors.white,
                 inactiveTrackColor: Colors.grey.shade300,

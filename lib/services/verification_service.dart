@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -212,6 +213,10 @@ class VerificationService {
     if (request['address'] != null) {
       userUpdates['address'] = request['address'];
     }
+    // Copy bio to users table so it appears in technician's "About Me"
+    if (request['bio'] != null) {
+      userUpdates['bio'] = request['bio'];
+    }
 
     await _supabase
         .from(DBConstants.users)
@@ -267,6 +272,27 @@ class VerificationService {
       }
     }
 
+    // Copy specialties to technician_specialties table so they appear on the profile
+    final rawSpecialties = request['specialties'];
+    if (rawSpecialties != null && rawSpecialties is List && rawSpecialties.isNotEmpty) {
+      try {
+        // Remove existing specialties first
+        await _supabase
+            .from('technician_specialties')
+            .delete()
+            .eq('technician_id', userId);
+
+        // Insert new specialties
+        final inserts = rawSpecialties
+            .map((s) => {'technician_id': userId, 'specialty_name': s.toString()})
+            .toList();
+        await _supabase.from('technician_specialties').insert(inserts);
+        AppLogger.p('✅ Specialties synced to technician_specialties for user: $userId');
+      } catch (e) {
+        AppLogger.p('⚠️ Could not sync specialties: $e');
+      }
+    }
+
     AppLogger.p('✅ User profile updated with verification data for user: $userId');
   }
 
@@ -296,21 +322,31 @@ class VerificationService {
     }).eq('id', requestId);
   }
 
-  Stream<List<VerificationRequestModel>> watchPendingVerifications() {
-    return _supabase
-        .from(DBConstants.verificationRequests)
-        .stream(primaryKey: ['id'])
-        .eq('status', AppConstants.verificationPending)
-        .order('submitted_at', ascending: true)
-        .map((data) => data.map((e) => VerificationRequestModel.fromJson(e)).toList());
+  Stream<List<VerificationRequestModel>> watchPendingVerifications() async* {
+    while (true) {
+      try {
+        final data = await _supabase
+            .from(DBConstants.verificationRequests)
+            .select()
+            .eq('status', AppConstants.verificationPending)
+            .order('submitted_at', ascending: true);
+        yield (data as List).map((e) => VerificationRequestModel.fromJson(e)).toList();
+      } catch (_) {}
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
-  Stream<List<VerificationRequestModel>> watchVerificationsByStatus(String status) {
-    return _supabase
-        .from(DBConstants.verificationRequests)
-        .stream(primaryKey: ['id'])
-        .eq('status', status)
-        .order('submitted_at', ascending: false)
-        .map((data) => data.map((e) => VerificationRequestModel.fromJson(e)).toList());
+  Stream<List<VerificationRequestModel>> watchVerificationsByStatus(String status) async* {
+    while (true) {
+      try {
+        final data = await _supabase
+            .from(DBConstants.verificationRequests)
+            .select()
+            .eq('status', status)
+            .order('submitted_at', ascending: false);
+        yield (data as List).map((e) => VerificationRequestModel.fromJson(e)).toList();
+      } catch (_) {}
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 }

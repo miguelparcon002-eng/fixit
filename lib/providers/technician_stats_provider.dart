@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/supabase_config.dart';
-import '../services/ratings_service.dart';
 import 'booking_provider.dart';
 import 'auth_provider.dart';
-import 'ratings_provider.dart';
 import '../core/utils/app_logger.dart';
 
 // Re-export Rating class for use in this file
@@ -82,22 +80,6 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
     }
   }
 
-  /// Helper to check if rating belongs to this technician
-  bool _isRatingForTechnician(String ratingTechnician, String userName) {
-    final userNameLower = userName.toLowerCase();
-    final ratingTechLower = ratingTechnician.toLowerCase();
-
-    if (ratingTechLower == userNameLower) return true;
-    if (userNameLower.contains(ratingTechLower)) return true;
-
-    final nameParts = userName.split(' ');
-    if (nameParts.length > 1) {
-      final lastName = nameParts.last.toLowerCase();
-      if (lastName == ratingTechLower) return true;
-    }
-
-    return false;
-  }
 
   Future<void> loadStats() async {
     if (_technicianName == null || _technicianId == null) {
@@ -108,35 +90,55 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
     try {
       state = const AsyncValue.loading();
 
-      // 1. Get ratings for this technician - load directly from Supabase for accuracy
-      List<Rating> allRatings = [];
-
-      // First try to get from provider
-      final ratingsAsync = _ref.read(ratingsProvider);
-      if (ratingsAsync.hasValue && ratingsAsync.value!.isNotEmpty) {
-        allRatings = ratingsAsync.value!;
-      } else {
-        // If provider doesn't have data, load directly from Supabase
-        try {
-          final ratingsService = _ref.read(ratingsServiceProvider);
-          allRatings = await ratingsService.getAllRatings();
-          AppLogger.p('TechnicianStatsNotifier: Loaded ${allRatings.length} ratings from Supabase');
-        } catch (e) {
-          AppLogger.p('TechnicianStatsNotifier: Could not load ratings from Supabase - $e');
-        }
-      }
-
-      final technicianRatings = allRatings.where(
-        (r) => _isRatingForTechnician(r.technician, _technicianName!)
-      ).toList();
-
+      // 1. Calculate average — always combine UUID rows + legacy name-matched rows
       double averageRating = 0.0;
-      if (technicianRatings.isNotEmpty) {
-        final sum = technicianRatings.map((r) => r.rating).reduce((a, b) => a + b);
-        averageRating = sum / technicianRatings.length;
-      }
+      int totalReviewCount = 0;
+      try {
+        final seenIds = <String>{};
+        final vals = <int>[];
 
-      AppLogger.p('TechnicianStatsNotifier: Found ${technicianRatings.length} ratings for $_technicianName, average: $averageRating');
+        // UUID rows (have technician_id set)
+        try {
+          final byId = await SupabaseConfig.client
+              .from('app_ratings')
+              .select('id, rating')
+              .eq('technician_id', _technicianId!);
+          for (final r in (byId as List)) {
+            final id = r['id'] as String? ?? '';
+            if (seenIds.add(id)) {
+              vals.add((r['rating'] as num).toInt());
+            }
+          }
+        } catch (_) {}
+
+        // Legacy rows (no technician_id) — always run, not just when UUID returns empty
+        final all = await SupabaseConfig.client
+            .from('app_ratings')
+            .select('id, rating, technician, technician_id');
+        final myName = _technicianName!.toLowerCase();
+        final nameParts = _technicianName!.split(' ');
+        final lastName = nameParts.length > 1 ? nameParts.last.toLowerCase() : null;
+        for (final r in (all as List)) {
+          if (r['technician_id'] != null) continue; // already counted above
+          final id = r['id'] as String? ?? '';
+          if (seenIds.contains(id)) continue;
+          final tech = (r['technician'] as String? ?? '').toLowerCase();
+          final matches = tech == myName ||
+              (myName.contains(tech) && tech.length > 2) ||
+              (lastName != null && tech == lastName);
+          if (matches && seenIds.add(id)) {
+            vals.add((r['rating'] as num).toInt());
+          }
+        }
+
+        if (vals.isNotEmpty) {
+          averageRating = vals.reduce((a, b) => a + b) / vals.length;
+          totalReviewCount = vals.length;
+        }
+        AppLogger.p('TechnicianStatsNotifier: ${vals.length} ratings for $_technicianName, average: $averageRating');
+      } catch (e) {
+        AppLogger.p('TechnicianStatsNotifier: app_ratings query failed — $e');
+      }
 
       // 2. Count completed jobs from Supabase bookings
       final bookingsAsync = await _ref.read(technicianBookingsProvider.future);
@@ -156,7 +158,7 @@ class TechnicianStatsNotifier extends StateNotifier<AsyncValue<TechnicianStats>>
 
       final stats = TechnicianStats(
         averageRating: averageRating,
-        totalReviews: technicianRatings.length,
+        totalReviews: totalReviewCount,
         completedJobs: completedBookings.length,
         totalEarnings: totalEarnings,
         experience: experience,

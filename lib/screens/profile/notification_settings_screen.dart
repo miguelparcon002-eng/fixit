@@ -42,7 +42,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
         ),
         child: settingsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) =>
+          error: (_, _) =>
               const Center(child: Text('Failed to load settings')),
           data: (settings) => _SettingsBody(settings: settings),
         ),
@@ -333,7 +333,7 @@ class _NotifTile extends StatelessWidget {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: Colors.white,
+          activeThumbColor: Colors.white,
           activeTrackColor: iconColor,
           inactiveThumbColor: Colors.white,
           inactiveTrackColor: Colors.grey.shade300,

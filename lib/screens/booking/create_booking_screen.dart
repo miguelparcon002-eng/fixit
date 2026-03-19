@@ -11,6 +11,7 @@ import '../../providers/address_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../models/redeemed_voucher.dart';
 import '../../services/notification_service.dart';
+import '../../services/ratings_service.dart';
 import '../../services/technician_specialty_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'widgets/technician_map_sheet.dart';
@@ -37,7 +38,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   String? _selectedBrand;
   String? _selectedModel;
   final TextEditingController _modelController = TextEditingController();
-  Set<String> _selectedProblems = {};
+  final Set<String> _selectedProblems = {};
   final TextEditingController _detailsController = TextEditingController();
 
   // Step 2: Time and location
@@ -215,14 +216,56 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         double avgRating = 0.0;
         int completedJobs = 0;
         String experience = 'New';
+
+        // Calculate live average — always combine UUID rows + legacy name-matched rows
+        final techFullName = row['full_name'] as String? ?? '';
+        try {
+          final seenIds = <String>{};
+          final vals = <int>[];
+
+          // UUID rows
+          try {
+            final byId = await supabase
+                .from('app_ratings')
+                .select('id, rating')
+                .eq('technician_id', techId);
+            for (final r in (byId as List)) {
+              final id = r['id'] as String? ?? '';
+              if (seenIds.add(id)) vals.add((r['rating'] as num).toInt());
+            }
+          } catch (_) {}
+
+          // Legacy rows (no technician_id) — always run
+          final allRatings = await supabase
+              .from('app_ratings')
+              .select('id, rating, technician, technician_id');
+          final myName = techFullName.toLowerCase().trim();
+          final nameParts = techFullName.split(' ');
+          final lastName = nameParts.length > 1 ? nameParts.last.toLowerCase() : null;
+          for (final r in (allRatings as List)) {
+            if (r['technician_id'] != null) continue;
+            final id = r['id'] as String? ?? '';
+            if (seenIds.contains(id)) continue;
+            final stored = (r['technician'] as String? ?? '').toLowerCase().trim();
+            final matches = stored == myName ||
+                (myName.contains(stored) && stored.length > 2) ||
+                (lastName != null && stored == lastName);
+            if (matches && seenIds.add(id)) vals.add((r['rating'] as num).toInt());
+          }
+
+          if (vals.isNotEmpty) {
+            avgRating = vals.reduce((a, b) => a + b) / vals.length;
+          }
+        } catch (_) {}
+
+        // Load completed jobs and experience from cached stats
         try {
           final statsRow = await supabase
               .from('app_technician_stats')
-              .select()
+              .select('completed_jobs, experience')
               .eq('technician_id', techId)
               .maybeSingle();
           if (statsRow != null) {
-            avgRating = (statsRow['average_rating'] as num?)?.toDouble() ?? 0.0;
             completedJobs = (statsRow['completed_jobs'] as num?)?.toInt() ?? 0;
             experience = statsRow['experience'] as String? ?? 'New';
           }
@@ -566,13 +609,11 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           .limit(1)
           .maybeSingle();
 
-      if (serviceResponse == null) {
-        serviceResponse = await supabase
-            .from('services')
-            .select('id')
-            .limit(1)
-            .maybeSingle();
-      }
+      serviceResponse ??= await supabase
+          .from('services')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
 
       if (serviceResponse != null) {
         serviceId = serviceResponse['id'] as String;
@@ -603,7 +644,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       );
 
       // Notify the technician of the new booking request
-      final customerName = user.fullName ?? 'A customer';
+      final customerName = user.fullName;
       final problemList = _selectedProblems.join(', ');
       await NotificationService().sendNotification(
         userId: technicianId,
@@ -948,7 +989,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: devices.length + 1, // +1 for "Other" option
-                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                    separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade200),
                     itemBuilder: (context, index) {
                       if (index == devices.length) {
                         // "Other" option at the end
@@ -1655,6 +1696,47 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     const SizedBox(height: 16),
                   ],
 
+                  // Customer Reviews
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Customer Reviews',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  FutureBuilder<List<Rating>>(
+                    future: RatingsService().getAllReviewsForTechnician(name, tech['id'] as String),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        );
+                      }
+                      final reviews = snap.data ?? [];
+                      if (reviews.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.rate_review_outlined, size: 20, color: Colors.grey[400]),
+                              const SizedBox(width: 8),
+                              Text('No reviews yet', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                            ],
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: reviews.map((r) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildReviewCard(r),
+                        )).toList(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
                   // Select button
                   SizedBox(
                     width: double.infinity,
@@ -1684,6 +1766,121 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showTechnicianReviews(String technicianName, String technicianId) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Reviews for $technicianName',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: FutureBuilder<List<Rating>>(
+                future: RatingsService().getAllReviewsForTechnician(technicianName, technicianId),
+                builder: (ctx, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final reviews = snap.data ?? [];
+                  if (reviews.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('No reviews yet', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    itemCount: reviews.length,
+                    separatorBuilder: (_, _) => const Divider(height: 20),
+                    itemBuilder: (ctx, i) => _buildReviewCard(reviews[i]),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewCard(Rating r) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.deepBlue.withValues(alpha: 0.15),
+              child: Text(
+                r.customerName.isNotEmpty ? r.customerName[0].toUpperCase() : '?',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.deepBlue),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.customerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text(r.date, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+            Row(
+              children: List.generate(5, (i) => Icon(
+                i < r.rating ? Icons.star : Icons.star_border,
+                size: 14,
+                color: Colors.amber,
+              )),
+            ),
+          ],
+        ),
+        if (r.review.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(r.review, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimaryColor, height: 1.4)),
+        ],
+        if (r.service.isNotEmpty || r.device.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            [if (r.device.isNotEmpty) r.device, if (r.service.isNotEmpty) r.service].join(' · '),
+            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+          ),
+        ],
+      ],
     );
   }
 
@@ -2090,11 +2287,30 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                                 const SizedBox(height: 3),
                                 Row(
                                   children: [
-                                    const Icon(Icons.star, size: 14, color: Colors.amber),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      rating > 0 ? rating.toStringAsFixed(1) : 'New',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                    GestureDetector(
+                                      onTap: rating > 0 ? () => _showTechnicianReviews(name, tech['id'] as String) : null,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: rating > 0 ? Colors.amber.withValues(alpha: 0.12) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.star, size: 14, color: Colors.amber),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              rating > 0 ? rating.toStringAsFixed(1) : 'New',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                            ),
+                                            if (rating > 0) ...[
+                                              const SizedBox(width: 2),
+                                              Icon(Icons.chevron_right, size: 12, color: Colors.grey[500]),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                     const SizedBox(width: 10),
                                     Icon(Icons.work_outline, size: 13, color: Colors.grey[500]),
@@ -2353,7 +2569,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _availableVouchers.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final voucher = _availableVouchers[index];
                 return GestureDetector(

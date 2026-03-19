@@ -67,6 +67,7 @@ class NotificationService {
   }
 
   /// Manually send a notification (for client-side events not covered by DB triggers).
+  /// Also sends an FCM push so the recipient is notified even when the app is closed.
   Future<void> sendNotification({
     required String userId,
     required String type,
@@ -74,6 +75,7 @@ class NotificationService {
     required String message,
     Map<String, dynamic>? data,
   }) async {
+    // Persist in DB (drives the in-app bell icon)
     await SupabaseConfig.client.from('notifications').insert({
       'user_id': userId,
       'type': type,
@@ -81,5 +83,20 @@ class NotificationService {
       'message': message,
       if (data != null) 'data': data,
     });
+
+    // Fire-and-forget FCM push — delivers even when the app is closed/background
+    try {
+      await SupabaseConfig.client.functions.invoke(
+        'send-push-notification',
+        body: {
+          'userId': userId,
+          'title': title,
+          'body': message,
+          'data': {'type': type, ...?data},
+        },
+      );
+    } catch (e) {
+      AppLogger.p('NotificationService: FCM push failed (non-fatal) — $e');
+    }
   }
 }

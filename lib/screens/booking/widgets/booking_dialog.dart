@@ -590,90 +590,88 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       ref.invalidate(customerBookingsProvider);
 
       // Show success dialog
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check, size: 60, color: Colors.white),
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Request Successful!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Icon(Icons.check, size: 60, color: Colors.white),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Request Successful!',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Close success dialog
-                        Navigator.of(context).pop(); // Close booking dialog
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.deepBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        'OK',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // Close success dialog
+                      Navigator.of(context).pop(); // Close booking dialog
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.deepBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
                       ),
                     ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      }
+        ),
+      );
     } catch (e) {
       AppLogger.p('Error creating booking: $e');
-      if (context.mounted) {
-        // Show user-friendly error message
-        String errorMessage = 'Error creating booking';
-        if (e.toString().contains('technician')) {
-          errorMessage = 'No technicians available. Please contact support.';
-        } else if (e.toString().contains('service')) {
-          errorMessage = 'Service setup incomplete. Please contact support.';
-        } else if (e.toString().contains('PostgrestException')) {
-          errorMessage = 'Database error. Please ensure all setup is complete.';
-        } else {
-          errorMessage = e.toString().replaceAll('Exception: ', '');
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'OK',
-              textColor: Colors.white,
-              onPressed: () {},
-            ),
-          ),
-        );
+      if (!mounted) return;
+      // Show user-friendly error message
+      String errorMessage = 'Error creating booking';
+      if (e.toString().contains('technician')) {
+        errorMessage = 'No technicians available. Please contact support.';
+      } else if (e.toString().contains('service')) {
+        errorMessage = 'Service setup incomplete. Please contact support.';
+      } else if (e.toString().contains('PostgrestException')) {
+        errorMessage = 'Database error. Please ensure all setup is complete.';
+      } else {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
+        ),
+      );
     }
   }
 

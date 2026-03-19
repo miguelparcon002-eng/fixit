@@ -562,33 +562,33 @@ class _AdminTicketDetailScreenState
   }
 
   void _showDeleteConfirmation() {
+    final outerContext = context;
     showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: outerContext,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Ticket?'),
         content: const Text(
           'Are you sure you want to delete this support ticket? This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await ref
                   .read(supportTicketsProvider.notifier)
                   .deleteTicket(widget.ticketId);
-              if (mounted) {
-                context.pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ticket deleted'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+              if (!outerContext.mounted) return;
+              outerContext.pop();
+              ScaffoldMessenger.of(outerContext).showSnackBar(
+                const SnackBar(
+                  content: Text('Ticket deleted'),
+                  backgroundColor: Colors.red,
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

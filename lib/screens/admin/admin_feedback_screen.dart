@@ -54,9 +54,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
     return items;
   }
 
-  int _countByType(String type) =>
-      _allFeedback.where((f) => f['type'] == type).length;
-
   int _countNew(String type) => _allFeedback
       .where((f) => f['type'] == type && f['status'] == 'new')
       .length;

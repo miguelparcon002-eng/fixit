@@ -89,7 +89,7 @@ class RatingsService {
       final response = await SupabaseConfig.client
           .from(_tableName)
           .select()
-          .eq('technician', technician)
+          .ilike('technician', technician)
           .order('created_at', ascending: false);
 
       AppLogger.p('RatingsService: Found ${response.length} ratings for $technician');
@@ -120,6 +120,69 @@ class RatingsService {
     } catch (e) {
       AppLogger.p('RatingsService: Error adding rating - $e');
     }
+  }
+
+  /// Same flexible name matching used by the technician's own ratings screen
+  static bool _nameMatches(String storedTech, String technicianName) {
+    final stored = storedTech.toLowerCase().trim();
+    final myName = technicianName.toLowerCase().trim();
+    if (stored == myName) return true;
+    if (myName.contains(stored) && stored.length > 2) return true;
+    final parts = myName.split(' ');
+    if (parts.length > 1 && stored == parts.last.toLowerCase()) return true;
+    return false;
+  }
+
+  /// Fetch all reviews for a technician from app_ratings.
+  /// Primary: query by technician_id UUID (reliable).
+  /// Fallback: flexible name matching for older rows without technician_id.
+  Future<List<Rating>> getAllReviewsForTechnician(String technicianName, String technicianId) async {
+    final results = <Rating>[];
+    final seenIds = <String>{};
+
+    // 1. From app_ratings by technician_id UUID (most reliable, post-SQL-migration)
+    try {
+      final r1 = await SupabaseConfig.client
+          .from('app_ratings')
+          .select()
+          .eq('technician_id', technicianId)
+          .order('created_at', ascending: false);
+      for (final item in (r1 as List)) {
+        final rating = Rating.fromSupabase(item);
+        if (seenIds.add(rating.id)) results.add(rating);
+      }
+    } catch (_) {
+      // technician_id column not yet added — fall through to name matching
+    }
+
+    // 2. Fallback: name matching for legacy rows without technician_id
+    try {
+      final r2 = await SupabaseConfig.client
+          .from('app_ratings')
+          .select()
+          .order('created_at', ascending: false);
+      final matched = (r2 as List)
+          .where((item) {
+            final id = item['id'] as String? ?? '';
+            if (seenIds.contains(id)) return false;
+            if (item['technician_id'] != null) return false;
+            return _nameMatches(item['technician'] as String? ?? '', technicianName);
+          })
+          .map((item) => Rating.fromSupabase(item))
+          .toList();
+      results.addAll(matched);
+    } catch (e) {
+      AppLogger.p('RatingsService: app_ratings name-fallback query failed — $e');
+    }
+
+    // Deduplicate by row id
+    final seen = <String>{};
+    final deduped = <Rating>[];
+    for (final r in results) {
+      final key = r.id;
+      if (seen.add(key)) deduped.add(r);
+    }
+    return deduped;
   }
 
   Future<bool> hasRatingForBooking(String bookingId) async {

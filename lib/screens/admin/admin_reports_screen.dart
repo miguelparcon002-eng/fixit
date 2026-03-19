@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../utils/export_helper.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../providers/admin_reports_provider.dart';
 import '../../services/admin_reports_service.dart';
@@ -122,11 +123,12 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () {
-                                // TODO: implement print/export
-                              },
-                              icon: const Icon(Icons.print_rounded),
-                              label: const Text('Print Report'),
+                              onPressed: reportsAsync.valueOrNull == null
+                                  ? null
+                                  : () => _exportCSV(
+                                      context, reportsAsync.valueOrNull!, period),
+                              icon: const Icon(Icons.share_rounded),
+                              label: const Text('Export CSV'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.deepBlue,
                                 foregroundColor: Colors.white,
@@ -162,6 +164,62 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _exportCSV(
+      BuildContext context, AdminReportsData data, String period) async {
+    final buf = StringBuffer();
+
+    buf.writeln('FixIt Admin Report — Period: $period');
+    buf.writeln('Generated: ${DateTime.now().toLocal()}');
+    buf.writeln();
+
+    buf.writeln('=== OVERVIEW ===');
+    buf.writeln('Metric,Value');
+    buf.writeln('Total Bookings,${data.totalBookings}');
+    buf.writeln('Completed Bookings,${data.completedBookings}');
+    buf.writeln('Pending Bookings,${data.pendingBookings}');
+    buf.writeln('Cancelled Bookings,${data.cancelledBookings}');
+    buf.writeln('Total Revenue,₱${data.totalRevenue.toStringAsFixed(2)}');
+    buf.writeln('Total Customers,${data.totalCustomers}');
+    buf.writeln('Total Technicians,${data.totalTechnicians}');
+    buf.writeln('Active Technicians,${data.activeTechnicians}');
+    buf.writeln();
+
+    buf.writeln('=== DEVICE BREAKDOWN ===');
+    buf.writeln('Device,Bookings,Revenue,Share');
+    for (final d in data.deviceBreakdown) {
+      buf.writeln(
+          '${d.deviceName},${d.count},₱${d.revenue.toStringAsFixed(2)},${d.percentage.toStringAsFixed(1)}%');
+    }
+    buf.writeln();
+
+    buf.writeln('=== POPULAR AREAS ===');
+    buf.writeln('Area,Bookings,Revenue');
+    for (final a in data.popularAreas) {
+      buf.writeln(
+          '${a.areaName},${a.count},₱${a.revenue.toStringAsFixed(2)}');
+    }
+    buf.writeln();
+
+    buf.writeln('=== TEAM PERFORMANCE ===');
+    buf.writeln('Technician,Completed Jobs,Revenue,Avg Rating');
+    for (final t in data.teamPerformance) {
+      buf.writeln(
+          '${t.name},${t.completedJobs},₱${t.revenue.toStringAsFixed(2)},${t.averageRating?.toStringAsFixed(1) ?? 'N/A'}');
+    }
+
+    try {
+      final filename =
+          'fixit_report_${period.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}.csv';
+      await exportCsvFile(buf.toString(), filename);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
   }
 
   void _showPeriodPicker(BuildContext context, WidgetRef ref, String current) {

@@ -89,29 +89,73 @@ class _LiveChatScreenState extends ConsumerState<LiveChatScreen> {
   String _getAIResponse(String message) {
     final msg = message.toLowerCase();
 
-    if (msg.contains('book') || msg.contains('appointment') || msg.contains('schedule')) {
-      return 'To book a repair service:\n\n1. Go to the Home screen\n2. Choose your service type (Emergency, Same Day, or Scheduled)\n3. Select your device and issue\n4. Pick a convenient time slot\n5. Confirm your booking\n\nWould you like me to guide you through the booking process?';
-    } else if (msg.contains('hours') || msg.contains('time') || msg.contains('available')) {
-      return 'Our service hours are:\n\n📍 Regular Support: 8:00 AM - 10:00 PM (Daily)\n🚨 Emergency Service: 24/7 Available\n💬 Live Chat: 24/7 Available\n\nIs there anything specific you\'d like to know?';
-    } else if (msg.contains('track') || msg.contains('status') || msg.contains('where')) {
-      return 'To track your booking:\n\n1. Go to "My Appointments" from the bottom navigation\n2. Select your active booking\n3. View real-time status and technician location\n\nYou can also enable push notifications for instant updates. Would you like help with anything else?';
-    } else if (msg.contains('cancel') || msg.contains('reschedule')) {
-      return 'To cancel or reschedule:\n\n1. Go to "My Appointments"\n2. Select the booking\n3. Tap "Cancel" or "Reschedule"\n\n⚠️ Note: Cancellations within 2 hours may incur a fee.\n\nNeed help with a specific booking?';
-    } else if (msg.contains('payment') || msg.contains('pay') || msg.contains('cost')) {
-      return 'We accept:\n\n💳 Credit/Debit Cards (Visa, Mastercard)\n📱 Digital Wallets (GCash, Maya)\n💵 Cash (on-site repairs)\n\nPayment is processed after service completion. You\'ll receive a detailed invoice via email.\n\nAny other questions about payments?';
-    } else if (msg.contains('price') || msg.contains('pricing') || msg.contains('how much')) {
-      return 'Our pricing varies by service:\n\n💡 Diagnostics: ₱300-800\n⚡ Emergency Repair: ₱500+ (depends on issue)\n🔧 Hardware Upgrades: ₱1,500-5,500\n💾 Data Recovery: ₱1,000-3,000\n\nFinal cost is determined after diagnosis. All prices include parts and labor. Would you like specific service pricing?';
-    } else if (msg.contains('reward') || msg.contains('point') || msg.contains('voucher')) {
-      return 'Rewards Program:\n\n⭐ Earn 1 point per ₱50 spent\n🎁 Redeem points for vouchers\n🎉 Welcome bonus: 20% off first service\n\nTo use your rewards:\n1. Go to Rewards section\n2. Redeem points for vouchers\n3. Apply during checkout\n\nCurrent vouchers expire in 30 days. Check your rewards balance in the app!';
-    } else if (msg.contains('technician') || msg.contains('who') || msg.contains('qualified')) {
-      return 'All our technicians are:\n\n✅ Certified professionals\n✅ Background verified\n✅ Rated by customers\n✅ Insured for your protection\n\nYou can view technician profiles, ratings, and reviews before booking. Would you like to know more about our verification process?';
-    } else if (msg.contains('thank') || msg.contains('thanks')) {
-      return 'You\'re welcome! 😊 Is there anything else I can help you with today?';
-    } else if (msg.contains('hi') || msg.contains('hello') || msg.contains('hey')) {
-      return 'Hello! How can I assist you with your repair needs today?';
-    } else {
-      return 'Thank you for your question! I\'m here to help with:\n\n• Booking repairs\n• Tracking appointments\n• Payment inquiries\n• Service pricing\n• Rewards & vouchers\n• Technical support\n\nCould you please provide more details about what you need help with?';
+    // Greetings
+    if (msg.contains('hi') || msg.contains('hello') || msg.contains('hey') || msg.contains('good morning') || msg.contains('good afternoon')) {
+      return 'Hello! 👋 Welcome to FixIt Support. I\'m here to help you with bookings, payments, rewards, and more. What can I assist you with today?';
     }
+
+    // Booking
+    if (msg.contains('book') || msg.contains('appointment') || msg.contains('schedule') || msg.contains('repair')) {
+      return 'To book a repair service:\n\n1. Tap the Home tab\n2. Choose a service type:\n   • 🚨 Emergency — within 1 hour\n   • ⚡ Same Day — within the day\n   • 📅 Scheduled — pick a date & time\n3. Select your device and describe the issue\n4. Choose a payment method (GCash)\n5. Confirm your booking\n\nYou\'ll receive a confirmation notification once a technician accepts. Need help with a specific step?';
+    }
+
+    // Tracking / Status
+    if (msg.contains('track') || msg.contains('status') || msg.contains('where is') || msg.contains('my booking') || msg.contains('my order')) {
+      return 'To track your booking:\n\n1. Tap the Bookings tab (bottom nav)\n2. Select your active booking\n3. View the current status:\n   • Pending → Accepted → In Progress → Completed\n\nYou\'ll also get push notifications at every status change. Is there a specific booking you need help with?';
+    }
+
+    // Cancel / Reschedule
+    if (msg.contains('cancel') || msg.contains('reschedule') || msg.contains('change') && msg.contains('booking')) {
+      return 'To cancel or reschedule a booking:\n\n1. Go to the Bookings tab\n2. Tap the booking you want to change\n3. Select "Cancel Booking" or contact your technician via chat\n\n⚠️ Note: Cancellations should be made as early as possible to avoid inconveniencing your assigned technician.\n\nNeed help with a specific booking?';
+    }
+
+    // Payment
+    if (msg.contains('payment') || msg.contains('pay') || msg.contains('gcash') || msg.contains('how to pay')) {
+      return 'FixIt currently accepts:\n\n📱 GCash — scan the QR code provided at checkout and upload your payment screenshot as proof\n\nPayment steps:\n1. Complete your booking\n2. Scan the GCash QR on the payment screen\n3. Upload a screenshot of your transaction\n4. Wait for admin confirmation\n\nHaving trouble with a payment? Let me know!';
+    }
+
+    // Pricing
+    if (msg.contains('price') || msg.contains('pricing') || msg.contains('how much') || msg.contains('cost') || msg.contains('fee')) {
+      return 'Pricing depends on the device and issue:\n\n📱 Phone Repair: ₱300–₱2,500\n💻 Laptop Repair: ₱500–₱5,500\n🔋 Battery Replacement: ₱400–₱1,200\n💾 Data Recovery: ₱1,000–₱3,000\n🔧 Hardware Upgrade: ₱1,500–₱5,500\n\nA diagnostic fee (₱300–₱800) applies and is waived if you proceed with the repair. Final cost is confirmed after diagnosis.';
+    }
+
+    // Rewards / Points / Vouchers
+    if (msg.contains('reward') || msg.contains('point') || msg.contains('voucher') || msg.contains('promo') || msg.contains('discount')) {
+      return 'FixIt Rewards Program:\n\n⭐ Earn 1 point for every ₱50 spent\n🎁 Redeem points for discount vouchers\n🎉 First-time users get a welcome bonus\n\nHow to redeem:\n1. Go to Profile → Rewards\n2. Choose a voucher to redeem\n3. Apply the voucher code at checkout\n\nVouchers are valid for 30 days after redemption. Check your current points in the Rewards section!';
+    }
+
+    // Technician
+    if (msg.contains('technician') || msg.contains('mechanic') || msg.contains('who will') || msg.contains('qualified') || msg.contains('verified')) {
+      return 'All FixIt technicians go through a strict verification process:\n\n✅ Government ID verified\n✅ Professional credentials checked\n✅ Background screening\n✅ Rated by real customers after every job\n\nYou can view a technician\'s profile, ratings, and completed jobs before and after they accept your booking. Only verified technicians can take jobs on FixIt.';
+    }
+
+    // Support ticket
+    if (msg.contains('ticket') || msg.contains('report') || msg.contains('complaint') || msg.contains('issue') || msg.contains('problem')) {
+      return 'For formal concerns, you can submit a support ticket:\n\n1. Go to Profile → Help & Support\n2. Tap "Submit a Ticket"\n3. Describe your issue in detail\n4. Our team will respond within 24 hours\n\nFor urgent issues, keep chatting here and I\'ll do my best to help right away!';
+    }
+
+    // Verification (technician asking)
+    if (msg.contains('verif') || msg.contains('apply') || msg.contains('become a technician') || msg.contains('join')) {
+      return 'To become a verified FixIt technician:\n\n1. Sign up and select the Technician role\n2. Go to Profile → Submit Verification\n3. Upload your valid government ID and credentials\n4. Wait for admin review (usually within 1–2 business days)\n\nOnce approved, you can start accepting repair jobs. Need help with your verification submission?';
+    }
+
+    // Notifications
+    if (msg.contains('notification') || msg.contains('alert') || msg.contains('push')) {
+      return 'To manage your notifications:\n\n1. Go to Profile → Notification Settings\n2. Toggle the alerts you want to receive:\n   • Booking updates\n   • Payment confirmations\n   • Promotions & rewards\n\nMake sure notifications are also enabled in your phone\'s system settings for the FixIt app.';
+    }
+
+    // Thanks
+    if (msg.contains('thank') || msg.contains('thanks') || msg.contains('appreciate')) {
+      return 'You\'re welcome! 😊 Don\'t hesitate to reach out if you need anything else. Have a great day!';
+    }
+
+    // Hours / Availability
+    if (msg.contains('hour') || msg.contains('open') || msg.contains('available') || msg.contains('operating')) {
+      return 'FixIt service availability:\n\n🚨 Emergency Repairs: 24/7\n⚡ Same-Day Repairs: 7:00 AM – 9:00 PM daily\n📅 Scheduled Repairs: 8:00 AM – 6:00 PM daily\n💬 Live Chat Support: 24/7\n\nService availability may vary by technician location. Is there anything else I can help you with?';
+    }
+
+    // Fallback
+    return 'Thanks for reaching out! I can help you with:\n\n• 📅 Booking a repair\n• 🔍 Tracking your appointment\n• 💳 Payment & pricing\n• ⭐ Rewards & vouchers\n• 👨‍🔧 Technician information\n• 🎫 Submitting a support ticket\n\nCould you tell me more about what you need? Or tap one of the Quick Questions below to get started.';
   }
 
   void _scrollToBottom() {
