@@ -29,6 +29,8 @@ class BookingService {
     double? customerLongitude,
     double? estimatedCost,
     String? paymentMethod,
+    String? status,
+    String bookingSource = 'booking',
   }) async {
     final bookingId = _uuid.v4();
 
@@ -37,7 +39,7 @@ class BookingService {
       'customer_id': customerId,
       'technician_id': technicianId,
       'service_id': serviceId,
-      'status': AppConstants.bookingRequested,
+      'status': status ?? AppConstants.bookingRequested,
       'scheduled_date': scheduledDate?.toIso8601String(),
       'customer_address': customerAddress,
       'customer_latitude': customerLatitude,
@@ -45,6 +47,7 @@ class BookingService {
       'estimated_cost': estimatedCost,
       'payment_method': paymentMethod,
       'payment_status': 'pending',
+      'booking_source': bookingSource,
     }).select().single();
 
     return BookingModel.fromJson(response);
@@ -54,29 +57,71 @@ class BookingService {
     required String bookingId,
     required String status,
     String? cancellationReason,
+    double? cancellationFee,
   }) async {
     if (_ref != null) {
       await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
     }
-    final updates = <String, dynamic>{
-      'status': status,
-    };
 
-    if (status == AppConstants.bookingAccepted) {
-      updates['accepted_at'] = DateTime.now().toIso8601String();
-    } else if (status == AppConstants.bookingCompleted) {
-      updates['completed_at'] = DateTime.now().toIso8601String();
-    } else if (status == AppConstants.bookingCancelled) {
-      updates['cancelled_at'] = DateTime.now().toIso8601String();
-      if (cancellationReason != null) {
-        updates['cancellation_reason'] = cancellationReason;
+    // Use an RPC function so the WHERE clause is UUID = UUID (no type-cast
+    // ambiguity that causes "operator does not exist: uuid = text").
+    await _supabase.rpc('set_booking_status', params: {
+      'p_booking_id': bookingId,
+      'p_status': status,
+      'p_cancel_reason': cancellationReason,
+      'p_cancel_fee': cancellationFee,
+    });
+
+    // Auto-update technician busy status based on active booking count.
+    await _syncTechnicianBusy(bookingId, status);
+  }
+
+  Future<void> _syncTechnicianBusy(String bookingId, String newStatus) async {
+    try {
+      // Fetch the technician_id for this booking
+      final row = await _supabase
+          .from(DBConstants.bookings)
+          .select('technician_id')
+          .filter('id::text', 'eq', bookingId)
+          .maybeSingle();
+      if (row == null) return;
+      final techUserId = row['technician_id'] as String?;
+      if (techUserId == null) return;
+
+      if (newStatus == AppConstants.bookingAccepted ||
+          newStatus == AppConstants.bookingEnRoute ||
+          newStatus == AppConstants.bookingArrived ||
+          newStatus == AppConstants.bookingInProgress) {
+        // Technician is now working — mark busy
+        await _supabase
+            .from(DBConstants.technicianProfiles)
+            .update({'is_busy': true})
+            .filter('user_id::text', 'eq', techUserId);
+      } else if (newStatus == AppConstants.bookingCompleted ||
+                 newStatus == AppConstants.bookingPaid ||
+                 newStatus == AppConstants.bookingClosed ||
+                 newStatus == AppConstants.bookingCancelled ||
+                 newStatus == AppConstants.bookingCancellationPending) {
+        // Only clear busy if there are no other active bookings
+        final active = await _supabase
+            .from(DBConstants.bookings)
+            .select('id')
+            .filter('technician_id::text', 'eq', techUserId)
+            .inFilter('status', [
+              AppConstants.bookingAccepted,
+              AppConstants.bookingInProgress,
+            ])
+            .filter('id::text', 'neq', bookingId);
+        if ((active as List).isEmpty) {
+          await _supabase
+              .from(DBConstants.technicianProfiles)
+              .update({'is_busy': false})
+              .filter('user_id::text', 'eq', techUserId);
+        }
       }
+    } catch (_) {
+      // Non-critical — the Supabase trigger handles this server-side too
     }
-
-    await _supabase
-        .from(DBConstants.bookings)
-        .update(updates)
-        .eq('id', bookingId);
   }
 
   Future<void> updateDiagnosticNotes({
@@ -95,7 +140,7 @@ class BookingService {
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)
-        .eq('id', bookingId);
+        .filter('id::text', 'eq', bookingId);
   }
 
   /// Update booking details (notes and price adjustment)
@@ -124,7 +169,7 @@ class BookingService {
       await _supabase
           .from(DBConstants.bookings)
           .update(updates)
-          .eq('id', bookingId);
+          .filter('id::text', 'eq', bookingId);
     }
   }
 
@@ -215,7 +260,7 @@ class BookingService {
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)
-        .eq('id', bookingId);
+        .filter('id::text', 'eq', bookingId);
 
     // Notify customer if price was adjusted
     if (priceAdjustment != null && priceAdjustment != 0) {
@@ -273,7 +318,7 @@ class BookingService {
     final response = await _supabase
         .from(DBConstants.bookings)
         .select()
-        .eq('id', bookingId)
+        .filter('id::text', 'eq', bookingId)
         .single();
 
     return BookingModel.fromJson(response);
@@ -287,7 +332,7 @@ class BookingService {
     await _supabase.from(DBConstants.bookings).update({
       'rating': rating,
       'review': review,
-    }).eq('id', bookingId);
+    }).filter('id::text', 'eq', bookingId);
   }
 
   Stream<List<BookingModel>> watchCustomerBookings(String customerId) {
@@ -342,6 +387,6 @@ class BookingService {
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)
-        .eq('id', bookingId);
+        .filter('id::text', 'eq', bookingId);
   }
 }

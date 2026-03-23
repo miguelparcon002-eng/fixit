@@ -1,14 +1,24 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/config/supabase_config.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/ratings_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/job_request_provider.dart';
+import '../../services/distance_fee_service.dart';
 import '../../services/ratings_service.dart';
 import '../../models/booking_model.dart';
+import '../../models/job_request_model.dart';
+import '../../models/redeemed_voucher.dart';
+import '../../providers/rewards_provider.dart';
+import '../../widgets/job_status_tracker.dart';
+import '../../core/utils/booking_notes_parser.dart';
 
 // ─── Filter model ─────────────────────────────────────────────────────────────
 
@@ -208,9 +218,7 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
-        onSelectionChanged: (value) {
-          setState(() => _selectedTab = value.first);
-        },
+        onSelectionChanged: (value) => setState(() => _selectedTab = value.first),
       ),
     );
   }
@@ -218,25 +226,139 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   Widget _buildBookingsList() {
     final bookingsAsync = ref.watch(customerBookingsProvider);
 
-    return bookingsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue))),
-      error: (error, stack) => _buildError(error.toString()),
-      data: (bookings) => _buildBookingsContent(bookings),
+    if (_selectedTab == _CustomerBookingsTab.upcoming) {
+      final user = ref.watch(currentUserProvider).valueOrNull;
+      final requestsAsync = user != null
+          ? ref.watch(customerJobRequestsProvider(user.id))
+          : const AsyncData<List<JobRequestModel>>([]);
+      return RefreshIndicator(
+        color: AppTheme.deepBlue,
+        onRefresh: () async {
+          ref.invalidate(customerBookingsProvider);
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        },
+        child: bookingsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue))),
+          error: (error, stack) => _buildError(error.toString()),
+          data: (bookings) => _buildUpcomingContent(bookings, requestsAsync.valueOrNull ?? []),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppTheme.deepBlue,
+      onRefresh: () async {
+        ref.invalidate(customerBookingsProvider);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      },
+      child: bookingsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(AppTheme.deepBlue))),
+        error: (error, stack) => _buildError(error.toString()),
+        data: (bookings) => _buildBookingsContent(bookings),
+      ),
+    );
+  }
+
+  Widget _buildUpcomingContent(List<BookingModel> allBookings, List<JobRequestModel> requests) {
+    final upcomingBookings = allBookings.where((b) => b.status == 'requested').toList();
+    final activeRequests = requests
+        .where((r) => r.status == 'open' || r.status == 'pending_customer_approval')
+        .toList();
+
+    if (upcomingBookings.isEmpty && activeRequests.isEmpty) {
+      return _buildEmptyState(
+        Icons.calendar_today_outlined,
+        'No upcoming appointments',
+        null,
+      );
+    }
+
+    final hasBoth = activeRequests.isNotEmpty && upcomingBookings.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        if (activeRequests.isNotEmpty) ...[
+          if (hasBoth) _buildListSectionLabel('Problem Requests'),
+          ...activeRequests.map((r) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _JobRequestCard(request: r, onTap: () => _showRequestSheet(r)),
+          )),
+          if (hasBoth) const SizedBox(height: 4),
+        ],
+        if (upcomingBookings.isNotEmpty) ...[
+          if (hasBoth) _buildListSectionLabel('Bookings'),
+          ...upcomingBookings.map((b) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildBookingCard(b),
+          )),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildListSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.shade500,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  void _showRequestSheet(JobRequestModel request) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobRequestDetailSheet(request: request),
     );
   }
 
   Widget _buildError(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-          const SizedBox(height: 16),
-          Text('Error loading bookings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-          const SizedBox(height: 8),
-          Text(error, style: TextStyle(fontSize: 14, color: Colors.grey[500]), textAlign: TextAlign.center),
-        ],
-      ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.error_outline, size: 30, color: Colors.red),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Couldn\'t load appointments',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                error,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondaryColor),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -248,17 +370,20 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
 
     switch (_selectedTab) {
       case _CustomerBookingsTab.upcoming:
-        filteredBookings = allBookings.where((b) => ['requested', 'accepted', 'scheduled'].contains(b.status)).toList();
+        filteredBookings = allBookings.where((b) => b.status == 'requested').toList();
         emptyMessage = 'No upcoming appointments';
         emptyIcon = Icons.calendar_today_outlined;
         break;
       case _CustomerBookingsTab.active:
-        filteredBookings = allBookings.where((b) => b.status == 'in_progress').toList();
+        filteredBookings = allBookings.where((b) => [
+          'accepted', 'en_route', 'arrived', 'in_progress', 'completed',
+          'cancellation_pending',
+        ].contains(b.status)).toList();
         emptyMessage = 'No active bookings';
         emptyIcon = Icons.work_outline;
         break;
       case _CustomerBookingsTab.complete:
-        filteredBookings = allBookings.where((b) => b.status == 'completed').toList();
+        filteredBookings = allBookings.where((b) => ['paid', 'closed'].contains(b.status)).toList();
         emptyMessage = 'No completed bookings';
         emptyIcon = Icons.check_circle_outline;
         break;
@@ -318,26 +443,51 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   }
 
   Widget _buildEmptyState(IconData icon, String message, [String? subtitle]) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(message, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-          if (subtitle != null) ...[
-            const SizedBox(height: 6),
-            Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey[400])),
-          ],
-        ],
-      ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(icon, size: 30, color: AppTheme.deepBlue),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+                textAlign: TextAlign.center,
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondaryColor, height: 1.3),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildBookingCard(BookingModel booking) {
     final (statusColor, displayStatus) = _getBookingStatus(booking.status);
-    final isCompleted = booking.status == 'completed';
-    final isActive = booking.status == 'in_progress';
+    final isCompleted = booking.status == 'paid' || booking.status == 'closed';
     final points = isCompleted ? ((booking.finalCost ?? booking.estimatedCost ?? 0.0) / 50).floor() : null;
     final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
     final currentUser = ref.watch(currentUserProvider).value;
@@ -347,6 +497,7 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       technicianId: booking.technicianId,
       customerName: currentUser?.fullName ?? 'Customer',
       status: displayStatus,
+      rawStatus: booking.status,
       statusColor: statusColor,
       date: _formatDate(booking.scheduledDate),
       time: _formatTime(booking.scheduledDate),
@@ -355,17 +506,20 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       moreDetails: booking.diagnosticNotes,
       showBookAgain: isCompleted,
       pointsEarned: points,
-      showPayButton: isActive,
+      showPayButton: booking.status == 'completed',
       paymentAmount: amount,
       paymentStatus: booking.paymentStatus,
       onCardTap: () => _showBookingSheet(context, booking),
+      onUseVoucher: () => _showVoucherDialog(context, booking),
     );
   }
 
   void _showBookingSheet(BuildContext context, BookingModel booking) {
     final (statusColor, displayStatus) = _getBookingStatus(booking.status);
-    final isActive = booking.status == 'in_progress';
-    final isCompleted = booking.status == 'completed';
+    // isActive = show pay button (status 'completed' = job done, awaiting payment)
+    final isActive = booking.status == 'completed';
+    // isCompleted = show rate/book-again actions (payment confirmed or job closed)
+    final isCompleted = booking.status == 'paid' || booking.status == 'closed';
     // Use finalCost (technician-adjusted price) if set, otherwise use estimate.
     // This ensures the customer pays the correct adjusted amount.
     final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
@@ -397,6 +551,116 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
           Navigator.of(ctx).pop();
           _showRatingDialogFor(context, booking, currentUser?.fullName ?? 'Customer');
         },
+        onUseVoucher: () {
+          Navigator.of(ctx).pop();
+          _showVoucherDialog(context, booking);
+        },
+      ),
+    );
+  }
+
+  Future<void> _showVoucherDialog(BuildContext context, BookingModel booking) async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+
+    // Check if a voucher has already been applied to this booking
+    final existing = await SupabaseConfig.client
+        .from('user_redeemed_vouchers')
+        .select('id')
+        .eq('booking_id', booking.id)
+        .limit(1);
+    if ((existing as List).isNotEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A voucher has already been applied to this booking.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final voucherService = ref.read(redeemedVoucherServiceProvider);
+    final vouchers = await voucherService.getUnusedVouchers(user.id);
+
+    if (!context.mounted) return;
+
+    if (vouchers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You have no available vouchers.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select a Voucher',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Apply a discount to booking #${booking.id.substring(0, 6).toUpperCase()}',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 16),
+            ...vouchers.map((voucher) => _VoucherTile(
+              key: ValueKey(voucher.id),
+              voucher: voucher,
+              onApply: () async {
+                Navigator.pop(context);
+
+                // Calculate discounted price
+                final currentAmount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
+                final double newAmount;
+                if (voucher.discountType == 'percentage') {
+                  newAmount = (currentAmount - currentAmount * voucher.discountAmount / 100).clamp(0, double.infinity);
+                } else {
+                  newAmount = (currentAmount - voucher.discountAmount).clamp(0, double.infinity);
+                }
+
+                // Apply discount to booking in Supabase
+                await SupabaseConfig.client
+                    .from('bookings')
+                    .update({'final_cost': newAmount})
+                    .eq('id', booking.id);
+
+                await voucherService.markVoucherAsUsed(voucherId: voucher.id, bookingId: booking.id);
+                ref.invalidate(redeemedVouchersProvider);
+                ref.invalidate(customerBookingsProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${voucher.voucherTitle} applied! New total: ₱${newAmount.toStringAsFixed(2)}'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+            )),
+          ],
+        ),
       ),
     );
   }
@@ -554,12 +818,17 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
 
   (Color, String) _getBookingStatus(String status) {
     return switch (status) {
-      'requested' => (const Color(0xFFFF9800), 'Requested'),
-      'accepted' || 'scheduled' => (const Color(0xFFFF9800), 'Scheduled'),
-      'in_progress' => (AppTheme.lightBlue, 'In Progress'),
-      'completed' => (Colors.green, 'Completed'),
-      'cancelled' => (Colors.red, 'Cancelled'),
-      _ => (Colors.grey, status),
+      'requested'            => (const Color(0xFFFF9800), 'Requested'),
+      'accepted'             => (AppTheme.lightBlue,       'Accepted'),
+      'en_route'             => (const Color(0xFF0EA5E9),  'En Route'),
+      'arrived'              => (const Color(0xFF8B5CF6),  'Arrived'),
+      'in_progress'          => (AppTheme.lightBlue,       'In Progress'),
+      'completed'            => (Colors.orange,            'Awaiting Payment'),
+      'paid'                 => (const Color(0xFF059669),  'Completed'),
+      'closed'               => (const Color(0xFF059669),  'Completed'),
+      'cancellation_pending' => (Colors.orange,            'Cancellation Pending'),
+      'cancelled'            => (Colors.red,               'Cancelled'),
+      _                      => (Colors.grey, status),
     };
   }
 
@@ -574,11 +843,14 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   }
 
   String _displayStatus(String s) => switch (s) {
-        'requested' => 'Requested',
-        'accepted' => 'Accepted',
+        'requested'   => 'Requested',
+        'accepted'    => 'Accepted',
+        'en_route'    => 'En Route',
+        'arrived'     => 'Arrived',
         'in_progress' => 'In Progress',
-        'completed' => 'Completed',
-        'cancelled' => 'Cancelled',
+        'completed'   => 'Completed',
+        'paid'        => 'Paid',
+        'cancelled'   => 'Cancelled',
         _ => s,
       };
 
@@ -967,6 +1239,7 @@ class _BookingCard extends StatelessWidget {
   final String technicianId;
   final String customerName;
   final String status;
+  final String rawStatus;
   final Color statusColor;
   final String date;
   final String time;
@@ -979,12 +1252,14 @@ class _BookingCard extends StatelessWidget {
   final double paymentAmount;
   final String? paymentStatus;
   final VoidCallback onCardTap;
+  final VoidCallback? onUseVoucher;
 
   const _BookingCard({
     required this.bookingId,
     required this.technicianId,
     required this.customerName,
     required this.status,
+    required this.rawStatus,
     required this.statusColor,
     required this.date,
     required this.time,
@@ -997,92 +1272,204 @@ class _BookingCard extends StatelessWidget {
     this.paymentAmount = 0.0,
     this.paymentStatus,
     required this.onCardTap,
+    this.onUseVoucher,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onCardTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
+    final icon = switch (rawStatus) {
+      'requested'            => Icons.inbox_outlined,
+      'accepted'             => Icons.check_circle_outline,
+      'en_route'             => Icons.directions_car_outlined,
+      'arrived'              => Icons.place_outlined,
+      'in_progress'          => Icons.build_circle_outlined,
+      'completed'            => Icons.hourglass_top_rounded,
+      'paid' || 'closed'     => Icons.payments_outlined,
+      'cancellation_pending' => Icons.pending_outlined,
+      'cancelled'            => Icons.cancel_outlined,
+      _                      => Icons.info_outline,
+    };
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onCardTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              // ── Header row ──────────────────────────────────────────
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Job #${bookingId.replaceAll('-', '').substring(0, 6).toUpperCase()}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.textPrimaryColor,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    child: Icon(icon, color: statusColor),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 13, color: AppTheme.textSecondaryColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$date · $time',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondaryColor,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Job #${bookingId.replaceAll('-', '').substring(0, 6).toUpperCase()}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textPrimaryColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _StatusChip(label: status, color: statusColor),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    total,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.deepBlue,
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            _MetaPill(icon: Icons.calendar_today, label: date),
+                            const SizedBox(width: 8),
+                            _MetaPill(icon: Icons.access_time, label: time),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _MetaLine(
+                          icon: Icons.location_on_outlined,
+                          text: location,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.35)),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: statusColor,
+
+              // ── Job progress tracker ─────────────────────────────────
+              if (['accepted', 'en_route', 'arrived', 'in_progress', 'completed'].contains(rawStatus)) ...[
+                const SizedBox(height: 12),
+                Divider(height: 1, color: Colors.grey.shade200),
+                const SizedBox(height: 10),
+                const Row(
+                  children: [
+                    Icon(Icons.route_outlined, size: 14, color: AppTheme.deepBlue),
+                    SizedBox(width: 6),
+                    Text(
+                      'Job Progress',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.deepBlue),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                JobStatusTracker(currentStatus: rawStatus),
+              ],
+
+              // ── Amount row ──────────────────────────────────────────
+              const SizedBox(height: 12),
+              Divider(height: 1, color: Colors.grey.shade200),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      total,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.deepBlue,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor, size: 20),
+                  const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
+                ],
+              ),
+
+              // ── Pay / voucher buttons ───────────────────────────────
+              if (showPayButton) ...[
+                const SizedBox(height: 12),
+                if (paymentStatus == 'completed')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.check_circle, size: 18),
+                      label: const Text('Payment Completed'),
+                      style: ElevatedButton.styleFrom(
+                        disabledBackgroundColor: Colors.green.shade100,
+                        disabledForegroundColor: Colors.green.shade700,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  )
+                else if (paymentStatus == 'submitted')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.hourglass_top_rounded, size: 18),
+                      label: const Text('Waiting for Verification'),
+                      style: ElevatedButton.styleFrom(
+                        disabledBackgroundColor: Colors.orange.shade100,
+                        disabledForegroundColor: Colors.orange.shade700,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  )
+                else
+                  Builder(builder: (ctx) => Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onUseVoucher,
+                          icon: const Icon(Icons.local_offer_rounded, size: 17),
+                          label: const Text('Use Voucher'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF8B5CF6),
+                            side: const BorderSide(color: Color(0xFF8B5CF6)),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => ctx.push('/payment/$bookingId?amount=${paymentAmount.toStringAsFixed(2)}'),
+                          icon: const Icon(Icons.payment, size: 18),
+                          label: const Text('Pay Now'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.deepBlue,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1102,6 +1489,7 @@ class _BookingDetailSheet extends StatefulWidget {
   final String customerName;
   final VoidCallback onOpenFull;
   final void Function(BuildContext) onRate;
+  final VoidCallback onUseVoucher;
 
   const _BookingDetailSheet({
     required this.booking,
@@ -1114,6 +1502,7 @@ class _BookingDetailSheet extends StatefulWidget {
     required this.customerName,
     required this.onOpenFull,
     required this.onRate,
+    required this.onUseVoucher,
   });
 
   @override
@@ -1121,7 +1510,6 @@ class _BookingDetailSheet extends StatefulWidget {
 }
 
 class _BookingDetailSheetState extends State<_BookingDetailSheet> {
-  bool _expanded = false;
 
   String _fmt(DateTime? dt) {
     if (dt == null) return 'TBD';
@@ -1137,11 +1525,18 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
   Widget build(BuildContext context) {
     final booking = widget.booking;
 
+    // ── Parse customer booking details ──────────────────────────────
+    final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
+    final hasBookingDetails = parsedNotes.device != null ||
+        parsedNotes.model != null ||
+        parsedNotes.problem != null ||
+        (parsedNotes.details != null && parsedNotes.details!.trim().isNotEmpty);
+
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.52,
+      initialChildSize: 0.62,
       minChildSize: 0.4,
-      maxChildSize: 0.92,
+      maxChildSize: 0.95,
       builder: (context, scrollController) {
         return SingleChildScrollView(
           controller: scrollController,
@@ -1198,10 +1593,45 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              // ── Booking Details (Customer Notes) ──────────────────
+              if (hasBookingDetails) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Booking Details',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      if (parsedNotes.device != null)
+                        _SheetRow(icon: Icons.devices_rounded, label: 'Device', value: parsedNotes.device!),
+                      if (parsedNotes.model != null)
+                        _SheetRow(icon: Icons.phone_iphone, label: 'Model', value: parsedNotes.model!),
+                      if (parsedNotes.problem != null)
+                        _SheetRow(icon: Icons.report_problem_outlined, label: 'Problem', value: parsedNotes.problem!),
+                      if (parsedNotes.details != null && parsedNotes.details!.trim().isNotEmpty)
+                        _SheetRow(icon: Icons.notes_rounded, label: 'Notes', value: parsedNotes.details!.trim()),
+                    ],
+                  ),
+                ),
+              ],
 
               // ── Points earned ─────────────────────────────────────
               if (widget.pointsEarned != null && widget.pointsEarned! > 0) ...[
+                const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
@@ -1220,101 +1650,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-              ],
-
-              // ── Expand / collapse ─────────────────────────────────
-              InkWell(
-                onTap: () => setState(() => _expanded = !_expanded),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _expanded ? 'Hide details' : 'Show all details',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.deepBlue,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(Icons.keyboard_arrow_down, color: AppTheme.deepBlue, size: 20),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Expanded details ──────────────────────────────────
-              if (_expanded) ...[
-                const SizedBox(height: 12),
-                _SheetSection(
-                  title: 'Booking Details',
-                  children: [
-                    _SheetRow(icon: Icons.tag, label: 'Booking ID', value: booking.id.substring(0, 8).toUpperCase()),
-                    _SheetRow(icon: Icons.event_available, label: 'Created', value: _fmt(booking.createdAt)),
-                    if (booking.acceptedAt != null)
-                      _SheetRow(icon: Icons.check_circle_outline, label: 'Accepted', value: _fmt(booking.acceptedAt)),
-                    if (booking.completedAt != null)
-                      _SheetRow(icon: Icons.done_all, label: 'Completed', value: _fmt(booking.completedAt)),
-                    if (booking.cancelledAt != null)
-                      _SheetRow(icon: Icons.cancel_outlined, label: 'Cancelled', value: _fmt(booking.cancelledAt)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SheetSection(
-                  title: 'Payment',
-                  children: [
-                    _SheetRow(
-                      icon: booking.paymentMethod == 'gcash'
-                          ? Icons.phone_android_rounded
-                          : Icons.payments_rounded,
-                      label: 'Method',
-                      value: booking.paymentMethod == 'gcash'
-                          ? 'GCash'
-                          : booking.paymentMethod == 'cash'
-                              ? 'Cash'
-                              : booking.paymentMethod ?? '—',
-                    ),
-                    _SheetRow(icon: Icons.receipt_outlined, label: 'Status', value: booking.paymentStatus ?? '—'),
-                    if (booking.estimatedCost != null)
-                      _SheetRow(icon: Icons.calculate_outlined, label: 'Estimate', value: '₱${booking.estimatedCost!.toStringAsFixed(2)}'),
-                    // Final price only shown once payment is completed
-                    if (booking.paymentStatus == 'completed' && booking.finalCost != null)
-                      _SheetRow(icon: Icons.price_check, label: 'Final', value: '₱${booking.finalCost!.toStringAsFixed(2)}'),
-                  ],
-                ),
-                if (booking.moreDetails != null && booking.moreDetails!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _SheetSection(
-                    title: 'Notes',
-                    children: [
-                      _SheetRow(icon: Icons.notes, label: 'Details', value: booking.moreDetails!, multiline: true),
-                      if (booking.technicianNotes != null && booking.technicianNotes!.isNotEmpty)
-                        _SheetRow(icon: Icons.engineering, label: 'Tech Notes', value: booking.technicianNotes!, multiline: true),
-                    ],
-                  ),
-                ],
-                if (booking.cancellationReason != null) ...[
-                  const SizedBox(height: 12),
-                  _SheetSection(
-                    title: 'Cancellation',
-                    children: [
-                      _SheetRow(icon: Icons.info_outline, label: 'Reason', value: booking.cancellationReason!, multiline: true),
-                    ],
-                  ),
-                ],
               ],
 
               const SizedBox(height: 20),
@@ -1322,6 +1657,21 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
               // ── Action buttons ────────────────────────────────────
               if (widget.isActive) ...[
                 _PayButton(booking: booking, amount: widget.amount),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: widget.onUseVoucher,
+                    icon: const Icon(Icons.local_offer_outlined, size: 18),
+                    label: const Text('Use Voucher'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                      side: BorderSide(color: Colors.green.shade400),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
               ],
               if (widget.isCompleted) ...[
@@ -1422,10 +1772,9 @@ class _PayButton extends StatelessWidget {
 // ─── Sheet helper widgets ─────────────────────────────────────────────────────
 
 class _SheetSection extends StatelessWidget {
-  final String? title;
   final List<Widget> children;
 
-  const _SheetSection({this.title, required this.children});
+  const _SheetSection({required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -1438,20 +1787,7 @@ class _SheetSection extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title != null) ...[
-            Text(
-              title!,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.textPrimaryColor,
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          ...children,
-        ],
+        children: children,
       ),
     );
   }
@@ -1461,14 +1797,12 @@ class _SheetRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final bool multiline;
   final TextStyle? valueStyle;
 
   const _SheetRow({
     required this.icon,
     required this.label,
     required this.value,
-    this.multiline = false,
     this.valueStyle,
   });
 
@@ -1477,7 +1811,7 @@ class _SheetRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        crossAxisAlignment: multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 15, color: AppTheme.textSecondaryColor),
           const SizedBox(width: 8),
@@ -1505,6 +1839,1066 @@ class _SheetRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Payment breakdown sheet ──────────────────────────────────────────────────
+
+class _PaymentBreakdownSheet extends StatefulWidget {
+  final BookingModel booking;
+  final double amount;
+  final ScrollController scrollController;
+
+  const _PaymentBreakdownSheet({
+    required this.booking,
+    required this.amount,
+    required this.scrollController,
+  });
+
+  @override
+  State<_PaymentBreakdownSheet> createState() => _PaymentBreakdownSheetState();
+}
+
+class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
+  RedeemedVoucher? _voucher;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await SupabaseConfig.client
+          .from('user_redeemed_vouchers')
+          .select()
+          .eq('booking_id', widget.booking.id)
+          .limit(1);
+      final list = rows as List;
+      if (list.isNotEmpty && mounted) {
+        _voucher = RedeemedVoucher.fromJson(Map<String, dynamic>.from(list.first as Map));
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+    }
+
+    final booking = widget.booking;
+    final estimatedCost = booking.estimatedCost ?? 0.0;
+    final voucher = _voucher;
+
+    // Reconstruct pre-voucher total
+    double preVoucherTotal;
+    double voucherDiscount = 0;
+    if (voucher != null) {
+      if (voucher.discountType == 'percentage') {
+        final rate = voucher.discountAmount / 100;
+        preVoucherTotal = rate >= 1 ? widget.amount : widget.amount / (1 - rate);
+        voucherDiscount = preVoucherTotal - widget.amount;
+      } else {
+        voucherDiscount = voucher.discountAmount;
+        preVoucherTotal = widget.amount + voucherDiscount;
+      }
+    } else {
+      preVoucherTotal = widget.amount;
+    }
+
+    // Tech additional charges above the initial estimate
+    final techAdditional = (preVoucherTotal - estimatedCost).clamp(0.0, double.infinity);
+
+    // Parsed breakdown (stored for new bookings)
+    final storedServiceFee = booking.parsedServiceFee;
+    final storedDistanceFee = booking.parsedDistanceFee;
+
+    final parts = booking.partsList;
+
+    // Parse individual price adjustments from technician notes
+    final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
+    final techNotes = booking.technicianNotes;
+    final adjustments = <(bool, double, String?)>[];
+    if (techNotes != null) {
+      for (final line in techNotes.split('\n')) {
+        final m = adjRegex.firstMatch(line.trim());
+        if (m != null) {
+          final isIncrease = m.group(1) == 'increased';
+          final amt = double.tryParse(m.group(2)!) ?? 0.0;
+          final reason = m.group(3)?.trim();
+          if (amt > 0) adjustments.add((isIncrease, amt, reason));
+        }
+      }
+    }
+
+    return SingleChildScrollView(
+      controller: widget.scrollController,
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+
+          // Title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: AppTheme.deepBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Payment Breakdown',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                  Text('Full itemization of charges',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryColor)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ── BASE CHARGES ─────────────────────────────────────────
+          _BdSectionHeader(title: 'Base Charges', icon: Icons.home_repair_service_rounded, color: AppTheme.deepBlue),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade100),
+            ),
+            child: Column(
+              children: [
+                if (storedServiceFee != null && storedServiceFee > 0)
+                  _BdRow('Service Fee', storedServiceFee),
+                if (storedDistanceFee != null)
+                  _BdRow(
+                    'Travel Fee${_distanceNote(booking)}',
+                    storedDistanceFee,
+                  )
+                else
+                  _BdRow('Estimated Base Charge', estimatedCost),
+              ],
+            ),
+          ),
+
+          // ── TECHNICIAN ADDITIONS ──────────────────────────────────
+          if ((storedServiceFee != null && storedServiceFee > 0) ||
+              adjustments.isNotEmpty ||
+              parts.isNotEmpty ||
+              techAdditional > 0) ...[
+            const SizedBox(height: 16),
+            _BdSectionHeader(title: 'Technician Additions', icon: Icons.engineering_rounded, color: Colors.orange.shade700),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Service Fee (from assess & price)
+                  if (storedServiceFee != null && storedServiceFee > 0)
+                    _BdRow('Service Fee', storedServiceFee, color: Colors.orange.shade800),
+                  // Individual price adjustments with reasons
+                  for (final (isIncrease, amt, reason) in adjustments) ...[
+                    _BdRow(
+                      isIncrease ? 'Price Increase' : 'Price Decrease',
+                      amt,
+                      color: isIncrease ? Colors.orange.shade800 : Colors.red.shade700,
+                    ),
+                    if (reason != null && reason.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4, left: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.subdirectory_arrow_right_rounded, size: 12, color: Colors.grey.shade500),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                  // Fallback for legacy bookings without parsed breakdown
+                  if (storedServiceFee == null && adjustments.isEmpty && techAdditional > 0)
+                    _BdRow('Service & Additional Charges', techAdditional, color: Colors.orange.shade800),
+                  // Parts Used
+                  if (parts.isNotEmpty) ...[
+                    if (storedServiceFee != null || adjustments.isNotEmpty || techAdditional > 0)
+                      const SizedBox(height: 8),
+                    Text('Parts Used',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800)),
+                    const SizedBox(height: 6),
+                    ...parts.map((p) => Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, size: 5, color: Colors.orange.shade400),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(p, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimaryColor))),
+                        ],
+                      ),
+                    )),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // ── VOUCHER DISCOUNT ──────────────────────────────────────
+          if (voucher != null) ...[
+            const SizedBox(height: 16),
+            _BdSectionHeader(title: 'Discount Applied', icon: Icons.local_offer_rounded, color: Colors.green.shade700),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_offer, color: Colors.green, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(voucher.voucherTitle,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.green)),
+                        Text(
+                          voucher.discountType == 'percentage'
+                              ? '${voucher.discountAmount.toStringAsFixed(0)}% off'
+                              : 'Fixed discount',
+                          style: TextStyle(fontSize: 11, color: Colors.green.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text('- ₱${voucherDiscount.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.green)),
+                ],
+              ),
+            ),
+          ],
+
+          // ── TOTAL ─────────────────────────────────────────────────
+          const SizedBox(height: 20),
+          Container(height: 1, color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total Amount',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+              Text(
+                '₱${widget.amount.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.deepBlue),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _distanceNote(BookingModel booking) {
+    if (booking.diagnosticNotes == null) return '';
+    final m = RegExp(r'Distance: ([\d.]+)\s*km').firstMatch(booking.diagnosticNotes!);
+    return m != null ? ' (${m.group(1)} km)' : '';
+  }
+}
+
+class _BdSectionHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+
+  const _BdSectionHeader({required this.title, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+      ],
+    );
+  }
+}
+
+class _BdRow extends StatelessWidget {
+  final String label;
+  final double amount;
+  final Color? color;
+
+  const _BdRow(this.label, this.amount, {this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppTheme.textPrimaryColor;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c))),
+          Text('₱${amount.toStringAsFixed(2)}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Voucher tile for the voucher selection sheet ─────────────────────────────
+
+class _VoucherTile extends StatelessWidget {
+  final RedeemedVoucher voucher;
+  final VoidCallback onApply;
+
+  const _VoucherTile({super.key, required this.voucher, required this.onApply});
+
+  @override
+  Widget build(BuildContext context) {
+    final discount = voucher.discountType == 'percentage'
+        ? '${voucher.discountAmount.toStringAsFixed(0)}% off'
+        : '₱${voucher.discountAmount.toStringAsFixed(0)} off';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.local_offer, color: Colors.green.shade700, size: 22),
+        ),
+        title: Text(
+          voucher.voucherTitle,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        ),
+        subtitle: Text(
+          discount,
+          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        trailing: ElevatedButton(
+          onPressed: onApply,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade600,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Job Request Card ──────────────────────────────────────────────────────────
+
+class _JobRequestCard extends StatelessWidget {
+  final JobRequestModel request;
+  final VoidCallback onTap;
+  const _JobRequestCard({required this.request, required this.onTap});
+
+  (Color, IconData, String) get _statusStyle => switch (request.status) {
+        'open' => (Colors.orange, Icons.hourglass_top_rounded, 'Open'),
+        'pending_customer_approval' => (
+            const Color(0xFF8B5CF6),
+            Icons.notification_important_rounded,
+            'Awaiting Approval'
+          ),
+        'accepted' => (
+            const Color(0xFF0EA5E9),
+            Icons.engineering_rounded,
+            'Accepted'
+          ),
+        'completed' => (
+            const Color(0xFF059669),
+            Icons.check_circle_rounded,
+            'Completed'
+          ),
+        'cancelled' => (Colors.red, Icons.cancel_rounded, 'Cancelled'),
+        _ => (Colors.grey, Icons.circle, request.status),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, statusIcon, label) = _statusStyle;
+    final fmt = DateFormat('MMM d, yyyy · h:mm a');
+
+    String? parsedBrand;
+    String? parsedModel;
+    String? parsedIssues;
+    for (final line in request.problemDescription.split('\n')) {
+      if (line.startsWith('Brand: ')) parsedBrand = line.substring(7).trim();
+      if (line.startsWith('Model: ')) parsedModel = line.substring(7).trim();
+      if (line.startsWith('Issues: ')) parsedIssues = line.substring(8).trim();
+    }
+
+    final deviceIcon = request.deviceType == 'Laptop'
+        ? Icons.laptop_rounded
+        : Icons.smartphone_rounded;
+    final deviceLabel = [request.deviceType, parsedBrand, parsedModel]
+        .whereType<String>()
+        .join(' · ');
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(deviceIcon, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                deviceLabel,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textPrimaryColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _StatusChip(label: label, color: color),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        _MetaPill(
+                          icon: Icons.access_time_rounded,
+                          label: fmt.format(request.createdAt.toLocal()),
+                        ),
+                        const SizedBox(height: 8),
+                        _MetaLine(
+                          icon: Icons.location_on_outlined,
+                          text: request.address,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: Colors.grey.shade200),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      parsedIssues ?? 'No issues listed',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Job Request Detail Sheet ──────────────────────────────────────────────────
+
+class _JobRequestDetailSheet extends ConsumerStatefulWidget {
+  final JobRequestModel request;
+  const _JobRequestDetailSheet({required this.request});
+
+  @override
+  ConsumerState<_JobRequestDetailSheet> createState() =>
+      _JobRequestDetailSheetState();
+}
+
+class _JobRequestDetailSheetState
+    extends ConsumerState<_JobRequestDetailSheet> {
+  bool _accepting = false;
+  bool _declining = false;
+
+  (Color, IconData, String) get _statusStyle =>
+      switch (widget.request.status) {
+        'open' => (Colors.orange, Icons.hourglass_top_rounded, 'Open'),
+        'pending_customer_approval' => (
+            const Color(0xFF8B5CF6),
+            Icons.notification_important_rounded,
+            'Awaiting Your Approval'
+          ),
+        'accepted' => (
+            const Color(0xFF0EA5E9),
+            Icons.engineering_rounded,
+            'Accepted'
+          ),
+        'completed' => (
+            const Color(0xFF059669),
+            Icons.check_circle_rounded,
+            'Completed'
+          ),
+        'cancelled' => (Colors.red, Icons.cancel_rounded, 'Cancelled'),
+        _ => (Colors.grey, Icons.circle, widget.request.status),
+      };
+
+  static double _haversineKm(
+      double lat1, double lng1, double lat2, double lng2) {
+    const toRad = pi / 180;
+    final dLat = (lat2 - lat1) * 111.0;
+    final dLng = (lng2 - lng1) * 111.0 * cos((lat1 + lat2) / 2 * toRad);
+    return sqrt(dLat * dLat + dLng * dLng);
+  }
+
+  Future<void> _accept() async {
+    setState(() => _accepting = true);
+    try {
+      final user = ref.read(currentUserProvider).value;
+      if (user == null) throw Exception('Not logged in');
+      final supabase = SupabaseConfig.client;
+      final techId = widget.request.technicianId!;
+
+      var svcRow = await supabase
+          .from('services')
+          .select('id')
+          .eq('technician_id', techId)
+          .limit(1)
+          .maybeSingle();
+      svcRow ??= await supabase
+          .from('services')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+      if (svcRow == null) throw Exception('No services available.');
+      final serviceId = svcRow['id'] as String;
+
+      final techRow = await supabase
+          .from('users')
+          .select('latitude, longitude')
+          .eq('id', techId)
+          .single();
+      final techLat = (techRow['latitude'] as num?)?.toDouble();
+      final techLng = (techRow['longitude'] as num?)?.toDouble();
+      double? distFee;
+      if (techLat != null && techLng != null) {
+        final distKm = _haversineKm(
+          techLat, techLng,
+          widget.request.latitude, widget.request.longitude,
+        );
+        final rate = await DistanceFeeService.getRate();
+        distFee = (distKm * 10).round() * rate;
+      }
+
+      final scheduledAt = DateTime.now().add(const Duration(minutes: 15));
+      final booking = await ref.read(bookingServiceProvider).createBooking(
+            customerId: user.id,
+            technicianId: techId,
+            serviceId: serviceId,
+            status: AppConstants.bookingAccepted,
+            scheduledDate: scheduledAt,
+            customerAddress: widget.request.address,
+            customerLatitude: widget.request.latitude,
+            customerLongitude: widget.request.longitude,
+            estimatedCost: distFee,
+            paymentMethod: 'gcash',
+            bookingSource: 'post_problem',
+          );
+
+      final distanceNoteLine = (distFee != null && distFee > 0)
+          ? '\nDistance Fee: ₱${distFee.toStringAsFixed(2)}'
+          : '';
+      await supabase.from('bookings').update({
+        'diagnostic_notes':
+            '[POST_PROBLEM]\n${widget.request.problemDescription}$distanceNoteLine',
+      }).eq('id', booking.id);
+
+      await ref
+          .read(jobRequestServiceProvider)
+          .acceptRequest(widget.request.id, techId);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Technician accepted! Check your Appointments tab.'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+      context.go('/bookings');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+      );
+      setState(() => _accepting = false);
+    }
+  }
+
+  Future<void> _decline() async {
+    setState(() => _declining = true);
+    try {
+      await ref
+          .read(jobRequestServiceProvider)
+          .customerDeclineRequest(widget.request.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Technician declined. Your request is still open.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+      );
+      setState(() => _declining = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, icon, label) = _statusStyle;
+    final fmt = DateFormat('MMM d, yyyy · h:mm a');
+
+    // Parse fields
+    String? parsedBrand;
+    String? parsedModel;
+    String? parsedIssues;
+    String? parsedNotes;
+    for (final line in widget.request.problemDescription.split('\n')) {
+      if (line.startsWith('Brand: ')) parsedBrand = line.substring(7).trim();
+      if (line.startsWith('Model: ')) parsedModel = line.substring(7).trim();
+      if (line.startsWith('Issues: ')) parsedIssues = line.substring(8).trim();
+    }
+    final sepIdx = widget.request.problemDescription.indexOf('---\n');
+    if (sepIdx != -1) {
+      parsedNotes =
+          widget.request.problemDescription.substring(sepIdx + 4).trim();
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ListView(
+          controller: ctrl,
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    widget.request.deviceType == 'Laptop'
+                        ? Icons.laptop_rounded
+                        : Icons.smartphone_rounded,
+                    color: AppTheme.deepBlue,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.request.deviceType,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimaryColor),
+                      ),
+                      Text(
+                        fmt.format(widget.request.createdAt.toLocal()),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondaryColor),
+                      ),
+                    ],
+                  ),
+                ),
+                // Status chip
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 13, color: color),
+                      const SizedBox(width: 5),
+                      Text(label,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: color)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Details card
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                children: [
+                  if (parsedBrand != null)
+                    _DetailRow(
+                        icon: Icons.business_rounded,
+                        label: 'Brand',
+                        value: parsedBrand),
+                  if (parsedBrand != null) const Divider(height: 1),
+                  if (parsedModel != null)
+                    _DetailRow(
+                        icon: Icons.perm_device_information_rounded,
+                        label: 'Model',
+                        value: parsedModel),
+                  if (parsedModel != null) const Divider(height: 1),
+                  if (parsedIssues != null)
+                    _DetailRow(
+                        icon: Icons.build_circle_rounded,
+                        label: 'Issues',
+                        value: parsedIssues),
+                  if (parsedIssues != null) const Divider(height: 1),
+                  if (parsedNotes != null)
+                    _DetailRow(
+                        icon: Icons.notes_rounded,
+                        label: 'Additional Notes',
+                        value: parsedNotes),
+                  if (parsedNotes != null) const Divider(height: 1),
+                  _DetailRow(
+                      icon: Icons.location_on_rounded,
+                      label: 'Location',
+                      value: widget.request.address),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Accept / Decline buttons (pending_customer_approval only)
+            if (widget.request.status == 'pending_customer_approval' &&
+                widget.request.technicianId != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: (_accepting || _declining) ? null : _decline,
+                      icon: _declining
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.close, size: 18),
+                      label: const Text('Decline'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: (_accepting || _declining) ? null : _accept,
+                      icon: _accepting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 18),
+                      label: const Text('Accept'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.deepBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Cancel button (open requests only)
+            if (widget.request.status == 'open')
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        title: const Text('Cancel Request'),
+                        content: const Text(
+                            'Are you sure you want to cancel this request?'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('No')),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red),
+                            child: const Text('Yes, Cancel',
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true || !context.mounted) return;
+                    await ref
+                        .read(jobRequestServiceProvider)
+                        .cancelRequest(widget.request.id);
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.cancel_outlined,
+                      color: Colors.red, size: 18),
+                  label: const Text('Cancel Request',
+                      style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailRow(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppTheme.deepBlue),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondaryColor,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimaryColor)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Shared card helper widgets ───────────────────────────────────────────────
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _StatusChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MetaPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade700),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetaLine extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _MetaLine({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

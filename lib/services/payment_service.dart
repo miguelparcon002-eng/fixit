@@ -45,6 +45,7 @@ class PaymentService {
   }
 
   /// Submit a payment record to the payments table.
+  /// [paymentType] is either 'booking' (regular job payment) or 'cancellation_fee'.
   static Future<void> submitPayment({
     required String bookingId,
     required String customerId,
@@ -52,6 +53,7 @@ class PaymentService {
     required String referenceNumber,
     required String senderName,
     required String proofImageUrl,
+    String paymentType = 'booking',
   }) async {
     await _supabase.from('payments').insert({
       'booking_id': bookingId,
@@ -62,23 +64,34 @@ class PaymentService {
       'proof_image_url': proofImageUrl,
       'status': 'pending_verification',
       'payment_method': 'gcash',
+      'payment_type': paymentType,
       'created_at': DateTime.now().toIso8601String(),
     });
 
-    // Also update the booking's payment status
-    await _supabase.from('bookings').update({
-      'payment_status': 'submitted',
-      'payment_method': 'gcash',
-    }).eq('id', bookingId);
+    // Only update booking payment_status for regular job payments.
+    if (paymentType == 'booking') {
+      await _supabase.from('bookings').update({
+        'payment_status': 'submitted',
+        'payment_method': 'gcash',
+      }).eq('id', bookingId);
+    }
   }
 
   /// Get payment for a booking.
-  static Future<Map<String, dynamic>?> getPaymentForBooking(String bookingId) async {
+  /// Pass [paymentType] to filter by type ('booking' or 'cancellation_fee').
+  static Future<Map<String, dynamic>?> getPaymentForBooking(
+    String bookingId, {
+    String? paymentType,
+  }) async {
     try {
-      final response = await _supabase
+      var query = _supabase
           .from('payments')
           .select()
-          .eq('booking_id', bookingId)
+          .eq('booking_id', bookingId);
+      if (paymentType != null) {
+        query = query.eq('payment_type', paymentType);
+      }
+      final response = await query
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -112,22 +125,39 @@ class PaymentService {
 
     await _supabase.from('payments').update(updates).eq('id', paymentId);
 
-    // Update the booking's payment_status based on admin decision
+    // Update the booking's payment_status based on type and admin decision.
     final payment = await _supabase
         .from('payments')
-        .select('booking_id')
+        .select('booking_id, payment_type')
         .eq('id', paymentId)
         .single();
 
-    if (status == 'verified') {
-      await _supabase.from('bookings').update({
-        'payment_status': 'completed',
-      }).eq('id', payment['booking_id']);
-    } else if (status == 'rejected') {
-      // Reset so the customer can resubmit
-      await _supabase.from('bookings').update({
-        'payment_status': 'pending',
-      }).eq('id', payment['booking_id']);
+    final pType = payment['payment_type'] as String? ?? 'booking';
+
+    if (pType == 'cancellation_fee') {
+      if (status == 'verified') {
+        // Fee confirmed — fully cancel the booking now
+        await _supabase.from('bookings').update({
+          'payment_status': 'fee_paid',
+          'status': 'cancelled',
+        }).eq('id', payment['booking_id']);
+      } else if (status == 'rejected') {
+        // Fee rejected — customer must resubmit; keep booking in cancellation_pending
+        await _supabase.from('bookings').update({
+          'payment_status': 'pending',
+        }).eq('id', payment['booking_id']);
+      }
+    } else {
+      if (status == 'verified') {
+        await _supabase.from('bookings').update({
+          'payment_status': 'completed',
+        }).eq('id', payment['booking_id']);
+      } else if (status == 'rejected') {
+        // Reset so the customer can resubmit
+        await _supabase.from('bookings').update({
+          'payment_status': 'pending',
+        }).eq('id', payment['booking_id']);
+      }
     }
   }
 

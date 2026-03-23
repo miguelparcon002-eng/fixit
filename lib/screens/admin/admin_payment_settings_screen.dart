@@ -34,11 +34,12 @@ class _AdminPaymentSettingsScreenState
   List<Map<String, dynamic>> _payments = [];
   bool _loadingPayments = true;
   String _filterStatus = 'all';
+  String _filterCancelStatus = 'all';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadSettings();
     _loadPayments();
   }
@@ -76,6 +77,9 @@ class _AdminPaymentSettingsScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingPayments = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load payments: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -157,13 +161,40 @@ class _AdminPaymentSettingsScreenState
     }
   }
 
-  List<Map<String, dynamic>> get _filteredPayments {
-    if (_filterStatus == 'all') return _payments;
-    return _payments.where((p) => p['status'] == _filterStatus).toList();
+  // ── Filtered helpers ──────────────────────────────────────────────────────
+
+  /// Regular booking payments (payment_type == 'booking' or null/missing).
+  List<Map<String, dynamic>> get _bookingPayments => _payments.where((p) {
+        final t = p['payment_type'] as String?;
+        return t == null || t == '' || t == 'booking';
+      }).toList();
+
+  /// Cancellation fee payments.
+  List<Map<String, dynamic>> get _cancelFeePayments => _payments.where((p) {
+        final t = p['payment_type'] as String?;
+        return t == 'cancellation_fee';
+      }).toList();
+
+  List<Map<String, dynamic>> get _filteredBookingPayments {
+    if (_filterStatus == 'all') return _bookingPayments;
+    return _bookingPayments.where((p) => p['status'] == _filterStatus).toList();
   }
+
+  List<Map<String, dynamic>> get _filteredCancelPayments {
+    if (_filterCancelStatus == 'all') return _cancelFeePayments;
+    return _cancelFeePayments.where((p) => p['status'] == _filterCancelStatus).toList();
+  }
+
+  int _pendingCount(List<Map<String, dynamic>> list) =>
+      list.where((p) => p['status'] == 'pending_verification').length;
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final bookingPending = _pendingCount(_bookingPayments);
+    final cancelPending = _pendingCount(_cancelFeePayments);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -182,28 +213,32 @@ class _AdminPaymentSettingsScreenState
           labelColor: AppTheme.deepBlue,
           unselectedLabelColor: AppTheme.textSecondaryColor,
           indicatorColor: AppTheme.deepBlue,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           tabs: [
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.receipt_long, size: 18),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.receipt_long, size: 16),
+                  const SizedBox(width: 5),
                   const Text('Payments'),
-                  if (_payments.where((p) => p['status'] == 'pending_verification').isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_payments.where((p) => p['status'] == 'pending_verification').length}',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                      ),
-                    ),
+                  if (bookingPending > 0) ...[
+                    const SizedBox(width: 5),
+                    _Badge(count: bookingPending),
+                  ],
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.cancel_outlined, size: 16),
+                  const SizedBox(width: 5),
+                  const Text('Cancel Fees'),
+                  if (cancelPending > 0) ...[
+                    const SizedBox(width: 5),
+                    _Badge(count: cancelPending),
                   ],
                 ],
               ),
@@ -212,8 +247,8 @@ class _AdminPaymentSettingsScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.qr_code, size: 18),
-                  SizedBox(width: 6),
+                  Icon(Icons.qr_code, size: 16),
+                  SizedBox(width: 5),
                   Text('QR Code'),
                 ],
               ),
@@ -224,16 +259,37 @@ class _AdminPaymentSettingsScreenState
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildPaymentsTab(),
+          _buildPaymentsTab(
+            payments: _filteredBookingPayments,
+            allPayments: _bookingPayments,
+            filterStatus: _filterStatus,
+            onFilterChanged: (v) => setState(() => _filterStatus = v),
+            emptyLabel: 'No booking payments yet',
+          ),
+          _buildPaymentsTab(
+            payments: _filteredCancelPayments,
+            allPayments: _cancelFeePayments,
+            filterStatus: _filterCancelStatus,
+            onFilterChanged: (v) => setState(() => _filterCancelStatus = v),
+            emptyLabel: 'No cancellation fee payments yet',
+            isCancelFee: true,
+          ),
           _buildQrSettingsTab(),
         ],
       ),
     );
   }
 
-  // ─── PAYMENTS TAB ───────────────────────────────────────────────────
+  // ─── PAYMENTS / CANCEL FEES TAB ─────────────────────────────────────────
 
-  Widget _buildPaymentsTab() {
+  Widget _buildPaymentsTab({
+    required List<Map<String, dynamic>> payments,
+    required List<Map<String, dynamic>> allPayments,
+    required String filterStatus,
+    required void Function(String) onFilterChanged,
+    required String emptyLabel,
+    bool isCancelFee = false,
+  }) {
     if (_loadingPayments) {
       return const Center(
         child: CircularProgressIndicator(
@@ -250,19 +306,19 @@ class _AdminPaymentSettingsScreenState
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
-              _buildFilterChip('All', 'all'),
+              _buildFilterChip('All', 'all', allPayments, filterStatus, onFilterChanged),
               const SizedBox(width: 8),
-              _buildFilterChip('Pending', 'pending_verification'),
+              _buildFilterChip('Pending', 'pending_verification', allPayments, filterStatus, onFilterChanged),
               const SizedBox(width: 8),
-              _buildFilterChip('Verified', 'verified'),
+              _buildFilterChip('Verified', 'verified', allPayments, filterStatus, onFilterChanged),
               const SizedBox(width: 8),
-              _buildFilterChip('Rejected', 'rejected'),
+              _buildFilterChip('Rejected', 'rejected', allPayments, filterStatus, onFilterChanged),
             ],
           ),
         ),
         const SizedBox(height: 4),
         Expanded(
-          child: _filteredPayments.isEmpty
+          child: payments.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -270,7 +326,7 @@ class _AdminPaymentSettingsScreenState
                       Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
                       const SizedBox(height: 12),
                       Text(
-                        'No payments found',
+                        filterStatus == 'all' ? emptyLabel : 'No $filterStatus payments',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -284,13 +340,11 @@ class _AdminPaymentSettingsScreenState
                   onRefresh: _loadPayments,
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: _filteredPayments.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildPaymentCard(_filteredPayments[index]),
-                      );
-                    },
+                    itemCount: payments.length,
+                    itemBuilder: (context, index) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildPaymentCard(payments[index], isCancelFee: isCancelFee),
+                    ),
                   ),
                 ),
         ),
@@ -298,14 +352,20 @@ class _AdminPaymentSettingsScreenState
     );
   }
 
-  Widget _buildFilterChip(String label, String status) {
-    final isSelected = _filterStatus == status;
+  Widget _buildFilterChip(
+    String label,
+    String status,
+    List<Map<String, dynamic>> allPayments,
+    String current,
+    void Function(String) onChange,
+  ) {
+    final isSelected = current == status;
     final count = status == 'all'
-        ? _payments.length
-        : _payments.where((p) => p['status'] == status).length;
+        ? allPayments.length
+        : allPayments.where((p) => p['status'] == status).length;
 
     return GestureDetector(
-      onTap: () => setState(() => _filterStatus = status),
+      onTap: () => onChange(status),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -327,7 +387,7 @@ class _AdminPaymentSettingsScreenState
     );
   }
 
-  Widget _buildPaymentCard(Map<String, dynamic> payment) {
+  Widget _buildPaymentCard(Map<String, dynamic> payment, {bool isCancelFee = false}) {
     final status = payment['status'] as String? ?? 'pending_verification';
     final (statusColor, statusLabel) = switch (status) {
       'verified' => (Colors.green, 'Verified'),
@@ -347,6 +407,13 @@ class _AdminPaymentSettingsScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,13 +422,32 @@ class _AdminPaymentSettingsScreenState
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'Booking #${(payment['booking_id'] as String? ?? '').length >= 8 ? (payment['booking_id'] as String).substring(0, 8) : payment['booking_id'] ?? '-'}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimaryColor,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Booking #${(payment['booking_id'] as String? ?? '').length >= 8 ? (payment['booking_id'] as String).substring(0, 8).toUpperCase() : payment['booking_id'] ?? '-'}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimaryColor,
+                      ),
+                    ),
+                    if (isCancelFee)
+                      Container(
+                        margin: const EdgeInsets.only(top: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Text(
+                          'Cancellation Fee',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.orange.shade700),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               Container(
@@ -385,17 +471,17 @@ class _AdminPaymentSettingsScreenState
           const SizedBox(height: 10),
 
           // Payment details
-          _buildPaymentInfoRow(Icons.person_outline, 'Sender', payment['sender_name'] ?? '-'),
+          _buildInfoRow(Icons.person_outline, 'Sender', payment['sender_name'] ?? '-'),
           const SizedBox(height: 6),
-          _buildPaymentInfoRow(Icons.receipt_long, 'Reference #', payment['reference_number'] ?? '-'),
+          _buildInfoRow(Icons.receipt_long, 'Reference #', payment['reference_number'] ?? '-'),
           const SizedBox(height: 6),
-          _buildPaymentInfoRow(Icons.payments_outlined, 'Amount', '₱${amount.toStringAsFixed(2)}'),
+          _buildInfoRow(Icons.payments_outlined, 'Amount', '₱${amount.toStringAsFixed(2)}'),
           const SizedBox(height: 6),
-          _buildPaymentInfoRow(Icons.schedule, 'Submitted', createdAt),
+          _buildInfoRow(Icons.schedule, 'Submitted', createdAt),
 
           if (payment['admin_note'] != null && (payment['admin_note'] as String).isNotEmpty) ...[
             const SizedBox(height: 6),
-            _buildPaymentInfoRow(Icons.note_outlined, 'Note', payment['admin_note']),
+            _buildInfoRow(Icons.note_outlined, 'Note', payment['admin_note']),
           ],
 
           // Proof image button
@@ -458,7 +544,7 @@ class _AdminPaymentSettingsScreenState
     );
   }
 
-  Widget _buildPaymentInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -468,20 +554,13 @@ class _AdminPaymentSettingsScreenState
           width: 85,
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondaryColor,
-            ),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondaryColor),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimaryColor,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
           ),
         ),
       ],
@@ -650,7 +729,7 @@ class _AdminPaymentSettingsScreenState
     );
   }
 
-  // ─── QR SETTINGS TAB ───────────────────────────────────────────────
+  // ─── QR SETTINGS TAB ────────────────────────────────────────────────────
 
   Widget _buildQrSettingsTab() {
     if (_loadingQr) {
@@ -855,6 +934,28 @@ class _AdminPaymentSettingsScreenState
         fontSize: 15,
         fontWeight: FontWeight.w800,
         color: AppTheme.textPrimaryColor,
+      ),
+    );
+  }
+}
+
+// ─── Small badge widget ────────────────────────────────────────────────────
+
+class _Badge extends StatelessWidget {
+  final int count;
+  const _Badge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
       ),
     );
   }

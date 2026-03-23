@@ -13,11 +13,13 @@ import '../../services/payment_service.dart';
 class PaymentScreen extends ConsumerStatefulWidget {
   final String bookingId;
   final double amount;
+  final bool isCancellationFee;
 
   const PaymentScreen({
     super.key,
     required this.bookingId,
     required this.amount,
+    this.isCancellationFee = false,
   });
 
   @override
@@ -55,7 +57,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Future<void> _loadData() async {
     final results = await Future.wait([
       PaymentService.getAdminQrSettings(),
-      PaymentService.getPaymentForBooking(widget.bookingId),
+      PaymentService.getPaymentForBooking(
+        widget.bookingId,
+        paymentType: widget.isCancellationFee ? 'cancellation_fee' : 'booking',
+      ),
     ]);
     if (!mounted) return;
     setState(() {
@@ -122,6 +127,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         referenceNumber: _referenceController.text.trim(),
         senderName: _senderNameController.text.trim(),
         proofImageUrl: proofUrl,
+        paymentType: widget.isCancellationFee ? 'cancellation_fee' : 'booking',
       );
 
       if (!mounted) return;
@@ -156,9 +162,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
-          'Payment',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+        title: Text(
+          widget.isCancellationFee ? 'Pay Cancellation Fee' : 'Payment',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -451,9 +457,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
               child: Column(
                 children: [
-                  const Text(
-                    'Amount to Pay',
-                    style: TextStyle(
+                  Text(
+                    widget.isCancellationFee ? 'Cancellation Fee' : 'Amount to Pay',
+                    style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

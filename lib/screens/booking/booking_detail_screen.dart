@@ -5,12 +5,16 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../widgets/job_status_tracker.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/technician_provider.dart';
 import '../../models/booking_model.dart';
+import '../../models/redeemed_voucher.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/utils/booking_notes_parser.dart';
 import '../../services/notification_service.dart';
+import '../../services/payment_service.dart';
 import '../technician/widgets/customer_location_sheet.dart';
 
 class BookingDetailScreen extends ConsumerWidget {
@@ -103,10 +107,28 @@ class _BookingDetailView extends ConsumerWidget {
 
   const _BookingDetailView({required this.booking});
 
-  /// Only 'requested' can be cancelled by the customer.
-  bool get _isCancellable => booking.status == AppConstants.bookingRequested;
+  /// Customers can cancel at any active stage before completion.
+  bool get _isCancellable => [
+        AppConstants.bookingRequested,
+        AppConstants.bookingAccepted,
+        AppConstants.bookingEnRoute,
+        AppConstants.bookingArrived,
+        AppConstants.bookingInProgress,
+      ].contains(booking.status);
+
+  /// Fee applies once technician has accepted (en_route, arrived, in_progress).
+  bool get _cancellationHasFee => [
+        AppConstants.bookingAccepted,
+        AppConstants.bookingEnRoute,
+        AppConstants.bookingArrived,
+        AppConstants.bookingInProgress,
+      ].contains(booking.status);
 
   Future<void> _showCancelDialog(BuildContext context, WidgetRef ref) async {
+    final isInProgress = booking.status == AppConstants.bookingInProgress;
+    final distanceFee = booking.parsedDistanceFee ?? 0.0;
+    final hasFee = _cancellationHasFee && distanceFee > 0;
+
     final reasons = [
       'Change of plans',
       'Found another technician',
@@ -137,6 +159,51 @@ class _BookingDetailView extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Fee warning for in-progress cancellations
+                if (hasFee) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cancellation Fee Applies',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.red.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isInProgress
+                                    ? 'The technician is already working on your device. A cancellation fee of ₱${distanceFee.toStringAsFixed(2)} (distance/travel fee) will be charged.'
+                                    : booking.status == AppConstants.bookingArrived
+                                        ? 'The technician has arrived at your location. A cancellation fee of ₱${distanceFee.toStringAsFixed(2)} (distance/travel fee) will be charged.'
+                                        : booking.status == AppConstants.bookingEnRoute
+                                            ? 'The technician is on the way to you. A cancellation fee of ₱${distanceFee.toStringAsFixed(2)} (distance/travel fee) will be charged.'
+                                            : 'The technician has already accepted your booking. A cancellation fee of ₱${distanceFee.toStringAsFixed(2)} (distance/travel fee) will be charged.',
+                                style: TextStyle(fontSize: 12, color: Colors.red.shade700, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 const Text(
                   'Please tell us why you want to cancel:',
                   style: TextStyle(fontSize: 14, color: AppTheme.textSecondaryColor),
@@ -205,7 +272,7 @@ class _BookingDetailView extends ConsumerWidget {
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade300,
               ),
-              child: const Text('Cancel Booking'),
+              child: Text(hasFee ? 'Cancel & Pay ₱${distanceFee.toStringAsFixed(2)}' : 'Cancel Booking'),
             ),
           ],
         ),
@@ -222,18 +289,28 @@ class _BookingDetailView extends ConsumerWidget {
 
     try {
       final bookingService = ref.read(bookingServiceProvider);
+      // When a fee applies, hold in cancellation_pending until admin confirms payment.
+      // Only fully cancel immediately when there is no fee.
+      final newStatus = hasFee
+          ? AppConstants.bookingCancellationPending
+          : AppConstants.bookingCancelled;
+
       await bookingService.updateBookingStatus(
         bookingId: booking.id,
-        status: AppConstants.bookingCancelled,
+        status: newStatus,
         cancellationReason: reason,
+        cancellationFee: hasFee ? distanceFee : null,
       );
 
       // Notify the technician
+      final techMessage = hasFee
+          ? 'A customer has initiated a cancellation. A cancellation fee of ₱${distanceFee.toStringAsFixed(2)} is pending admin confirmation. Reason: $reason'
+          : 'A customer has cancelled their booking. Reason: $reason';
       await NotificationService().sendNotification(
         userId: booking.technicianId,
         type: 'booking_cancelled',
-        title: 'Booking Cancelled',
-        message: 'A customer has cancelled their booking. Reason: $reason',
+        title: hasFee ? 'Cancellation Pending' : 'Booking Cancelled',
+        message: techMessage,
         data: {'booking_id': booking.id, 'route': '/tech-jobs'},
       );
 
@@ -241,13 +318,21 @@ class _BookingDetailView extends ConsumerWidget {
       ref.invalidate(customerBookingsProvider);
 
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Booking cancelled successfully.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      context.pop();
+      if (hasFee) {
+        // Redirect customer to pay the cancellation fee.
+        // Booking stays as cancellation_pending until admin verifies.
+        context.pushReplacement(
+          '/payment/${booking.id}?amount=${distanceFee.toStringAsFixed(2)}&type=cancellation_fee',
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking cancelled successfully.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        context.pop();
+      }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -264,28 +349,50 @@ class _BookingDetailView extends ConsumerWidget {
         : const AsyncData(null);
     final techPhone = techUserAsync.value?.contactNumber;
 
-    // Determine colors based on booking status
+    // Determine colors and friendly label based on booking status
     Color statusColor;
+    String statusLabel;
     switch (booking.status.toLowerCase()) {
       case 'requested':
         statusColor = Colors.orange;
+        statusLabel = 'Requested';
         break;
-      case 'scheduled':
-      case 'pending':
-        statusColor = const Color(0xFFFF6B6B);
+      case 'accepted':
+        statusColor = AppTheme.lightBlue;
+        statusLabel = 'Accepted';
+        break;
+      case 'en_route':
+        statusColor = const Color(0xFF0EA5E9);
+        statusLabel = 'En Route';
+        break;
+      case 'arrived':
+        statusColor = const Color(0xFF8B5CF6);
+        statusLabel = 'Arrived';
         break;
       case 'in_progress':
-      case 'ongoing':
         statusColor = AppTheme.lightBlue;
+        statusLabel = 'In Progress';
         break;
       case 'completed':
-        statusColor = Colors.green;
+        statusColor = Colors.orange;
+        statusLabel = 'Awaiting Payment';
+        break;
+      case 'paid':
+      case 'closed':
+        statusColor = const Color(0xFF059669);
+        statusLabel = 'Completed';
+        break;
+      case 'cancellation_pending':
+        statusColor = Colors.orange;
+        statusLabel = 'Cancellation Pending';
         break;
       case 'cancelled':
         statusColor = Colors.red;
+        statusLabel = 'Cancelled';
         break;
       default:
         statusColor = Colors.grey;
+        statusLabel = booking.status.replaceAll('_', ' ').toUpperCase();
     }
 
     // Format dates
@@ -312,6 +419,37 @@ class _BookingDetailView extends ConsumerWidget {
     final estimatedCost = booking.estimatedCost ?? 0.0;
     final finalCost = booking.finalCost ?? estimatedCost;
 
+    // Parse technician notes into general assessment + price adjustments
+    final techNotes = booking.technicianNotes;
+    final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
+    // Lines to skip — already shown in the payment breakdown
+    final skipLineRegex = RegExp(r'^(Service Fee:|Parts Used:|• .+ — [^\d]*[\d.]+$)');
+    final techAdjustments = <(bool, double, String?)>[];
+    final techGeneralLines = <String>[];
+    if (techNotes != null) {
+      for (final line in techNotes.split('\n')) {
+        final trimmed = line.trim();
+        final m = adjRegex.firstMatch(trimmed);
+        if (m != null) {
+          final isIncrease = m.group(1) == 'increased';
+          final amt = double.tryParse(m.group(2)!) ?? 0.0;
+          final reason = m.group(3)?.trim();
+          if (amt > 0) techAdjustments.add((isIncrease, amt, reason));
+        } else if (trimmed.isNotEmpty && !skipLineRegex.hasMatch(trimmed)) {
+          techGeneralLines.add(trimmed);
+        }
+      }
+    }
+    final hasTechNotes = techGeneralLines.isNotEmpty;
+    // Check tech notes section first for a service fee (tech's assessed value takes priority)
+    final techServiceFeeSet = techNotes != null &&
+        RegExp(r'Service Fee:[^\d]*([\d.]+)').hasMatch(techNotes);
+    final hasBreakdown = techServiceFeeSet ||
+        booking.parsedServiceFee != null ||
+        booking.parsedDistanceFee != null ||
+        booking.partsList.isNotEmpty ||
+        techAdjustments.isNotEmpty;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -336,14 +474,17 @@ class _BookingDetailView extends ConsumerWidget {
               onSelected: (value) {
                 if (value == 'cancel') _showCancelDialog(context, ref);
               },
-              itemBuilder: (context) => const [
+              itemBuilder: (context) => [
                 PopupMenuItem(
                   value: 'cancel',
                   child: Row(
                     children: [
-                      Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
-                      SizedBox(width: 8),
-                      Text('Cancel Booking', style: TextStyle(color: Colors.red)),
+                      const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        _cancellationHasFee ? 'Cancel (Fee Applies)' : 'Cancel Booking',
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ],
                   ),
                 ),
@@ -365,7 +506,7 @@ class _BookingDetailView extends ConsumerWidget {
               ),
               child: Center(
                 child: Text(
-                  booking.status.toUpperCase(),
+                  statusLabel,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -532,11 +673,25 @@ class _BookingDetailView extends ConsumerWidget {
             _TechnicianSection(technicianId: booking.technicianId),
             const SizedBox(height: 16),
 
+            // Technician Notes — assessment only (price adjustments are in the payment breakdown)
+            if (hasTechNotes) ...[
+              _SectionCard(
+                title: 'Technician Notes',
+                children: [
+                  _InfoRow(
+                    icon: Icons.engineering_rounded,
+                    label: 'Assessment',
+                    value: techGeneralLines.join('\n'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // Payment Information
             _SectionCard(
               title: 'Payment',
               children: [
-                // Payment method
                 _InfoRow(
                   icon: booking.paymentMethod == 'gcash'
                       ? Icons.phone_android_rounded
@@ -549,63 +704,63 @@ class _BookingDetailView extends ConsumerWidget {
                           : booking.paymentMethod ?? '—',
                 ),
                 const SizedBox(height: 12),
-                // Payment status
                 _InfoRow(
                   icon: Icons.receipt_outlined,
                   label: 'Payment Status',
                   value: booking.paymentStatus ?? '—',
                 ),
-                const SizedBox(height: 12),
-                // Estimated cost always shown
-                if (estimatedCost > 0) ...[
+                if (hasBreakdown) ...[
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey.shade200, height: 1),
+                  const SizedBox(height: 16),
+                  _CompletedPaymentBreakdown(
+                    booking: booking,
+                    finalCost: finalCost,
+                    estimatedCost: estimatedCost,
+                    isCompleted: booking.status == 'completed' ||
+                        booking.status == 'paid' ||
+                        booking.status == 'closed',
+                  ),
+                ] else if (estimatedCost > 0) ...[
+                  const SizedBox(height: 12),
                   _InfoRow(
                     icon: Icons.calculate_outlined,
                     label: 'Estimated Amount',
                     value: '₱${estimatedCost.toStringAsFixed(2)}',
                   ),
                 ],
-                // Final cost + adjustment only shown after payment is completed
-                if (booking.paymentStatus == 'completed') ...[
-                  if (booking.finalCost != null && booking.finalCost != estimatedCost && estimatedCost > 0) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          finalCost > estimatedCost ? 'Price Increase' : 'Discount',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${finalCost > estimatedCost ? '+' : '-'} ₱${(finalCost - estimatedCost).abs().toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: finalCost > estimatedCost ? Colors.orange : AppTheme.successColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Divider(color: Colors.grey.shade300, height: 1),
-                  ],
-                  const SizedBox(height: 12),
-                  _InfoRow(
-                    icon: Icons.price_check,
-                    label: 'Final Amount',
-                    value: '₱${finalCost.toStringAsFixed(2)}',
-                    valueStyle: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.deepBlue,
-                    ),
-                  ),
-                ],
               ],
             ),
+            const SizedBox(height: 16),
+
+            // Job status tracker — visible for all active bookings
+            if ([
+              AppConstants.bookingAccepted,
+              AppConstants.bookingEnRoute,
+              AppConstants.bookingArrived,
+              AppConstants.bookingInProgress,
+            ].contains(booking.status)) ...[
+              _SectionCard(
+                title: 'Job Progress',
+                children: [JobStatusTracker(currentStatus: booking.status)],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Cancellation Policy Card
+            if (booking.status != AppConstants.bookingCancelled &&
+                booking.status != AppConstants.bookingCancellationPending &&
+                booking.status != AppConstants.bookingCompleted &&
+                booking.status != AppConstants.bookingPaid &&
+                booking.status != AppConstants.bookingClosed)
+              _CancellationPolicyCard(booking: booking),
+
+            // Cancellation fee payment section — shown while pending AND after cancelled
+            if ((booking.status == AppConstants.bookingCancellationPending ||
+                    booking.status == AppConstants.bookingCancelled) &&
+                (booking.parsedDistanceFee ?? 0) > 0)
+              _CancellationFeeSection(booking: booking),
+
             const SizedBox(height: 24),
 
             // Action Buttons — Call/Message only shown when job is in progress
@@ -652,16 +807,16 @@ class _BookingDetailView extends ConsumerWidget {
               const SizedBox(height: 12),
             ],
 
-            // Cancel button — only shown while still 'requested'
+            // Cancel button — shown for requested, accepted, or in_progress
             if (_isCancellable)
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _showCancelDialog(context, ref),
                   icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                  label: const Text(
-                    'Cancel Booking Request',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                  label: Text(
+                    _cancellationHasFee ? 'Cancel Booking (Fee Applies)' : 'Cancel Booking',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -670,38 +825,164 @@ class _BookingDetailView extends ConsumerWidget {
                   ),
                 ),
               ),
-
-            // Locked banner — shown once technician has accepted
-            if (!_isCancellable &&
-                booking.status != AppConstants.bookingCancelled &&
-                booking.status != AppConstants.bookingCompleted)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.lock_outline, color: Colors.orange, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This booking can no longer be cancelled because the technician has already accepted it.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.orange,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CancellationPolicyCard extends StatelessWidget {
+  final BookingModel booking;
+  const _CancellationPolicyCard({required this.booking});
+
+  @override
+  Widget build(BuildContext context) {
+    final isRequested = booking.status == AppConstants.bookingRequested;
+    final isPostAcceptance = [
+      AppConstants.bookingAccepted,
+      AppConstants.bookingEnRoute,
+      AppConstants.bookingArrived,
+      AppConstants.bookingInProgress,
+    ].contains(booking.status);
+    final distanceFee = booking.parsedDistanceFee;
+    final feeText = distanceFee != null && distanceFee > 0
+        ? '₱${distanceFee.toStringAsFixed(2)} distance fee'
+        : 'Distance/travel fee applies';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.policy_outlined, size: 16, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 6),
+                const Text(
+                  'Cancellation Policy',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Colors.grey.shade100),
+          // Row 1 — Free during request
+          _PolicyRow(
+            icon: Icons.check_circle_rounded,
+            iconColor: Colors.green,
+            title: 'While Requesting',
+            subtitle: 'Cancel anytime for free — technician hasn\'t responded yet.',
+            feeLabel: 'FREE',
+            feeLabelColor: Colors.green,
+            isActive: isRequested,
+          ),
+          Divider(height: 1, color: Colors.grey.shade100),
+          // Row 2 — Fee after acceptance
+          _PolicyRow(
+            icon: Icons.warning_amber_rounded,
+            iconColor: Colors.orange,
+            title: 'After Technician Accepts',
+            subtitle: 'The technician committed to the job. You are responsible for the $feeText.',
+            feeLabel: distanceFee != null && distanceFee > 0
+                ? '₱${distanceFee.toStringAsFixed(2)}'
+                : 'Fee',
+            feeLabelColor: Colors.orange.shade700,
+            isActive: isPostAcceptance,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PolicyRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String feeLabel;
+  final Color feeLabelColor;
+  final bool isActive;
+
+  const _PolicyRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.feeLabel,
+    required this.feeLabelColor,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: isActive ? iconColor.withValues(alpha: 0.05) : null,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: isActive ? iconColor : Colors.grey.shade400),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? AppTheme.textPrimaryColor : Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isActive ? AppTheme.textSecondaryColor : Colors.grey.shade400,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isActive ? feeLabelColor.withValues(alpha: 0.12) : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              feeLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: isActive ? feeLabelColor : Colors.grey.shade400,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -715,57 +996,91 @@ class _TechnicianSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(userByIdProvider(technicianId));
     final techAsync = ref.watch(technicianProfileProvider(technicianId));
+    final ratingsAsync = ref.watch(technicianActualRatingsProvider(technicianId));
+
+    final user = userAsync.value;
+    final tech = techAsync.value;
+
+    // Show loading spinner until at least the user row is ready
+    if (userAsync.isLoading) {
+      return _SectionCard(
+        title: 'Assigned Technician',
+        children: const [Center(child: CircularProgressIndicator())],
+      );
+    }
 
     return _SectionCard(
       title: 'Assigned Technician',
       children: [
-        userAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) => const _InfoRow(
-            icon: Icons.person,
-            label: 'Technician',
-            value: 'Unknown Technician',
-          ),
-          data: (user) => _InfoRow(
-            icon: Icons.person,
-            label: 'Technician',
-            value: user?.fullName ?? 'Unknown Technician',
-          ),
+        // ── Name ────────────────────────────────────────────────────
+        _InfoRow(
+          icon: Icons.person,
+          label: 'Name',
+          value: user?.fullName ?? 'Unknown Technician',
         ),
         const SizedBox(height: 12),
-        techAsync.when(
+
+        // ── Contact number ──────────────────────────────────────────
+        if (user?.contactNumber != null && user!.contactNumber!.isNotEmpty) ...[
+          _InfoRow(
+            icon: Icons.phone_rounded,
+            label: 'Contact',
+            value: user.contactNumber!,
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── Rating (live from app_ratings) ──────────────────────────
+        ratingsAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (e, st) => const SizedBox.shrink(),
-          data: (tech) => tech != null
-              ? Column(
-                  children: [
-                    _InfoRow(
-                      icon: Icons.stars,
-                      label: 'Rating',
-                      value: tech.rating > 0
-                          ? '${tech.rating.toStringAsFixed(1)} ⭐ (${tech.totalJobs} jobs)'
-                          : 'No ratings yet',
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.verified,
-                      label: 'Certification',
-                      value: tech.certifications.isNotEmpty
-                          ? tech.certifications.join(', ')
-                          : 'Verified & Certified',
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                )
-              : const SizedBox.shrink(),
+          data: (data) {
+            final (avg, count) = data;
+            return _InfoRow(
+              icon: Icons.star_rounded,
+              label: 'Rating',
+              value: count > 0
+                  ? '${avg.toStringAsFixed(1)} ⭐ ($count ${count == 1 ? 'review' : 'reviews'})'
+                  : 'No reviews yet',
+            );
+          },
         ),
-        _InfoRow(
-          icon: Icons.badge,
-          label: 'Technician ID',
-          value: technicianId.length >= 12
-              ? technicianId.substring(0, 12)
-              : technicianId,
-        ),
+
+        // ── Profile details from technician_profiles ─────────────────
+        if (tech != null) ...[
+          if (tech.specialties.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.build_rounded,
+              label: 'Specialties',
+              value: tech.specialties.join(', '),
+            ),
+          ],
+          if (tech.yearsExperience > 0) ...[
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.workspace_premium_rounded,
+              label: 'Experience',
+              value: '${tech.yearsExperience} ${tech.yearsExperience == 1 ? 'year' : 'years'}',
+            ),
+          ],
+          if (tech.shopName != null && tech.shopName!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.storefront_rounded,
+              label: 'Shop',
+              value: tech.shopName!,
+            ),
+          ],
+          if (tech.certifications.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.verified_rounded,
+              label: 'Certifications',
+              value: tech.certifications.join(', '),
+            ),
+          ],
+        ],
       ],
     );
   }
@@ -874,6 +1189,342 @@ class _InfoRow extends StatelessWidget {
           trailing!,
         ],
       ],
+    );
+  }
+}
+
+// ─── Completed booking itemized payment breakdown ─────────────────────────────
+
+class _CompletedPaymentBreakdown extends StatefulWidget {
+  final BookingModel booking;
+  final double finalCost;
+  final double estimatedCost;
+  final bool isCompleted;
+
+  const _CompletedPaymentBreakdown({
+    required this.booking,
+    required this.finalCost,
+    required this.estimatedCost,
+    this.isCompleted = false,
+  });
+
+  @override
+  State<_CompletedPaymentBreakdown> createState() => _CompletedPaymentBreakdownState();
+}
+
+class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> {
+  RedeemedVoucher? _voucher;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVoucher();
+  }
+
+  Future<void> _loadVoucher() async {
+    try {
+      final rows = await SupabaseConfig.client
+          .from('user_redeemed_vouchers')
+          .select()
+          .eq('booking_id', widget.booking.id)
+          .limit(1);
+      final list = rows as List;
+      if (list.isNotEmpty && mounted) {
+        _voucher = RedeemedVoucher.fromJson(Map<String, dynamic>.from(list.first as Map));
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    final booking = widget.booking;
+    final voucher = _voucher;
+
+    // Reconstruct pre-voucher total
+    double preVoucherTotal;
+    double voucherDiscount = 0;
+    if (voucher != null) {
+      if (voucher.discountType == 'percentage') {
+        final rate = voucher.discountAmount / 100;
+        preVoucherTotal = rate >= 1 ? widget.finalCost : widget.finalCost / (1 - rate);
+        voucherDiscount = preVoucherTotal - widget.finalCost;
+      } else {
+        voucherDiscount = voucher.discountAmount;
+        preVoucherTotal = widget.finalCost + voucherDiscount;
+      }
+    } else {
+      preVoucherTotal = widget.finalCost;
+    }
+
+    // Prefer the tech-assessed service fee (from tech notes section) over the
+    // original booking estimate (which parsedServiceFee may find first via firstMatch).
+    final storedServiceFee = (() {
+      final tn = booking.technicianNotes;
+      if (tn != null) {
+        final m = RegExp(r'Service Fee:[^\d]*([\d.]+)').firstMatch(tn);
+        final v = m != null ? double.tryParse(m.group(1)!) : null;
+        if (v != null && v > 0) return v;
+      }
+      return booking.parsedServiceFee;
+    })();
+    final storedDistanceFee = booking.parsedDistanceFee;
+    final techAdditional = (preVoucherTotal - widget.estimatedCost).clamp(0.0, double.infinity);
+    final parts = booking.partsList;
+
+    // Parse individual price adjustments from technician notes
+    final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
+    final techNotes = booking.technicianNotes;
+    final adjustments = <(bool, double, String?)>[];
+    if (techNotes != null) {
+      for (final line in techNotes.split('\n')) {
+        final m = adjRegex.firstMatch(line.trim());
+        if (m != null) {
+          final isIncrease = m.group(1) == 'increased';
+          final amt = double.tryParse(m.group(2)!) ?? 0.0;
+          final reason = m.group(3)?.trim();
+          if (amt > 0) adjustments.add((isIncrease, amt, reason));
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Row(
+          children: [
+            const Icon(Icons.receipt_long_rounded, size: 15, color: AppTheme.deepBlue),
+            const SizedBox(width: 6),
+            const Text(
+              'Expense Breakdown',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.deepBlue),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── Base Charges ──────────────────────────────────────
+        _BreakdownBlock(
+          color: Colors.blue,
+          icon: Icons.home_repair_service_rounded,
+          label: 'Base Charges',
+          child: Column(
+            children: [
+              if (storedDistanceFee != null)
+                _BreakdownRow(
+                  'Travel Fee${_distanceNote(booking)}',
+                  storedDistanceFee,
+                )
+              else
+                _BreakdownRow('Estimated Base Charge', widget.estimatedCost),
+            ],
+          ),
+        ),
+
+        // ── Technician Additions ──────────────────────────────
+        if ((storedServiceFee != null && storedServiceFee > 0) ||
+            adjustments.isNotEmpty ||
+            parts.isNotEmpty ||
+            techAdditional > 0) ...[
+          const SizedBox(height: 10),
+          _BreakdownBlock(
+            color: Colors.orange,
+            icon: Icons.engineering_rounded,
+            label: 'Technician Additions',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Service Fee (from assess & price)
+                if (storedServiceFee != null && storedServiceFee > 0)
+                  _BreakdownRow('Service Fee', storedServiceFee, color: Colors.orange.shade800),
+                // Individual price adjustments with reasons
+                for (final (isIncrease, amt, reason) in adjustments) ...[
+                  _BreakdownRow(
+                    isIncrease ? 'Price Increase' : 'Price Decrease',
+                    amt,
+                    color: isIncrease ? Colors.orange.shade800 : Colors.red.shade700,
+                  ),
+                  if (reason != null && reason.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4, left: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.subdirectory_arrow_right_rounded, size: 12, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              reason,
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+                // Fallback for legacy bookings without parsed breakdown
+                if (storedServiceFee == null && adjustments.isEmpty && techAdditional > 0)
+                  _BreakdownRow('Service & Repair Charge', techAdditional, color: Colors.orange.shade800),
+                // Parts Used
+                if (parts.isNotEmpty) ...[
+                  if (storedServiceFee != null || adjustments.isNotEmpty || techAdditional > 0)
+                    const SizedBox(height: 8),
+                  Text('Parts Used',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.orange.shade800)),
+                  const SizedBox(height: 6),
+                  ...parts.map((p) => Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle, size: 5, color: Colors.orange.shade400),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(p,
+                                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimaryColor)),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ],
+            ),
+          ),
+        ],
+
+        // ── Voucher Discount ──────────────────────────────────
+        if (voucher != null) ...[
+          const SizedBox(height: 10),
+          _BreakdownBlock(
+            color: Colors.green,
+            icon: Icons.local_offer_rounded,
+            label: 'Discount Applied',
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(voucher.voucherTitle,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimaryColor)),
+                      Text(
+                        voucher.discountType == 'percentage'
+                            ? '${voucher.discountAmount.toStringAsFixed(0)}% off'
+                            : 'Fixed discount',
+                        style: TextStyle(fontSize: 11, color: Colors.green.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '- ₱${voucherDiscount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800, color: Colors.green),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        // ── Total ─────────────────────────────────────────────
+        const SizedBox(height: 14),
+        Container(height: 1, color: Colors.grey.shade200),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(widget.isCompleted ? 'Total Paid' : 'Amount Due',
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimaryColor)),
+            Text(
+              '₱${widget.finalCost.toStringAsFixed(2)}',
+              style: const TextStyle(
+                  fontSize: 26, fontWeight: FontWeight.w900, color: AppTheme.deepBlue),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _distanceNote(BookingModel b) {
+    if (b.diagnosticNotes == null) return '';
+    final m = RegExp(r'Distance: ([\d.]+)\s*km').firstMatch(b.diagnosticNotes!);
+    return m != null ? ' (${m.group(1)} km)' : '';
+  }
+}
+
+class _BreakdownBlock extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+  final String label;
+  final Widget child;
+
+  const _BreakdownBlock({
+    required this.color,
+    required this.icon,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 5),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  final String label;
+  final double amount;
+  final Color? color;
+
+  const _BreakdownRow(this.label, this.amount, {this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppTheme.textPrimaryColor;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c))),
+          Text('₱${amount.toStringAsFixed(2)}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c)),
+        ],
+      ),
     );
   }
 }
@@ -1320,6 +1971,145 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// Shows cancellation fee payment status for cancelled bookings.
+/// If unpaid, offers a "Pay Cancellation Fee" button using the same GCash flow.
+class _CancellationFeeSection extends StatefulWidget {
+  final BookingModel booking;
+  const _CancellationFeeSection({required this.booking});
+
+  @override
+  State<_CancellationFeeSection> createState() =>
+      _CancellationFeeSectionState();
+}
+
+class _CancellationFeeSectionState extends State<_CancellationFeeSection> {
+  Map<String, dynamic>? _feePayment;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final p = await PaymentService.getPaymentForBooking(
+      widget.booking.id,
+      paymentType: 'cancellation_fee',
+    );
+    if (!mounted) return;
+    setState(() {
+      _feePayment = p;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fee = widget.booking.finalCost ?? 0.0;
+
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    final status = _feePayment?['status'] as String?;
+
+    final (Color bg, Color border, Color textColor, IconData icon, String title, String subtitle) =
+        switch (status) {
+      'verified' => (
+          Colors.green.shade50,
+          Colors.green.shade200,
+          Colors.green.shade700,
+          Icons.check_circle,
+          'Cancellation Fee Paid',
+          'Your cancellation fee of ₱${fee.toStringAsFixed(2)} has been verified.',
+        ),
+      'pending_verification' => (
+          Colors.orange.shade50,
+          Colors.orange.shade200,
+          Colors.orange.shade700,
+          Icons.hourglass_top,
+          'Fee Payment Pending Verification',
+          'Your payment proof has been submitted. Awaiting admin confirmation.',
+        ),
+      _ => (
+          Colors.red.shade50,
+          Colors.red.shade200,
+          Colors.red.shade700,
+          Icons.warning_amber_rounded,
+          'Cancellation Fee Due',
+          'A cancellation fee of ₱${fee.toStringAsFixed(2)} applies to this booking.',
+        ),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: textColor, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: textColor)),
+                    const SizedBox(height: 4),
+                    Text(subtitle,
+                        style: TextStyle(fontSize: 12, color: textColor, height: 1.4)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (status == null || status == 'rejected') ...[
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => context.push(
+                '/payment/${widget.booking.id}'
+                '?amount=${fee.toStringAsFixed(2)}&type=cancellation_fee',
+              ),
+              icon: const Icon(Icons.payment, size: 18),
+              label: Text(
+                status == 'rejected'
+                    ? 'Resubmit Fee Payment'
+                    : 'Pay Cancellation Fee  ₱${fee.toStringAsFixed(2)}',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

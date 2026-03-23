@@ -18,9 +18,13 @@ class BookingModel {
   final int? rating;
   final String? review;
   final String? invoiceUrl;
+  final String bookingSource; // 'booking' | 'post_problem'
   final DateTime createdAt;
   final DateTime? acceptedAt;
+  final DateTime? enRouteAt;
+  final DateTime? arrivedAt;
   final DateTime? completedAt;
+  final DateTime? paidAt;
   final DateTime? cancelledAt;
   final DateTime? updatedAt;
 
@@ -44,9 +48,13 @@ class BookingModel {
     this.rating,
     this.review,
     this.invoiceUrl,
+    this.bookingSource = 'booking',
     required this.createdAt,
     this.acceptedAt,
+    this.enRouteAt,
+    this.arrivedAt,
     this.completedAt,
+    this.paidAt,
     this.cancelledAt,
     this.updatedAt,
   });
@@ -76,12 +84,22 @@ class BookingModel {
       rating: json['rating'] as int?,
       review: json['review'] as String?,
       invoiceUrl: json['invoice_url'] as String?,
+      bookingSource: json['booking_source'] as String? ?? 'booking',
       createdAt: DateTime.parse(json['created_at'] as String),
       acceptedAt: json['accepted_at'] != null
           ? DateTime.parse(json['accepted_at'] as String)
           : null,
+      enRouteAt: json['en_route_at'] != null
+          ? DateTime.parse(json['en_route_at'] as String)
+          : null,
+      arrivedAt: json['arrived_at'] != null
+          ? DateTime.parse(json['arrived_at'] as String)
+          : null,
       completedAt: json['completed_at'] != null
           ? DateTime.parse(json['completed_at'] as String)
+          : null,
+      paidAt: json['paid_at'] != null
+          ? DateTime.parse(json['paid_at'] as String)
           : null,
       cancelledAt: json['cancelled_at'] != null
           ? DateTime.parse(json['cancelled_at'] as String)
@@ -110,12 +128,16 @@ class BookingModel {
       'payment_method': paymentMethod,
       'payment_status': paymentStatus,
       'cancellation_reason': cancellationReason,
+      'booking_source': bookingSource,
       'rating': rating,
       'review': review,
       'invoice_url': invoiceUrl,
       'created_at': createdAt.toIso8601String(),
       'accepted_at': acceptedAt?.toIso8601String(),
+      'en_route_at': enRouteAt?.toIso8601String(),
+      'arrived_at': arrivedAt?.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
+      'paid_at': paidAt?.toIso8601String(),
       'cancelled_at': cancelledAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -184,7 +206,13 @@ class BookingModel {
     // Extract only the customer's original booking details (before "---TECHNICIAN NOTES---")
     if (diagnosticNotes == null) return null;
     final parts = diagnosticNotes!.split('---TECHNICIAN NOTES---');
-    return parts[0].trim();
+    var customer = parts[0].trim();
+    // Strip internal [POST_PROBLEM] marker — it's used only for source detection,
+    // not meant to be displayed to anyone.
+    if (customer.startsWith('[POST_PROBLEM]')) {
+      customer = customer.replaceFirst(RegExp(r'^\[POST_PROBLEM\]\n?'), '').trim();
+    }
+    return customer.isEmpty ? null : customer;
   }
 
   String? get technicianNotes {
@@ -213,6 +241,28 @@ class BookingModel {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Discount: ([\d.]+%|₱[\d.]+)').firstMatch(diagnosticNotes!);
     return match?.group(1);
+  }
+
+  /// Service fee stored in diagnostic notes. Null for legacy bookings.
+  /// Uses [^\d]* so the ₱ character encoding never causes a mismatch.
+  double? get parsedServiceFee {
+    if (diagnosticNotes == null) return null;
+    final m = RegExp(r'Service Fee:[^\d]*([\d.]+)').firstMatch(diagnosticNotes!);
+    return m != null ? double.tryParse(m.group(1)!) : null;
+  }
+
+  /// Distance/travel fee stored in diagnostic notes. Null for legacy bookings.
+  double? get parsedDistanceFee {
+    if (diagnosticNotes == null) return null;
+    final m = RegExp(r'Distance Fee:[^\d]*([\d.]+)').firstMatch(diagnosticNotes!);
+    return m != null ? double.tryParse(m.group(1)!) : null;
+  }
+
+  /// Platform convenience fee rate (decimal, e.g. 0.05 = 5%). Defaults to 5%.
+  double get convenienceFeeRate {
+    if (diagnosticNotes == null) return 0.05;
+    final m = RegExp(r'Convenience Fee Rate: ([\d.]+)').firstMatch(diagnosticNotes!);
+    return m != null ? (double.tryParse(m.group(1)!) ?? 5.0) / 100.0 : 0.05;
   }
 
   String? get originalPrice {

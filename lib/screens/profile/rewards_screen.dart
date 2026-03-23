@@ -7,11 +7,37 @@ import '../../providers/auth_provider.dart';
 import '../../models/reward.dart';
 import '../../models/redeemed_voucher.dart';
 
-class RewardsScreen extends ConsumerWidget {
+class RewardsScreen extends ConsumerStatefulWidget {
   const RewardsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RewardsScreen> createState() => _RewardsScreenState();
+}
+
+class _RewardsScreenState extends ConsumerState<RewardsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  bool _onAvailableTab = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() => _onAvailableTab = _tabController.index == 0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final pointsAsync = ref.watch(rewardPointsProvider);
     final availableVouchers = ref.watch(availableVouchersProvider);
     final redeemedVouchersAsync = ref.watch(redeemedVouchersProvider);
@@ -141,11 +167,10 @@ class RewardsScreen extends ConsumerWidget {
 
             // Tabs
             Expanded(
-              child: DefaultTabController(
-                length: 2,
-                child: Column(
+              child: Column(
                   children: [
                     TabBar(
+                      controller: _tabController,
                       labelColor: AppTheme.deepBlue,
                       unselectedLabelColor: AppTheme.textSecondaryColor,
                       indicatorColor: AppTheme.deepBlue,
@@ -160,6 +185,7 @@ class RewardsScreen extends ConsumerWidget {
                     ),
                     Expanded(
                       child: TabBarView(
+                        controller: _tabController,
                         children: [
                           // Available Vouchers
                           ListView.builder(
@@ -167,11 +193,13 @@ class RewardsScreen extends ConsumerWidget {
                             itemCount: availableVouchers.length,
                             itemBuilder: (context, index) {
                               final voucher = availableVouchers[index];
-                              final canRedeem = points >= voucher.pointsCost;
+                              final canRedeem = _onAvailableTab && points >= voucher.pointsCost;
                               return _VoucherCard(
                                 voucher: voucher,
                                 canRedeem: canRedeem,
-                                onRedeem: () => _showRedeemDialog(context, ref, voucher, points),
+                                onRedeem: _onAvailableTab
+                                    ? () => _showRedeemDialog(context, ref, voucher, points)
+                                    : () {},
                               );
                             },
                           ),
@@ -230,7 +258,6 @@ class RewardsScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-              ),
             ),
           ],
         ),

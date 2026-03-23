@@ -8,6 +8,7 @@ import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../services/user_session_service.dart';
+import '../../services/technician_service.dart';
 import 'tech_jobs_screen_new.dart';
 
 // Uses currentUserProvider.user.profilePicture (users.profile_picture) for avatar
@@ -102,6 +103,14 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
 
               // Specialties
               const _SpecialtiesCard(),
+              const SizedBox(height: 20),
+
+              // Availability Schedule
+              const _ScheduleCard(),
+              const SizedBox(height: 20),
+
+              // Job Preferences
+              const _JobPreferencesCard(),
               const SizedBox(height: 20),
 
               // Settings & Support
@@ -1447,6 +1456,631 @@ class _SettingsItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Availability Schedule Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+const List<String> _kDays = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+];
+
+class _ScheduleCard extends ConsumerStatefulWidget {
+  const _ScheduleCard();
+
+  @override
+  ConsumerState<_ScheduleCard> createState() => _ScheduleCardState();
+}
+
+class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
+  final _service = TechnicianService();
+
+  // Local mutable schedule state: day → {enabled, start, end}
+  final Map<String, Map<String, dynamic>> _schedule = {
+    for (final d in _kDays)
+      d: {
+        'enabled': false,
+        'start': const TimeOfDay(hour: 9, minute: 0),
+        'end': const TimeOfDay(hour: 18, minute: 0),
+      },
+  };
+
+  bool _loaded = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchedule();
+  }
+
+  Future<void> _loadSchedule() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+    final profile = await _service.getProfileByUserId(user.id);
+    if (!mounted) return;
+    final saved = profile?.weeklySchedule;
+    if (saved != null) {
+      for (final day in _kDays) {
+        final d = saved[day];
+        if (d == null) continue;
+        final startStr = (d['start'] as String?) ?? '09:00';
+        final endStr   = (d['end']   as String?) ?? '18:00';
+        _schedule[day] = {
+          'enabled': d['enabled'] as bool? ?? false,
+          'start': _parseTime(startStr),
+          'end':   _parseTime(endStr),
+        };
+      }
+    }
+    setState(() => _loaded = true);
+  }
+
+  TimeOfDay _parseTime(String hhmm) {
+    final parts = hhmm.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _displayTime(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$h:$m $period';
+  }
+
+  bool get _isOnlineNow {
+    final now = DateTime.now();
+    final dayName = _kDays[now.weekday - 1];
+    final d = _schedule[dayName]!;
+    if (d['enabled'] != true) return false;
+    final start = d['start'] as TimeOfDay;
+    final end   = d['end']   as TimeOfDay;
+    final nowMin   = now.hour * 60 + now.minute;
+    final startMin = start.hour * 60 + start.minute;
+    final endMin   = end.hour * 60 + end.minute;
+    return nowMin >= startMin && nowMin < endMin;
+  }
+
+  Future<void> _pickTime(String day, bool isStart) async {
+    final current = _schedule[day]![isStart ? 'start' : 'end'] as TimeOfDay;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current,
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: false),
+        child: child!,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    // Enforce start < end
+    if (isStart) {
+      final end = _schedule[day]!['end'] as TimeOfDay;
+      final pickedMin = picked.hour * 60 + picked.minute;
+      final endMin    = end.hour * 60 + end.minute;
+      if (pickedMin >= endMin) return; // silently ignore invalid range
+      setState(() => _schedule[day]!['start'] = picked);
+    } else {
+      final start = _schedule[day]!['start'] as TimeOfDay;
+      final pickedMin = picked.hour * 60 + picked.minute;
+      final startMin  = start.hour * 60 + start.minute;
+      if (pickedMin <= startMin) return;
+      setState(() => _schedule[day]!['end'] = picked);
+    }
+  }
+
+  Future<void> _save() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+    setState(() => _saving = true);
+    try {
+      final toSave = <String, Map<String, dynamic>>{
+        for (final day in _kDays)
+          day: {
+            'enabled': _schedule[day]!['enabled'] as bool,
+            'start': _fmtTime(_schedule[day]!['start'] as TimeOfDay),
+            'end':   _fmtTime(_schedule[day]!['end']   as TimeOfDay),
+          },
+      };
+      await _service.updateWeeklySchedule(user.id, toSave);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Schedule saved!'),
+          backgroundColor: AppTheme.successColor,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onlineNow = _loaded ? _isOnlineNow : false;
+    final anyEnabled = _schedule.values.any((d) => d['enabled'] == true);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.schedule_rounded, color: AppTheme.deepBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Availability Schedule',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+                ),
+              ),
+              // Online/offline badge
+              if (_loaded)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: onlineNow
+                        ? AppTheme.successColor.withValues(alpha: 0.12)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: onlineNow
+                          ? AppTheme.successColor.withValues(alpha: 0.4)
+                          : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7, height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: onlineNow ? AppTheme.successColor : Colors.grey.shade400,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        onlineNow ? 'Online Now' : 'Offline',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: onlineNow ? AppTheme.successColor : Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            anyEnabled
+                ? 'Customers see you as available during your set hours'
+                : 'Set working hours so customers know when you\'re available',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          const SizedBox(height: 16),
+
+          if (!_loaded)
+            const Center(child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ))
+          else ...[
+            // Day rows
+            ...List.generate(_kDays.length, (i) {
+              final day = _kDays[i];
+              final d = _schedule[day]!;
+              final enabled = d['enabled'] as bool;
+              final start   = d['start'] as TimeOfDay;
+              final end     = d['end']   as TimeOfDay;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: enabled
+                        ? AppTheme.deepBlue.withValues(alpha: 0.05)
+                        : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: enabled ? AppTheme.deepBlue.withValues(alpha: 0.25) : Colors.grey.shade200,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          // Toggle
+                          GestureDetector(
+                            onTap: _saving ? null : () => setState(() => d['enabled'] = !enabled),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 42, height: 24,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: enabled ? AppTheme.deepBlue : Colors.grey.shade300,
+                              ),
+                              child: AnimatedAlign(
+                                duration: const Duration(milliseconds: 200),
+                                alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  width: 18, height: 18,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Day name
+                          Expanded(
+                            child: Text(
+                              day,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: enabled ? FontWeight.w700 : FontWeight.w500,
+                                color: enabled ? AppTheme.textPrimaryColor : Colors.grey.shade400,
+                              ),
+                            ),
+                          ),
+                          // Day-off label or time range
+                          if (!enabled)
+                            Text('Day off',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade400))
+                          else
+                            Row(
+                              children: [
+                                _TimeButton(
+                                  label: _displayTime(start),
+                                  onTap: _saving ? null : () => _pickTime(day, true),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                  child: Text('–', style: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.w700)),
+                                ),
+                                _TimeButton(
+                                  label: _displayTime(end),
+                                  onTap: _saving ? null : () => _pickTime(day, false),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 8),
+
+            // Save button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(
+                  _saving ? 'Saving…' : 'Save Schedule',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.deepBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+
+  const _TimeButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.deepBlue.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.deepBlue,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Job Preferences Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _JobPreferencesCard extends ConsumerStatefulWidget {
+  const _JobPreferencesCard();
+
+  @override
+  ConsumerState<_JobPreferencesCard> createState() => _JobPreferencesCardState();
+}
+
+class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
+  final _service = TechnicianService();
+
+  bool _acceptWhileBusy = false;
+  bool _isBusy = false;
+  bool _loaded = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+    final profile = await _service.getProfileByUserId(user.id);
+    if (!mounted) return;
+    setState(() {
+      _acceptWhileBusy = profile?.acceptRequestsWhileBusy ?? false;
+      _isBusy = profile?.isBusy ?? false;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _toggle(bool value) async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null) return;
+    setState(() { _saving = true; _acceptWhileBusy = value; });
+    try {
+      await _service.setAcceptRequestsWhileBusy(user.id, value);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _acceptWhileBusy = !value); // revert on error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.engineering_rounded, color: Colors.orange.shade700, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Job Preferences',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+                ),
+              ),
+              // Busy indicator badge
+              if (_loaded && _isBusy)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7, height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.orange.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'On a Job',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.orange.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (!_loaded)
+            const Center(child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ))
+          else ...[
+            // Toggle row
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _acceptWhileBusy
+                    ? Colors.orange.shade50
+                    : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _acceptWhileBusy
+                      ? Colors.orange.shade300
+                      : Colors.grey.shade200,
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Custom toggle
+                  GestureDetector(
+                    onTap: _saving ? null : () => _toggle(!_acceptWhileBusy),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 42, height: 24,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: _acceptWhileBusy ? Colors.orange.shade600 : Colors.grey.shade300,
+                      ),
+                      child: AnimatedAlign(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: _acceptWhileBusy ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: 18, height: 18,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Accept requests while working',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _acceptWhileBusy
+                                ? Colors.orange.shade800
+                                : AppTheme.textPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _acceptWhileBusy
+                              ? 'Customers can book you even when you\'re on a job'
+                              : 'You won\'t appear in results while on an active job',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_saving)
+                    const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Info note
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.deepBlue.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 15, color: AppTheme.deepBlue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'When on a job, customers will see a "Busy" badge on your profile. '
+                      'If this is off, you will be hidden from search results until your current job is done.',
+                      style: TextStyle(fontSize: 11, color: AppTheme.deepBlue.withValues(alpha: 0.8), height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

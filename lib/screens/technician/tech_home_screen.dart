@@ -208,17 +208,19 @@ class TechHomeScreen extends ConsumerWidget {
                 bookingDate.isBefore(endDate);
           }).toList();
 
-          // Job Requests count uses createdAt so brand-new requests appear immediately,
-          // even when the customer picked a future repair date.
+          // Job Requests count: only pending (requested) bookings.
+          // Accepted bookings are counted separately under Today's Jobs.
           final techScheduledCount = allBookings
               .where((booking) =>
-                  (booking.status == 'requested' || booking.status == 'accepted') &&
+                  booking.status == 'requested' &&
                   booking.createdAt.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
                   booking.createdAt.isBefore(endDate))
               .length;
 
           final techActiveCount = filteredBookings
-              .where((booking) => booking.status == 'in_progress')
+              .where((booking) =>
+                  booking.status == 'accepted' ||
+                  booking.status == 'in_progress')
               .length;
           final techCompletedCount = filteredBookings
               .where((booking) => booking.status == 'completed')
@@ -785,12 +787,20 @@ class TechHomeScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: _QuickActionButton(
+                                icon: Icons.map_rounded,
+                                iconColor: Colors.deepOrange,
+                                iconBgColor: Colors.deepOrange.withValues(alpha: 0.15),
+                                label: 'Job Map',
+                                onTap: () => context.push('/tech-job-map'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _QuickActionButton(
                                 icon: Icons.star,
                                 iconColor: Colors.pink,
-                                iconBgColor: Colors.pink.withValues(
-                                  alpha: 0.15,
-                                ),
-                                label: 'View\nRating',
+                                iconBgColor: Colors.pink.withValues(alpha: 0.15),
+                                label: 'View Rating',
                                 onTap: () {
                                   Navigator.push(
                                     context,
@@ -802,7 +812,11 @@ class TechHomeScreen extends ConsumerWidget {
                                 },
                               ),
                             ),
-                            const SizedBox(width: 12),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
                             Expanded(
                               child: _AvailabilityToggleButton(
                                 userId: currentUserId,
@@ -814,10 +828,8 @@ class TechHomeScreen extends ConsumerWidget {
                               child: _QuickActionButton(
                                 icon: Icons.headset_mic,
                                 iconColor: AppTheme.lightBlue,
-                                iconBgColor: AppTheme.lightBlue.withValues(
-                                  alpha: 0.15,
-                                ),
-                                label: 'Contact\nSupport',
+                                iconBgColor: AppTheme.lightBlue.withValues(alpha: 0.15),
+                                label: 'Contact Support',
                                 onTap: () {
                                   context.go('/tech-help-support');
                                 },

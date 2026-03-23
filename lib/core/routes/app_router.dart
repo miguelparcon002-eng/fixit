@@ -58,11 +58,17 @@ import '../../screens/admin/admin_customers_screen.dart';
 import '../../screens/admin/admin_users_screen.dart';
 import '../../screens/admin/admin_customer_detail_screen.dart';
 import '../../screens/admin/admin_payment_settings_screen.dart';
+import '../../screens/admin/admin_transactions_screen.dart';
 import '../../screens/admin/admin_feedback_screen.dart';
+import '../../screens/admin/admin_distance_fee_screen.dart';
 import '../../screens/admin/admin_earnings_screen.dart';
 import '../../screens/admin/admin_technician_earnings_detail_screen.dart';
 import '../../screens/booking/payment_screen.dart';
 import '../../screens/booking/shop_booking_screen.dart';
+import '../../screens/customer/post_problem_screen.dart';
+import '../../screens/customer/my_requests_screen.dart';
+import '../../screens/technician/tech_job_map_screen.dart';
+import '../../screens/admin/admin_job_requests_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -479,7 +485,13 @@ class AppRouter {
           final amount = double.tryParse(
                   state.uri.queryParameters['amount'] ?? '') ??
               0.0;
-          return PaymentScreen(bookingId: bookingId, amount: amount);
+          final isCancellationFee =
+              state.uri.queryParameters['type'] == 'cancellation_fee';
+          return PaymentScreen(
+            bookingId: bookingId,
+            amount: amount,
+            isCancellationFee: isCancellationFee,
+          );
         },
       ),
 
@@ -490,11 +502,25 @@ class AppRouter {
         builder: (context, state) => const AdminPaymentSettingsScreen(),
       ),
 
+      // Admin Transactions (job payments + cancellation fees)
+      GoRoute(
+        path: '/admin-transactions',
+        name: 'adminTransactions',
+        builder: (context, state) => const AdminTransactionsScreen(),
+      ),
+
       // Admin Feedback & Bug Reports
       GoRoute(
         path: '/admin-feedback',
         name: 'adminFeedback',
         builder: (context, state) => const AdminFeedbackScreen(),
+      ),
+
+      // Admin Distance Fee Settings
+      GoRoute(
+        path: '/admin-distance-fee',
+        name: 'adminDistanceFee',
+        builder: (context, state) => const AdminDistanceFeeScreen(),
       ),
 
       // Admin Earnings Management routes
@@ -505,6 +531,28 @@ class AppRouter {
           final technicianId = state.pathParameters['technicianId']!;
           return AdminTechnicianEarningsDetailScreen(technicianId: technicianId);
         },
+      ),
+
+      // Job Request routes
+      GoRoute(
+        path: '/post-problem',
+        name: 'postProblem',
+        builder: (context, state) => const PostProblemScreen(),
+      ),
+      GoRoute(
+        path: '/my-requests',
+        name: 'myRequests',
+        builder: (context, state) => const MyRequestsScreen(),
+      ),
+      GoRoute(
+        path: '/tech-job-map',
+        name: 'techJobMap',
+        builder: (context, state) => const TechJobMapScreen(),
+      ),
+      GoRoute(
+        path: '/admin-job-requests',
+        name: 'adminJobRequests',
+        builder: (context, state) => const AdminJobRequestsScreen(),
       ),
 
       // Admin Customer Management routes

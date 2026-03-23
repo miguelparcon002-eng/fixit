@@ -1,14 +1,17 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/constants/app_constants.dart';
+import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../services/booking_service.dart';
 import '../../services/notification_service.dart';
+import '../../widgets/job_status_tracker.dart';
 import 'widgets/customer_location_sheet.dart';
 
 // Provider for the initial tab to show in jobs screen
@@ -27,6 +30,8 @@ class _TechJobFilter {
   final DateTime? toDate;
   final _TechSortOrder sort;
   final bool? emergencyOnly; // null = both, true = only emergency, false = only regular
+  // null = all, 'post_problem' = job-map accepted, 'booking' = regular bookings
+  final String? bookingSource;
 
   const _TechJobFilter({
     this.statuses = const {},
@@ -34,6 +39,7 @@ class _TechJobFilter {
     this.toDate,
     this.sort = _TechSortOrder.newest,
     this.emergencyOnly,
+    this.bookingSource,
   });
 
   bool get isActive =>
@@ -50,6 +56,7 @@ class _TechJobFilter {
     bool clearTo = false,
     _TechSortOrder? sort,
     Object? emergencyOnly = _sentinel,
+    Object? bookingSource = _sentinel,
   }) {
     return _TechJobFilter(
       statuses: statuses ?? this.statuses,
@@ -58,6 +65,8 @@ class _TechJobFilter {
       sort: sort ?? this.sort,
       emergencyOnly:
           identical(emergencyOnly, _sentinel) ? this.emergencyOnly : emergencyOnly as bool?,
+      bookingSource:
+          identical(bookingSource, _sentinel) ? this.bookingSource : bookingSource as String?,
     );
   }
 
@@ -142,6 +151,7 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: _buildTabs(),
             ),
+            if (_selectedTab == _TechJobsTab.active) _buildSourceFilterChips(),
             if (_filter.isActive) _buildActiveFilterBanner(),
             const SizedBox(height: 4),
             Expanded(child: _buildJobsList()),
@@ -152,6 +162,50 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
   }
 
   // ─── Filter helpers ──────────────────────────────────────────────────────
+
+  Widget _buildSourceFilterChips() {
+    final options = [
+      (null, 'All'),
+      ('post_problem', 'Post Problem'),
+      ('booking', 'Booking'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Row(
+        children: options.map((opt) {
+          final (value, label) = opt;
+          final selected = _filter.bookingSource == value;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(
+                () => _filter = _filter.copyWith(bookingSource: value),
+              ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: selected ? AppTheme.deepBlue : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected ? AppTheme.deepBlue : Colors.grey.shade300,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
   Widget _buildActiveFilterBanner() {
     final parts = <String>[];
@@ -269,7 +323,13 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
           ),
         ),
         onSelectionChanged: (value) {
-          setState(() => _selectedTab = value.first);
+          setState(() {
+            _selectedTab = value.first;
+            // Clear source filter when leaving Active tab
+            if (_selectedTab != _TechJobsTab.active) {
+              _filter = _filter.copyWith(bookingSource: null);
+            }
+          });
         },
       ),
     );
@@ -311,6 +371,13 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
     if (_filter.emergencyOnly != null) {
       filtered = filtered.where((b) => b.isEmergency == _filter.emergencyOnly).toList();
     }
+    if (_filter.bookingSource != null) {
+      filtered = filtered.where((b) {
+        return _filter.bookingSource == 'post_problem'
+            ? _isPostProblem(b)
+            : !_isPostProblem(b);
+      }).toList();
+    }
     if (_filter.fromDate != null) {
       final from = DateTime(_filter.fromDate!.year, _filter.fromDate!.month, _filter.fromDate!.day);
       filtered = filtered.where((b) {
@@ -347,12 +414,16 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
           final bDate = b.scheduledDate ?? b.createdAt;
           return aDate.compareTo(bDate);
         }
-        // Default: emergency first, then newest
+        // Default: emergency first, then by date
         final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
         if (prio != 0) return prio;
         final aDate = a.scheduledDate ?? a.createdAt;
         final bDate = b.scheduledDate ?? b.createdAt;
-        return bDate.compareTo(aDate);
+        // Active tab: soonest first so today's jobs appear at top
+        if (_selectedTab == _TechJobsTab.active) {
+          return aDate.compareTo(bDate);
+        }
+        return bDate.compareTo(aDate); // other tabs: newest first
       });
 
     return ListView.builder(
@@ -370,15 +441,56 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
 
   List<BookingModel> _filterBookings(List<BookingModel> allBookings) {
     return switch (_selectedTab) {
-      _TechJobsTab.request => allBookings
-          .where((b) => b.status == 'requested' || b.status == 'accepted')
-          .toList(),
-      _TechJobsTab.active =>
-        allBookings.where((b) => b.status == 'in_progress').toList(),
-      _TechJobsTab.complete =>
-        allBookings.where((b) => b.status == 'completed').toList(),
+      _TechJobsTab.request =>
+        allBookings.where((b) => b.status == AppConstants.bookingRequested).toList(),
+      _TechJobsTab.active => allBookings.where((b) => [
+            AppConstants.bookingAccepted,
+            AppConstants.bookingEnRoute,
+            AppConstants.bookingArrived,
+            AppConstants.bookingInProgress,
+            AppConstants.bookingCompleted,
+            AppConstants.bookingPaid,   // stays in Active until tech marks complete
+          ].contains(b.status)).toList(),
+      _TechJobsTab.complete => allBookings.where((b) => [
+            AppConstants.bookingClosed,
+          ].contains(b.status)).toList(),
       _TechJobsTab.all => allBookings,
     };
+  }
+
+  /// Returns true if [b] originated from the "Post a Problem / Job Map" flow.
+  ///
+  /// Layer 1 — DB field (new bookings, most reliable):
+  ///   booking_source = 'post_problem'
+  ///
+  /// Layer 2 — Explicit marker in notes (pre-DB-column, still in notes):
+  ///   diagnostic_notes starts with '[POST_PROBLEM]'
+  ///
+  /// Layer 3 — accepted_at heuristic (legacy data):
+  ///   Regular bookings go through requested→accepted via the set_booking_status
+  ///   RPC, which writes accepted_at. Post-problem bookings are created directly
+  ///   as 'accepted' via INSERT, so accepted_at is never set by the RPC.
+  ///   accepted_at != null  →  went through normal flow  →  regular booking.
+  ///
+  /// Layer 4 — Notes format fallback (last resort):
+  ///   All regular booking flows write notes starting with 'Repair Type:' or
+  ///   'Device:'. Check the customer portion (before any '---TECHNICIAN NOTES---'
+  ///   separator) so technician-appended text doesn't affect classification.
+  bool _isPostProblem(BookingModel b) {
+    // Layer 1
+    if (b.bookingSource == 'post_problem') return true;
+    // Layer 2
+    final notes = b.diagnosticNotes;
+    if (notes != null && notes.startsWith('[POST_PROBLEM]')) return true;
+    // Layer 3 — has accepted_at → normal booking flow → NOT post-problem
+    if (b.acceptedAt != null) return false;
+    // Layer 4 — check notes format on the customer portion only
+    if (notes == null || notes.isEmpty) return false;
+    final customerPart = notes.split('---TECHNICIAN NOTES---').first.trim();
+    if (customerPart.startsWith('Repair Type:') || customerPart.startsWith('Device:')) {
+      return false;
+    }
+    return true;
   }
 
   (IconData, String, String) _emptyStateForTab() {
@@ -517,9 +629,9 @@ class _TechJobCard extends ConsumerWidget {
                   const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
                 ],
               ),
-              if (booking.diagnosticNotes != null && booking.diagnosticNotes!.trim().isNotEmpty) ...[
+              if (booking.moreDetails != null && booking.moreDetails!.trim().isNotEmpty) ...[
                 const SizedBox(height: 10),
-                _NotesBox(text: booking.diagnosticNotes!),
+                _NotesBox(text: booking.moreDetails!),
               ],
               const SizedBox(height: 12),
               _buildActionButtons(context, ref, bookingService),
@@ -532,14 +644,33 @@ class _TechJobCard extends ConsumerWidget {
 
   (Color, String, IconData) _status(String status) {
     return switch (status) {
-      'requested' => (AppTheme.warningColor, 'New request', Icons.inbox_outlined),
-      'accepted' || 'scheduled' => (AppTheme.lightBlue, 'Accepted', Icons.event_available),
-      'in_progress' => (AppTheme.accentPurple, 'In progress', Icons.play_circle_outline),
-      'completed' => (AppTheme.successColor, 'Completed', Icons.check_circle_outline),
-      'cancelled' => (AppTheme.errorColor, 'Cancelled', Icons.cancel_outlined),
-      _ => (Colors.grey, status, Icons.info_outline),
+      'requested'   => (AppTheme.warningColor,       'New Request',       Icons.inbox_outlined),
+      'accepted'    => (AppTheme.lightBlue,           'Accepted',          Icons.check_circle_outline),
+      'en_route'    => (const Color(0xFF0EA5E9),      'En Route',          Icons.directions_car_outlined),
+      'arrived'     => (const Color(0xFF8B5CF6),      'Arrived',           Icons.place_outlined),
+      'in_progress' => (AppTheme.accentPurple,        'In Progress',       Icons.build_circle_outlined),
+      'completed'   => (Colors.orange,                'Awaiting Payment',  Icons.hourglass_top_rounded),
+      'paid'        => (const Color(0xFF059669),      'Payment Received',  Icons.payments_outlined),
+      'closed'      => (const Color(0xFF059669),      'Completed',         Icons.check_circle_outlined),
+      'cancelled'   => (AppTheme.errorColor,          'Cancelled',         Icons.cancel_outlined),
+      _             => (Colors.grey, status, Icons.info_outline),
     };
   }
+
+  Widget _progressHeader() => const Row(
+    children: [
+      Icon(Icons.route_outlined, size: 14, color: AppTheme.deepBlue),
+      SizedBox(width: 6),
+      Text(
+        'Job Progress',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.deepBlue,
+        ),
+      ),
+    ],
+  );
 
   Widget _buildActionButtons(
     BuildContext context,
@@ -582,140 +713,311 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
 
-    // Active tab - show payment status + adjust price + mark complete
-    if (selectedTab == _TechJobsTab.active && booking.status == 'in_progress') {
-      final payStatus = booking.paymentStatus ?? 'pending';
-      final (payLabel, payIcon, payColor) = switch (payStatus) {
-        'completed' => ('Payment Completed', Icons.check_circle, AppTheme.successColor),
-        'submitted' => ('Payment Submitted - Awaiting Verification', Icons.hourglass_top, Colors.orange),
-        _ => ('Payment Pending', Icons.payment, Colors.grey),
+    // ── Pre-work active statuses (accepted / en_route): advance button ────────
+    if (selectedTab == _TechJobsTab.active &&
+        (booking.status == AppConstants.bookingAccepted ||
+         booking.status == AppConstants.bookingEnRoute)) {
+      final (nextStatus, btnLabel, btnIcon, notifTitle, notifMsg) =
+          switch (booking.status) {
+        AppConstants.bookingAccepted => (
+            AppConstants.bookingEnRoute,
+            "I'm On My Way",
+            Icons.directions_car_outlined,
+            'Technician En Route',
+            'Your technician is on the way to your location!',
+          ),
+        _ => (
+            AppConstants.bookingArrived,
+            "I've Arrived",
+            Icons.place_outlined,
+            'Technician Arrived',
+            'Your technician has arrived at your location!',
+          ),
       };
 
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Payment status banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: payColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: payColor.withValues(alpha: 0.30)),
+          // ── Primary action: always visible at the top ─────────────────────
+          ElevatedButton.icon(
+            onPressed: () => _advanceJobStatus(
+              context, ref, bookingService,
+              nextStatus, notifTitle, notifMsg,
             ),
-            child: Row(
-              children: [
-                Icon(payIcon, size: 18, color: payColor),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    payLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: payColor,
-                    ),
-                  ),
+            icon: Icon(btnIcon, size: 18),
+            label: Text(btnLabel),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.deepBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // ── Progress tracker (next step is also tappable) ─────────────────
+          _progressHeader(),
+          const SizedBox(height: 10),
+          JobStatusTracker(
+            currentStatus: booking.status,
+            onNextStepTap: (ns) => _advanceJobStatus(
+              context, ref, bookingService,
+              ns, notifTitle, notifMsg,
+            ),
+          ),
+          if (booking.customerLatitude != null && booking.customerLongitude != null) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => CustomerLocationSheet(
+                  latitude: booking.customerLatitude!,
+                  longitude: booking.customerLongitude!,
+                  customerName: booking.customerAddress ?? 'Customer',
+                  address: booking.customerAddress ?? 'No address provided',
                 ),
-              ],
+              ),
+              icon: const Icon(Icons.location_searching, size: 18),
+              label: const Text('View Customer Location'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4A5FE0),
+                side: const BorderSide(color: Color(0xFF4A5FE0)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // ── Arrived: assess & price + start work ─────────────────────────────────
+    if (selectedTab == _TechJobsTab.active &&
+        booking.status == AppConstants.bookingArrived) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => _assessAndPrice(context, ref, bookingService),
+            icon: const Icon(Icons.medical_services_rounded, size: 18),
+            label: const Text('Assess & Price'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.deepBlue,
+              side: const BorderSide(color: AppTheme.deepBlue),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _adjustPrice(context, ref, bookingService),
+            icon: const Icon(Icons.edit_rounded, size: 18),
+            label: const Text('Adjust Price'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF8B5CF6),
+              side: const BorderSide(color: Color(0xFF8B5CF6)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 10),
-          // Track customer location button — only if coordinates were pinned
+          ElevatedButton.icon(
+            onPressed: () => _advanceJobStatus(
+              context, ref, bookingService,
+              AppConstants.bookingInProgress,
+              'Repair Started',
+              'Your technician has started working on your device.',
+            ),
+            icon: const Icon(Icons.build_circle_outlined, size: 18),
+            label: const Text('Start Work'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.deepBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _progressHeader(),
+          const SizedBox(height: 10),
+          JobStatusTracker(
+            currentStatus: booking.status,
+            onNextStepTap: (ns) => _advanceJobStatus(
+              context, ref, bookingService,
+              ns, 'Repair Started', 'Your technician has started working on your device.',
+            ),
+          ),
           if (booking.customerLatitude != null && booking.customerLongitude != null) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => CustomerLocationSheet(
-                      latitude: booking.customerLatitude!,
-                      longitude: booking.customerLongitude!,
-                      customerName: booking.customerAddress ?? 'Customer',
-                      address: booking.customerAddress ?? 'No address provided',
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.location_searching, size: 18),
-                label: const Text('Track Customer Location'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF4A5FE0),
-                  side: const BorderSide(color: Color(0xFF4A5FE0)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => CustomerLocationSheet(
+                  latitude: booking.customerLatitude!,
+                  longitude: booking.customerLongitude!,
+                  customerName: booking.customerAddress ?? 'Customer',
+                  address: booking.customerAddress ?? 'No address provided',
                 ),
+              ),
+              icon: const Icon(Icons.location_searching, size: 18),
+              label: const Text('View Customer Location'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4A5FE0),
+                side: const BorderSide(color: Color(0xFF4A5FE0)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            const SizedBox(height: 10),
           ],
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: (payStatus == 'completed' || payStatus == 'submitted')
-                      ? null
-                      : () => _adjustPrice(context, ref, bookingService),
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Adjust price'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.deepBlue,
-                    side: BorderSide(color: Colors.grey.shade300),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: payStatus == 'completed'
-                      ? () => _completeJob(context, ref, bookingService)
-                      : null,
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: const Text('Mark complete'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.successColor,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    disabledForegroundColor: Colors.grey.shade500,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
+        ],
+      );
+    }
+
+    // ── In-progress: tracker + adjust price + mark done ───────────────────────
+    if (selectedTab == _TechJobsTab.active &&
+        booking.status == AppConstants.bookingInProgress) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _progressHeader(),
+          const SizedBox(height: 10),
+          JobStatusTracker(currentStatus: booking.status),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _adjustPrice(context, ref, bookingService),
+            icon: const Icon(Icons.edit_rounded, size: 18),
+            label: const Text('Adjust Price'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.deepBlue,
+              side: const BorderSide(color: AppTheme.deepBlue),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            onPressed: () => _completeJob(context, ref, bookingService),
+            icon: const Icon(Icons.check_circle_outline, size: 18),
+            label: const Text('Mark as Done'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.successColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ],
       );
     }
 
-    // Completed state
+    // ── Completed in active tab: tracker + confirm paid ──────────────────
+    if ((selectedTab == _TechJobsTab.active || selectedTab == _TechJobsTab.all) &&
+        booking.status == AppConstants.bookingCompleted) {
+      final payStatus = booking.paymentStatus ?? 'pending';
+      final isPaid = payStatus == 'completed';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _progressHeader(),
+          const SizedBox(height: 10),
+          JobStatusTracker(currentStatus: booking.status),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: isPaid ? () => _markPaid(context, ref, bookingService) : null,
+            icon: const Icon(Icons.payments_outlined, size: 18),
+            label: Text(isPaid ? 'Confirm Payment Received' : 'Awaiting Payment'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade500,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── Paid in active tab: tracker at "Paid" + Mark Complete button ──────
+    if ((selectedTab == _TechJobsTab.active || selectedTab == _TechJobsTab.all) &&
+        booking.status == AppConstants.bookingPaid) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _progressHeader(),
+          const SizedBox(height: 10),
+          JobStatusTracker(currentStatus: booking.status),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () => _closeJob(context, ref, bookingService),
+            icon: const Icon(Icons.check_circle_outline, size: 18),
+            label: const Text('Mark Complete'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ── Closed: clean success card ─────────────────────────────────────────
     if ((selectedTab == _TechJobsTab.complete || selectedTab == _TechJobsTab.all) &&
-        booking.status == 'completed') {
+        booking.status == AppConstants.bookingClosed) {
       return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
-          color: AppTheme.successColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.25)),
+          color: const Color(0xFF059669).withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.20)),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Row(
           children: [
-            Icon(Icons.check_circle, color: AppTheme.successColor, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Completed',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.successColor,
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: Color(0xFF059669),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Paid & Closed',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Job completed successfully',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
+                ],
               ),
             ),
+            const Icon(Icons.payments_outlined, color: Color(0xFF059669), size: 22),
           ],
         ),
       );
@@ -732,14 +1034,14 @@ class _TechJobCard extends ConsumerWidget {
     try {
       await bookingService.updateBookingStatus(
         bookingId: booking.id,
-        status: 'in_progress',
+        status: AppConstants.bookingAccepted,
       );
 
       await NotificationService().sendNotification(
         userId: booking.customerId,
         type: 'booking_accepted',
         title: 'Booking Accepted',
-        message: 'Your booking has been accepted by the technician and is now in progress.',
+        message: 'Your booking has been accepted! The technician will be on their way soon.',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
 
@@ -758,7 +1060,7 @@ class _TechJobCard extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Job accepted and started!'),
+          content: Text('Job accepted!'),
           backgroundColor: AppTheme.successColor,
         ),
       );
@@ -766,6 +1068,118 @@ class _TechJobCard extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to accept job: $e')),
+      );
+    }
+  }
+
+  Future<void> _advanceJobStatus(
+    BuildContext context,
+    WidgetRef ref,
+    BookingService bookingService,
+    String nextStatus,
+    String notifTitle,
+    String notifMsg,
+  ) async {
+    try {
+      await bookingService.updateBookingStatus(
+        bookingId: booking.id,
+        status: nextStatus,
+      );
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_update',
+        title: notifTitle,
+        message: notifMsg,
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+      ref.invalidate(technicianBookingsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(notifTitle), backgroundColor: AppTheme.successColor),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
+      );
+    }
+  }
+
+  Future<void> _markPaid(
+    BuildContext context,
+    WidgetRef ref,
+    BookingService bookingService,
+  ) async {
+    try {
+      await bookingService.updateBookingStatus(
+        bookingId: booking.id,
+        status: AppConstants.bookingPaid,
+      );
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_paid',
+        title: 'Payment Confirmed',
+        message: 'Your payment has been confirmed. Thank you for using FixIT!',
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+      // Notify admins
+      try {
+        final adminRows = await SupabaseConfig.client
+            .from('users')
+            .select('id')
+            .eq('role', 'admin');
+        for (final admin in (adminRows as List)) {
+          await NotificationService().sendNotification(
+            userId: admin['id'] as String,
+            type: 'booking_paid',
+            title: 'Booking Paid',
+            message: 'Booking #${booking.id.substring(0, 8)} has been marked as paid.',
+            data: {'booking_id': booking.id},
+          );
+        }
+      } catch (_) {}
+      ref.invalidate(technicianBookingsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Job marked as paid!'), backgroundColor: Color(0xFF059669)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _closeJob(
+    BuildContext context,
+    WidgetRef ref,
+    BookingService bookingService,
+  ) async {
+    try {
+      await bookingService.updateBookingStatus(
+        bookingId: booking.id,
+        status: AppConstants.bookingClosed,
+      );
+      await NotificationService().sendNotification(
+        userId: booking.customerId,
+        type: 'booking_update',
+        title: 'Job Closed',
+        message: 'Your job has been completed and closed. Thank you for using FixIT!',
+        data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
+      );
+      ref.invalidate(technicianBookingsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Job marked as complete!'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed: $e')),
       );
     }
   }
@@ -831,10 +1245,457 @@ class _TechJobCard extends ConsumerWidget {
     WidgetRef ref,
     BookingService bookingService,
   ) async {
-    final noteController = TextEditingController();
-    // Track mutable state outside StatefulBuilder so it survives rebuilds
-    double adjustmentAmount = 0;
-    bool isIncrease = true; // true = increase, false = decrease
+    final currentPrice = booking.finalCost ?? booking.estimatedCost ?? 0.0;
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setState) {
+          final enteredAmt = double.tryParse(amountController.text.trim()) ?? 0.0;
+
+          Future<void> apply(double sign) async {
+            final amt = double.tryParse(amountController.text.trim());
+            if (amt == null || amt <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enter a valid amount')),
+              );
+              return;
+            }
+            setState(() => saving = true);
+            try {
+              final reason = reasonController.text.trim();
+              final direction = sign > 0 ? 'increased' : 'decreased';
+              final note = reason.isNotEmpty
+                  ? 'Price $direction by ₱${amt.toStringAsFixed(2)} — Reason: $reason'
+                  : 'Price $direction by ₱${amt.toStringAsFixed(2)}';
+              await bookingService.addTechnicianNotes(
+                bookingId: booking.id,
+                technicianNotes: note,
+                priceAdjustment: amt * sign,
+              );
+              ref.invalidate(technicianBookingsProvider);
+              if (context.mounted) Navigator.pop(context);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      sign > 0
+                          ? 'Price increased by ₱${amt.toStringAsFixed(2)}'
+                          : 'Price decreased by ₱${amt.toStringAsFixed(2)}',
+                    ),
+                    backgroundColor: sign > 0 ? AppTheme.successColor : AppTheme.errorColor,
+                  ),
+                );
+              }
+            } catch (e) {
+              setState(() => saving = false);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to adjust price: $e')),
+                );
+              }
+            }
+          }
+
+          void setQuickAmount(double amt) {
+            amountController.text = amt.toStringAsFixed(0);
+            setState(() {});
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Gradient header ────────────────────────────────────────
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF6D28D9), Color(0xFF8B5CF6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Adjust Price',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                Text(
+                                  'Update the repair cost for this job',
+                                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        // Price preview row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'CURRENT',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '₱${currentPrice.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                size: 18,
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: enteredAmt > 0
+                                      ? Colors.white.withValues(alpha: 0.28)
+                                      : Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: enteredAmt > 0
+                                        ? Colors.white.withValues(alpha: 0.5)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'AFTER ADJUST',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      enteredAmt > 0
+                                          ? '₱${(currentPrice + enteredAmt).toStringAsFixed(2)}'
+                                          : '—',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Body ──────────────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Quick presets
+                        const Text(
+                          'QUICK AMOUNTS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF9CA3AF),
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final amt in [100.0, 250.0, 500.0, 1000.0])
+                              GestureDetector(
+                                onTap: () => setQuickAmount(amt),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: amountController.text == amt.toStringAsFixed(0)
+                                        ? Color(0xFF8B5CF6)
+                                        : Color(0xFFF5F3FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '₱${amt.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: amountController.text == amt.toStringAsFixed(0)
+                                          ? Colors.white
+                                          : Color(0xFF8B5CF6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Amount field
+                        TextField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            labelText: 'Custom Amount',
+                            prefixIcon: const Icon(Icons.attach_money_rounded, size: 20),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Reason field
+                        TextField(
+                          controller: reasonController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            labelText: 'Reason for adjustment',
+                            hintText: 'e.g. Additional damage found on motherboard',
+                            prefixIcon: const Padding(
+                              padding: EdgeInsets.only(bottom: 24),
+                              child: Icon(Icons.notes_rounded, size: 20),
+                            ),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Action buttons
+                        if (saving)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => apply(-1),
+                                  icon: const Icon(Icons.arrow_downward_rounded, size: 17),
+                                  label: const Text('Decrease'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.errorColor,
+                                    side: const BorderSide(color: AppTheme.errorColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => apply(1),
+                                  icon: const Icon(Icons.arrow_upward_rounded, size: 17),
+                                  label: const Text('Increase'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF8B5CF6),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 13),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _assessAndPrice(
+    BuildContext context,
+    WidgetRef ref,
+    BookingService bookingService,
+  ) async {
+    // ── Pricing catalogue per device type ─────────────────────────────────
+    final Map<String, List<Map<String, dynamic>>> catalogue = {
+      'Mobile Phone': [
+        {'label': 'Screen Cracked / Broken', 'price': 800.0},
+        {'label': 'Battery Replacement', 'price': 500.0},
+        {'label': 'Charging Port Issue', 'price': 350.0},
+        {'label': 'Speaker / Mic Issue', 'price': 300.0},
+        {'label': 'Camera Not Working', 'price': 400.0},
+        {'label': 'Water Damage', 'price': 700.0},
+        {'label': 'Won\'t Power On', 'price': 600.0},
+        {'label': 'Software / OS Problem', 'price': 250.0},
+        {'label': 'Overheating', 'price': 300.0},
+        {'label': 'Wi-Fi / Bluetooth Issue', 'price': 280.0},
+      ],
+      'Laptop': [
+        {'label': 'Screen Cracked / Broken', 'price': 2500.0},
+        {'label': 'Keyboard Damage', 'price': 1200.0},
+        {'label': 'Battery Replacement', 'price': 1500.0},
+        {'label': 'Won\'t Boot / No Power', 'price': 800.0},
+        {'label': 'Overheating', 'price': 600.0},
+        {'label': 'Virus / Malware Removal', 'price': 500.0},
+        {'label': 'HDD / SSD Issue', 'price': 1000.0},
+        {'label': 'Water Damage', 'price': 2000.0},
+        {'label': 'RAM Issue', 'price': 800.0},
+        {'label': 'Trackpad Issue', 'price': 700.0},
+      ],
+      'Tablet': [
+        {'label': 'Screen Cracked / Broken', 'price': 1200.0},
+        {'label': 'Battery Replacement', 'price': 600.0},
+        {'label': 'Won\'t Power On', 'price': 700.0},
+        {'label': 'Charging Issue', 'price': 400.0},
+        {'label': 'Camera Not Working', 'price': 350.0},
+        {'label': 'Water Damage', 'price': 800.0},
+        {'label': 'Software / OS Problem', 'price': 300.0},
+        {'label': 'Speaker Issue', 'price': 280.0},
+      ],
+      'TV': [
+        {'label': 'No Power', 'price': 500.0},
+        {'label': 'No Picture', 'price': 800.0},
+        {'label': 'No Sound', 'price': 400.0},
+        {'label': 'Remote Not Working', 'price': 200.0},
+        {'label': 'HDMI Port Issue', 'price': 350.0},
+        {'label': 'Backlight Issue', 'price': 700.0},
+        {'label': 'Smart TV Software Issue', 'price': 400.0},
+        {'label': 'Screen Lines / Flicker', 'price': 900.0},
+      ],
+      'Other': [
+        {'label': 'Won\'t Turn On', 'price': 400.0},
+        {'label': 'Power Supply Issue', 'price': 350.0},
+        {'label': 'Mechanical Failure', 'price': 500.0},
+        {'label': 'Control Board Issue', 'price': 600.0},
+        {'label': 'Physical Damage', 'price': 450.0},
+        {'label': 'Performance Issue', 'price': 350.0},
+      ],
+    };
+
+    // ── Parse device info from booking notes ───────────────────────────────
+    final notes = booking.diagnosticNotes ?? '';
+    final rawDevice = RegExp(r'Device:\s*(.+)', caseSensitive: false)
+            .firstMatch(notes)?.group(1)?.trim() ?? '';
+    final deviceBrand = RegExp(r'Brand:\s*(.+)', caseSensitive: false)
+            .firstMatch(notes)?.group(1)?.trim() ?? '';
+    final deviceModel = RegExp(r'Model:\s*(.+)', caseSensitive: false)
+            .firstMatch(notes)?.group(1)?.trim() ?? '';
+    final deviceProblem = RegExp(r'Problem:\s*(.+)', caseSensitive: false)
+            .firstMatch(notes)?.group(1)?.trim() ?? '';
+
+    // Match device to catalogue key
+    String deviceKey = 'Other';
+    for (final key in catalogue.keys) {
+      if (rawDevice.toLowerCase().contains(key.toLowerCase().split(' ').first)) {
+        deviceKey = key;
+        break;
+      }
+    }
+    final items = catalogue[deviceKey]!;
+
+    // ── Mutable state (captured by StatefulBuilder closure) ───────────────
+    final diagNotesController = TextEditingController();
+    final serviceFeeController = TextEditingController();
+    final newPartController        = TextEditingController();
+    final newPartPriceController   = TextEditingController();
+    final customIssueController    = TextEditingController();
+    final Set<String>  selectedIssues  = {};
+    final List<String> customIssueOrder = [];
+    final List<Map<String, dynamic>> addedParts = [
+      for (final p in booking.partsList)
+        {'name': p, 'price': 0.0},
+    ];
     bool saving = false;
 
     try {
@@ -842,452 +1703,631 @@ class _TechJobCard extends ConsumerWidget {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (sheetContext) {
-          return StatefulBuilder(
-            builder: (sheetContext, setState) {
-              final note = noteController.text.trim();
-              final hasValidAmount = adjustmentAmount > 0;
-              final canSave = !saving && hasValidAmount && note.isNotEmpty;
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (sheetContext, setState) {
+            final serviceFee = double.tryParse(serviceFeeController.text.trim()) ?? 0.0;
+            final partsTotal = addedParts.fold(0.0, (s, p) => s + (p['price'] as double));
+            final distanceFee = booking.parsedDistanceFee ?? 0.0;
+            final total = serviceFee + partsTotal + distanceFee;
+            final canSave = !saving && (selectedIssues.isNotEmpty || serviceFee > 0 || partsTotal > 0);
 
-              final signedAmount = isIncrease ? adjustmentAmount : -adjustmentAmount;
-              final basePrice = booking.estimatedCost ?? booking.finalCost ?? 0.0;
-              final newPrice = (basePrice + signedAmount).clamp(0.0, double.infinity);
-
-              void stepAmount(double delta) {
-                setState(() {
-                  adjustmentAmount = (adjustmentAmount + delta).clamp(0.0, 99999.0);
-                });
-              }
-
-              void setQuickAmount(double amount) {
-                setState(() => adjustmentAmount = amount);
-              }
-
-              Future<void> save() async {
-                setState(() => saving = true);
-                try {
-                  final reason = noteController.text.trim();
-                  await bookingService.addTechnicianNotes(
-                    bookingId: booking.id,
-                    technicianNotes: 'Price adjustment note: $reason',
-                    priceAdjustment: signedAmount,
-                  );
-                  // Pop the sheet first, then invalidate so the provider
-                  // refresh happens outside the sheet's widget tree.
-                  if (!sheetContext.mounted) return;
-                  Navigator.pop(sheetContext, true);
-                } catch (e) {
-                  if (!sheetContext.mounted) return;
-                  setState(() => saving = false);
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    SnackBar(content: Text('Failed to adjust price: $e')),
-                  );
+            Future<void> save() async {
+              setState(() => saving = true);
+              try {
+                final buf = StringBuffer();
+                if (selectedIssues.isNotEmpty) {
+                  buf.writeln('Identified Issues:');
+                  for (final l in selectedIssues) {
+                    buf.writeln('• $l');
+                  }
                 }
+                if (serviceFee > 0) buf.writeln('Service Fee: ₱${serviceFee.toStringAsFixed(2)}');
+                if (addedParts.isNotEmpty) {
+                  buf.writeln('Parts Used:');
+                  for (final p in addedParts) {
+                    buf.writeln('• ${p['name']} — ₱${(p['price'] as double).toStringAsFixed(2)}');
+                  }
+                }
+                final diagNote = diagNotesController.text.trim();
+                if (diagNote.isNotEmpty) buf.writeln('Technician Notes: $diagNote');
+
+                final customerPart = booking.moreDetails ?? notes;
+                final combined = '$customerPart\n---TECHNICIAN NOTES---\n${buf.toString().trim()}';
+                await bookingService.updateDiagnosticNotes(
+                  bookingId: booking.id,
+                  notes: combined,
+                  partsList: addedParts.isEmpty ? null : addedParts
+                      .map((p) => '${p['name']} — ₱${(p['price'] as double).toStringAsFixed(2)}')
+                      .toList(),
+                  finalCost: total,
+                );
+                if (!sheetContext.mounted) return;
+                Navigator.pop(sheetContext, true);
+              } catch (e) {
+                if (!sheetContext.mounted) return;
+                setState(() => saving = false);
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(content: Text('Failed to save assessment: $e')),
+                );
               }
+            }
 
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.85,
+              maxChildSize: 0.95,
+              builder: (_, scrollController) => Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
+                      child: Row(
                         children: [
-                          // Handle bar
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Header
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.deepBlue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(Icons.tune_rounded, color: AppTheme.deepBlue, size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Adjust Price',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.textPrimaryColor,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: saving ? null : () => Navigator.pop(sheetContext, false),
-                                icon: const Icon(Icons.close_rounded),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: Colors.grey.shade100,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Current price display
                           Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.shade200),
+                              color: AppTheme.deepBlue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: const Icon(Icons.medical_services_rounded, color: AppTheme.deepBlue, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Original Price',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textSecondaryColor,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '₱${basePrice.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.textPrimaryColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Icon(Icons.arrow_forward_rounded, color: Colors.grey.shade400),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Adjusted Price',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textSecondaryColor,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '₱${newPrice.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: hasValidAmount
-                                            ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
-                                            : AppTheme.textPrimaryColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                Text('Assess & Price',
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                                Text('Diagnose device and set charges',
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryColor)),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
-
-                          // Increase / Decrease toggle
-                          const Text(
-                            'Adjustment Type',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
+                          IconButton(
+                            onPressed: saving ? null : () => Navigator.pop(sheetContext, false),
+                            icon: const Icon(Icons.close_rounded),
+                            style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: saving ? null : () => setState(() => isIncrease = true),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: isIncrease ? AppTheme.errorColor : Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: isIncrease ? AppTheme.errorColor : Colors.grey.shade300,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.arrow_upward_rounded,
-                                          size: 18,
-                                          color: isIncrease ? Colors.white : Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Increase',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                            color: isIncrease ? Colors.white : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.grey.shade100, height: 1),
+                    // Scrollable body
+                    Expanded(
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                        children: [
+                          // Device info banner
+                          if (rawDevice.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              margin: const EdgeInsets.only(bottom: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.blue.shade100),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(children: [
+                                    Icon(Icons.devices_rounded, size: 13, color: Colors.blue.shade700),
+                                    const SizedBox(width: 5),
+                                    Text("Customer's Device",
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.blue.shade700)),
+                                  ]),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '$rawDevice${deviceBrand.isNotEmpty ? ' · $deviceBrand' : ''}${deviceModel.isNotEmpty ? ' $deviceModel' : ''}',
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
                                   ),
-                                ),
+                                  if (deviceProblem.isNotEmpty) ...[
+                                    const SizedBox(height: 3),
+                                    Text('Reported: $deviceProblem',
+                                        style: TextStyle(fontSize: 12, color: Colors.blue.shade700)),
+                                  ],
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: saving ? null : () => setState(() => isIncrease = false),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: !isIncrease ? AppTheme.successColor : Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: !isIncrease ? AppTheme.successColor : Colors.grey.shade300,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.arrow_downward_rounded,
-                                          size: 18,
-                                          color: !isIncrease ? Colors.white : Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Decrease',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                            color: !isIncrease ? Colors.white : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Amount stepper
-                          const Text(
-                            'Amount (₱)',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              // Minus button
-                              _StepButton(
-                                icon: Icons.remove_rounded,
-                                color: AppTheme.errorColor,
-                                enabled: !saving && adjustmentAmount > 0,
-                                onTap: () => stepAmount(-50),
-                                onLongPress: () => stepAmount(-100),
-                              ),
-                              const SizedBox(width: 12),
-                              // Amount display / input
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () async {
-                                    final inputController = TextEditingController(
-                                      text: adjustmentAmount > 0 ? adjustmentAmount.toStringAsFixed(0) : '',
-                                    );
-                                    await showDialog(
-                                      context: sheetContext,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text('Enter amount'),
-                                        content: TextField(
-                                          controller: inputController,
-                                          autofocus: true,
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          decoration: const InputDecoration(
-                                            prefixText: '₱ ',
-                                            border: OutlineInputBorder(),
-                                            hintText: '0',
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(ctx),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              final v = double.tryParse(inputController.text.replaceAll(',', '').trim());
-                                              if (v != null && v >= 0) {
-                                                setState(() => adjustmentAmount = v);
-                                              }
-                                              Navigator.pop(ctx);
-                                            },
-                                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.deepBlue, foregroundColor: Colors.white),
-                                            child: const Text('Set'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: hasValidAmount
-                                            ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
-                                            : Colors.grey.shade300,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          '₱${adjustmentAmount.toStringAsFixed(0)}',
-                                          style: TextStyle(
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.w800,
-                                            color: hasValidAmount
-                                                ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
-                                                : Colors.grey.shade400,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Tap to type exact amount',
-                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Plus button
-                              _StepButton(
-                                icon: Icons.add_rounded,
-                                color: AppTheme.successColor,
-                                enabled: !saving,
-                                onTap: () => stepAmount(50),
-                                onLongPress: () => stepAmount(100),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Center(
-                            child: Text(
-                              'Tap +/− to step by ₱50 · Hold for ₱100',
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
                             ),
-                          ),
-                          const SizedBox(height: 12),
 
-                          // Quick presets
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [100, 200, 300, 500, 1000].map((preset) {
-                              final isSelected = adjustmentAmount == preset.toDouble();
-                              return GestureDetector(
-                                onTap: saving ? null : () => setQuickAmount(preset.toDouble()),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
-                                        : Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? (isIncrease ? AppTheme.errorColor : AppTheme.successColor)
-                                          : Colors.grey.shade300,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '₱$preset',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: isSelected ? Colors.white : AppTheme.textSecondaryColor,
-                                    ),
+                          // ── Identified Issues ────────────────────────
+                          Row(children: [
+                            const Icon(Icons.build_circle_rounded, size: 15, color: AppTheme.deepBlue),
+                            const SizedBox(width: 6),
+                            Text('Identified Issues',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                            const SizedBox(width: 6),
+                            Text('($deviceKey)',
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondaryColor)),
+                          ]),
+                          const SizedBox(height: 4),
+                          Text('Select all damage found on the device',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          const SizedBox(height: 10),
+                          // Catalogue issues
+                          ...items.map((item) {
+                            final label = item['label'] as String;
+                            final isSelected = selectedIssues.contains(label);
+                            return GestureDetector(
+                              onTap: saving ? null : () => setState(() {
+                                isSelected ? selectedIssues.remove(label) : selectedIssues.add(label);
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.08) : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
+                                    width: isSelected ? 1.5 : 1,
                                   ),
                                 ),
-                              );
-                            }).toList(),
+                                child: Row(
+                                  children: [
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      width: 22, height: 22,
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? AppTheme.deepBlue : Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
+                                        ),
+                                      ),
+                                      child: isSelected
+                                          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(label,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                            color: isSelected ? AppTheme.deepBlue : AppTheme.textPrimaryColor,
+                                          )),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                          // Custom issues added by technician
+                          ...customIssueOrder.map((label) {
+                            final isSelected = selectedIssues.contains(label);
+                            return GestureDetector(
+                              onTap: saving ? null : () => setState(() {
+                                isSelected ? selectedIssues.remove(label) : selectedIssues.add(label);
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.08) : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      width: 22, height: 22,
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? AppTheme.deepBlue : Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
+                                        ),
+                                      ),
+                                      child: isSelected
+                                          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(label,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                            color: isSelected ? AppTheme.deepBlue : AppTheme.textPrimaryColor,
+                                          )),
+                                    ),
+                                    // Remove custom issue
+                                    if (!saving)
+                                      GestureDetector(
+                                        onTap: () => setState(() {
+                                          selectedIssues.remove(label);
+                                          customIssueOrder.remove(label);
+                                        }),
+                                        child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                          // Add custom issue input
+                          const SizedBox(height: 4),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: customIssueController,
+                                  enabled: !saving,
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: InputDecoration(
+                                    hintText: 'Other issue not listed above…',
+                                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.grey.shade50,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: ElevatedButton(
+                                  onPressed: (saving || customIssueController.text.trim().isEmpty)
+                                      ? null
+                                      : () {
+                                          final label = customIssueController.text.trim();
+                                          if (label.isNotEmpty && !customIssueOrder.contains(label)) {
+                                            setState(() {
+                                              customIssueOrder.add(label);
+                                              selectedIssues.add(label);
+                                              customIssueController.clear();
+                                            });
+                                          }
+                                        },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.deepBlue,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 20),
 
-                          // Note field
-                          const Text(
-                            'Reason *',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor),
-                          ),
+                          // ── Service Fee ──────────────────────────────
+                          const Text('Service Fee (₱)',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                          const SizedBox(height: 4),
+                          Text('Base labour / visit charge',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                           const SizedBox(height: 8),
                           TextField(
-                            controller: noteController,
-                            enabled: !saving,
-                            maxLines: 3,
+                            controller: serviceFeeController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
-                              hintText: 'e.g. Additional parts required, labour cost, discount applied…',
-                              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                              prefixText: '₱ ',
+                              hintText: '0',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: Colors.grey.shade300),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide(color: AppTheme.deepBlue, width: 2),
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
                               ),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Parts Used ───────────────────────────────
+                          const Text('Parts Used',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                          const SizedBox(height: 4),
+                          Text('Add replacement parts used during repair',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          const SizedBox(height: 8),
+                          if (addedParts.isNotEmpty) ...[
+                            Column(
+                              children: addedParts.map((part) {
+                                final name  = part['name'] as String;
+                                final price = part['price'] as double;
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.orange.shade200),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.build_circle_outlined, size: 16, color: Colors.orange),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(name,
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                                            Text('₱${price.toStringAsFixed(2)}',
+                                                style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                      ),
+                                      if (!saving)
+                                        GestureDetector(
+                                          onTap: () => setState(() => addedParts.remove(part)),
+                                          child: Icon(Icons.close, size: 16, color: Colors.grey.shade500),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Column(
+                            children: [
+                              TextField(
+                                controller: newPartController,
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  hintText: 'e.g. Replacement screen, New battery',
+                                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade50,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: newPartPriceController,
+                                      onChanged: (_) => setState(() {}),
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      decoration: InputDecoration(
+                                        hintText: 'Part price',
+                                        prefixText: '₱ ',
+                                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: BorderSide(color: Colors.grey.shade300),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                          borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: (saving || newPartController.text.trim().isEmpty)
+                                        ? null
+                                        : () {
+                                            final name  = newPartController.text.trim();
+                                            final price = double.tryParse(newPartPriceController.text.trim()) ?? 0.0;
+                                            if (name.isNotEmpty) {
+                                              setState(() {
+                                                addedParts.add({'name': name, 'price': price});
+                                                newPartController.clear();
+                                                newPartPriceController.clear();
+                                              });
+                                            }
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.deepBlue,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Diagnosis Notes ──────────────────────────
+                          const Text('Diagnosis Notes',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
+                          const SizedBox(height: 4),
+                          Text('Describe findings and recommendations',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: diagNotesController,
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. Found corrosion on charging port, replaced screen and battery…',
+                              hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                              ),
+                              filled: true, fillColor: Colors.grey.shade50,
                               contentPadding: const EdgeInsets.all(14),
                             ),
                           ),
                           const SizedBox(height: 24),
 
-                          // Save button
+                          // ── Price Summary card ───────────────────────
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [AppTheme.deepBlue, AppTheme.lightBlue],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Price Summary',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white70)),
+                                const SizedBox(height: 10),
+                                if (selectedIssues.isNotEmpty) ...[
+                                  const Text('Identified Issues',
+                                      style: TextStyle(fontSize: 11, color: Colors.white60)),
+                                  const SizedBox(height: 4),
+                                  ...selectedIssues.map((l) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 3),
+                                    child: Text('• $l',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                                  )),
+                                  const Divider(color: Colors.white24, height: 16),
+                                ],
+                                if (serviceFee > 0) ...[
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('Service Fee', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                      Text('₱${serviceFee.toStringAsFixed(2)}',
+                                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const Divider(color: Colors.white24, height: 16),
+                                ],
+                                if (distanceFee > 0) ...[
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.directions_car_rounded, size: 13, color: Colors.white60),
+                                          const SizedBox(width: 5),
+                                          const Text('Distance Fee', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                        ],
+                                      ),
+                                      Text('₱${distanceFee.toStringAsFixed(2)}',
+                                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                  const Divider(color: Colors.white24, height: 16),
+                                ],
+                                if (addedParts.isNotEmpty) ...[
+                                  ...addedParts.map((p) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(child: Text(p['name'] as String,
+                                            style: const TextStyle(fontSize: 12, color: Colors.white70))),
+                                        Text('₱${(p['price'] as double).toStringAsFixed(2)}',
+                                            style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  )),
+                                  const Divider(color: Colors.white24, height: 16),
+                                ],
+                                if (total == 0)
+                                  const Text('Select issues or enter a service fee to see total',
+                                      style: TextStyle(fontSize: 12, color: Colors.white60))
+                                else if (distanceFee > 0 && serviceFee == 0 && partsTotal == 0)
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Distance fee applied. Add service fee or parts to complete pricing.',
+                                          style: TextStyle(fontSize: 11, color: Colors.white60)),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('Total',
+                                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                                          Text('₱${total.toStringAsFixed(2)}',
+                                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+                                        ],
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('Total',
+                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                                      Text('₱${total.toStringAsFixed(2)}',
+                                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ── Save button ──────────────────────────────
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: canSave ? save : null,
                               icon: saving
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
+                                  ? const SizedBox(width: 18, height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                   : const Icon(Icons.check_circle_outline_rounded, size: 20),
-                              label: Text(
-                                saving ? 'Saving…' : 'Confirm Adjustment',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                              ),
+                              label: Text(saving ? 'Saving…' : 'Save Assessment',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: canSave ? AppTheme.deepBlue : Colors.grey.shade300,
                                 foregroundColor: Colors.white,
@@ -1302,28 +2342,32 @@ class _TechJobCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              );
-            },
-          );
-        },
+              ),
+            );
+          },
+        ),
       );
 
       if (confirmed != true) return;
-      // Invalidate after the sheet is fully closed to avoid _dependents assertion
       ref.invalidate(technicianBookingsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Price adjustment saved.'),
+          content: Text('Assessment saved successfully.'),
           backgroundColor: AppTheme.deepBlue,
         ),
       );
     } finally {
-      noteController.dispose();
+      diagNotesController.dispose();
+      serviceFeeController.dispose();
+      newPartController.dispose();
+      newPartPriceController.dispose();
+      customIssueController.dispose();
     }
   }
+
 
   Future<void> _completeJob(
     BuildContext context,
@@ -1340,7 +2384,7 @@ class _TechJobCard extends ConsumerWidget {
         userId: booking.customerId,
         type: 'booking_completed',
         title: 'Booking Completed',
-        message: 'Your repair has been completed! Please rate your experience with the technician.',
+        message: 'Your repair has been completed! Please proceed with payment.',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
 
@@ -2100,47 +3144,3 @@ class _TechSortChip extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Step button used in the price adjustment bottom sheet
-class _StepButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final bool enabled;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-
-  const _StepButton({
-    required this.icon,
-    required this.color,
-    required this.enabled,
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      onLongPress: enabled ? onLongPress : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: enabled ? color.withValues(alpha: 0.1) : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: enabled ? color.withValues(alpha: 0.4) : Colors.grey.shade200,
-            width: 1.5,
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: 26,
-          color: enabled ? color : Colors.grey.shade300,
-        ),
-      ),
-    );
-  }
-}

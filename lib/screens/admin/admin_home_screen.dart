@@ -202,6 +202,22 @@ class AdminHomeScreen extends ConsumerWidget {
                   subtitle: 'View customer feedback',
                   onTap: () => context.push('/admin-feedback'),
                 ),
+                const SizedBox(height: 10),
+                _ActionTile(
+                  icon: Icons.map_rounded,
+                  color: Colors.deepOrange,
+                  title: 'Job Requests Map',
+                  subtitle: 'View & manage all posted job requests',
+                  onTap: () => context.push('/admin-job-requests'),
+                ),
+                const SizedBox(height: 10),
+                _ActionTile(
+                  icon: Icons.directions_car,
+                  color: Colors.teal,
+                  title: 'Distance Fee Settings',
+                  subtitle: 'Set ₱ per 100m travel fee for technicians',
+                  onTap: () => context.push('/admin-distance-fee'),
+                ),
               ],
             ),
           );

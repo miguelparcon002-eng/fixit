@@ -606,11 +606,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _CategoryCard(
-                                icon: Icons.rocket_launch_rounded,
-                                title: 'More Coming',
-                                subtitle: 'Coming soon',
-                                color: const Color(0xFF9B59B6),
-                                onTap: () => _showComingSoonSheet(context),
+                                icon: Icons.location_on_rounded,
+                                title: 'Post Problem',
+                                subtitle: 'Find nearby tech',
+                                color: const Color(0xFFFF6B35),
+                                onTap: () => context.push('/post-problem'),
                               ),
                             ),
                           ],
@@ -834,6 +834,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 subtitle: 'Get help now',
                                 gradientColors: const [Color(0xFFFF6B9D), Color(0xFFC73866)],
                                 onTap: () => _showSupportOptionsDialog(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ModernQuickActionCard(
+                                icon: Icons.rocket_launch_rounded,
+                                label: 'More Coming',
+                                subtitle: 'Coming soon',
+                                gradientColors: const [Color(0xFF9B59B6), Color(0xFF6C3483)],
+                                onTap: () => _showComingSoonSheet(context),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _ModernQuickActionCard(
+                                icon: Icons.list_alt_rounded,
+                                label: 'My Requests',
+                                subtitle: 'Track requests',
+                                gradientColors: const [Color(0xFF11998E), Color(0xFF38EF7D)],
+                                onTap: () => context.push('/my-requests'),
                               ),
                             ),
                           ],

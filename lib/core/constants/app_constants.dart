@@ -46,8 +46,12 @@ class AppConstants {
   static const String bookingAccepted = 'accepted';
   static const String bookingScheduled = 'scheduled';
   static const String bookingEnRoute = 'en_route';
+  static const String bookingArrived = 'arrived';
   static const String bookingInProgress = 'in_progress';
   static const String bookingCompleted = 'completed';
+  static const String bookingPaid = 'paid';
+  static const String bookingClosed = 'closed';
+  static const String bookingCancellationPending = 'cancellation_pending';
   static const String bookingCancelled = 'cancelled';
   static const String bookingRefunded = 'refunded';
 

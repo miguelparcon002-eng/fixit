@@ -772,7 +772,6 @@ class _BookingDetailSheet extends StatefulWidget {
 }
 
 class _BookingDetailSheetState extends State<_BookingDetailSheet> {
-  bool _expanded = false;
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
@@ -809,9 +808,9 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.55,
+      initialChildSize: 0.6,
       minChildSize: 0.4,
-      maxChildSize: 0.92,
+      maxChildSize: 0.95,
       builder: (context, scrollController) {
         return SingleChildScrollView(
           controller: scrollController,
@@ -869,7 +868,7 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
               ),
               const SizedBox(height: 16),
 
-              // ── Key info summary ───────────────────────────────────
+              // ── Summary ───────────────────────────────────────────
               _DetailsSection(
                 title: 'Summary',
                 children: [
@@ -887,133 +886,80 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
               ),
               const SizedBox(height: 12),
 
-              // ── Expand / collapse button ───────────────────────────
-              InkWell(
-                onTap: () => setState(() => _expanded = !_expanded),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
+              // ── Schedule ──────────────────────────────────────────
+              _DetailsSection(
+                title: 'Schedule',
+                children: [
+                  _DetailsRow(label: 'Created', value: _fmt(booking.createdAt)),
+                  if (booking.scheduledDate != null)
+                    _DetailsRow(label: 'Scheduled', value: _fmt(booking.scheduledDate)),
+                  if (booking.acceptedAt != null)
+                    _DetailsRow(label: 'Accepted', value: _fmt(booking.acceptedAt)),
+                  if (booking.completedAt != null)
+                    _DetailsRow(label: 'Completed', value: _fmt(booking.completedAt)),
+                  if (booking.cancelledAt != null)
+                    _DetailsRow(label: 'Cancelled', value: _fmt(booking.cancelledAt)),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // ── Location & Payment ────────────────────────────────
+              _DetailsSection(
+                title: 'Location & Payment',
+                children: [
+                  _DetailsRow(
+                    label: 'Address',
+                    value: booking.customerAddress ?? '—',
+                    multiline: true,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _expanded ? 'Hide details' : 'Show all details',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.deepBlue,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: AppTheme.deepBlue,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                  _DetailsRow(label: 'Payment', value: booking.paymentMethod ?? '—'),
+                  _DetailsRow(label: 'Pay Status', value: booking.paymentStatus ?? '—'),
+                  if (booking.estimatedCost != null)
+                    _DetailsRow(
+                      label: 'Est. Cost',
+                      value: '₱${booking.estimatedCost!.toStringAsFixed(2)}',
+                    ),
+                  if (booking.finalCost != null)
+                    _DetailsRow(
+                      label: 'Final Cost',
+                      value: '₱${booking.finalCost!.toStringAsFixed(2)}',
+                    ),
+                ],
               ),
 
-              // ── Expanded details ───────────────────────────────────
-              if (_expanded) ...[
+              // ── Cancellation ──────────────────────────────────────
+              if (booking.cancellationReason != null) ...[
                 const SizedBox(height: 12),
                 _DetailsSection(
-                  title: 'Schedule',
-                  children: [
-                    _DetailsRow(label: 'Created', value: _fmt(booking.createdAt)),
-                    if (booking.scheduledDate != null)
-                      _DetailsRow(label: 'Scheduled', value: _fmt(booking.scheduledDate)),
-                    if (booking.acceptedAt != null)
-                      _DetailsRow(label: 'Accepted', value: _fmt(booking.acceptedAt)),
-                    if (booking.completedAt != null)
-                      _DetailsRow(label: 'Completed', value: _fmt(booking.completedAt)),
-                    if (booking.cancelledAt != null)
-                      _DetailsRow(label: 'Cancelled', value: _fmt(booking.cancelledAt)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _DetailsSection(
-                  title: 'Location & Payment',
+                  title: 'Cancellation',
                   children: [
                     _DetailsRow(
-                      label: 'Address',
-                      value: booking.customerAddress ?? '—',
+                      label: 'Reason',
+                      value: booking.cancellationReason!,
                       multiline: true,
                     ),
-                    _DetailsRow(label: 'Payment', value: booking.paymentMethod ?? '—'),
-                    _DetailsRow(label: 'Pay Status', value: booking.paymentStatus ?? '—'),
-                    if (booking.estimatedCost != null)
+                  ],
+                ),
+              ],
+
+              // ── Rating ────────────────────────────────────────────
+              if (booking.rating != null) ...[
+                const SizedBox(height: 12),
+                _DetailsSection(
+                  title: 'Rating',
+                  children: [
+                    _DetailsRow(
+                      label: 'Stars',
+                      value: '${'★' * booking.rating!}${'☆' * (5 - booking.rating!)} (${booking.rating}/5)',
+                    ),
+                    if (booking.review != null && booking.review!.isNotEmpty)
                       _DetailsRow(
-                        label: 'Est. Cost',
-                        value: '₱${booking.estimatedCost!.toStringAsFixed(2)}',
-                      ),
-                    if (booking.finalCost != null)
-                      _DetailsRow(
-                        label: 'Final Cost',
-                        value: '₱${booking.finalCost!.toStringAsFixed(2)}',
+                        label: 'Review',
+                        value: booking.review!,
+                        multiline: true,
                       ),
                   ],
                 ),
-                if (booking.moreDetails != null && booking.moreDetails!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _DetailsSection(
-                    title: 'Notes',
-                    children: [
-                      _DetailsRow(
-                        label: 'Details',
-                        value: booking.moreDetails!,
-                        multiline: true,
-                      ),
-                      if (booking.technicianNotes != null && booking.technicianNotes!.isNotEmpty)
-                        _DetailsRow(
-                          label: 'Tech Notes',
-                          value: booking.technicianNotes!,
-                          multiline: true,
-                        ),
-                    ],
-                  ),
-                ],
-                if (booking.cancellationReason != null) ...[
-                  const SizedBox(height: 12),
-                  _DetailsSection(
-                    title: 'Cancellation',
-                    children: [
-                      _DetailsRow(
-                        label: 'Reason',
-                        value: booking.cancellationReason!,
-                        multiline: true,
-                      ),
-                    ],
-                  ),
-                ],
-                if (booking.rating != null) ...[
-                  const SizedBox(height: 12),
-                  _DetailsSection(
-                    title: 'Rating',
-                    children: [
-                      _DetailsRow(
-                        label: 'Stars',
-                        value: '${'★' * booking.rating!}${'☆' * (5 - booking.rating!)} (${booking.rating}/5)',
-                      ),
-                      if (booking.review != null && booking.review!.isNotEmpty)
-                        _DetailsRow(
-                          label: 'Review',
-                          value: booking.review!,
-                          multiline: true,
-                        ),
-                    ],
-                  ),
-                ],
               ],
 
               const SizedBox(height: 20),

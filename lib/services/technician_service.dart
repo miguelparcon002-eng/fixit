@@ -123,13 +123,48 @@ class TechnicianService {
 
     final response = await queryBuilder.order('rating', ascending: false);
 
-    return (response as List).map((e) => TechnicianProfileModel.fromJson(e)).toList();
+    final results = (response as List)
+        .map((e) => TechnicianProfileModel.fromJson(e))
+        .toList();
+
+    // If caller wants available technicians, also enforce the weekly schedule.
+    if (isAvailable == true) {
+      return results.where((t) => t.isScheduledOnlineNow).toList();
+    }
+    return results;
+  }
+
+  Future<void> setBusy(String userId, bool isBusy) async {
+    await _supabase
+        .from(DBConstants.technicianProfiles)
+        .update({'is_busy': isBusy})
+        .eq('user_id', userId);
+  }
+
+  Future<void> setAcceptRequestsWhileBusy(String userId, bool value) async {
+    await _supabase
+        .from(DBConstants.technicianProfiles)
+        .update({'accept_requests_while_busy': value})
+        .eq('user_id', userId);
   }
 
   Future<void> toggleAvailability(String userId, bool isAvailable) async {
     await _supabase
         .from(DBConstants.technicianProfiles)
         .update({'is_available': isAvailable})
+        .eq('user_id', userId);
+  }
+
+  // Required Supabase migration:
+  // ALTER TABLE technician_profiles
+  //   ADD COLUMN IF NOT EXISTS weekly_schedule JSONB DEFAULT NULL;
+  Future<void> updateWeeklySchedule(
+    String userId,
+    Map<String, Map<String, dynamic>> schedule,
+  ) async {
+    await _supabase
+        .from(DBConstants.technicianProfiles)
+        .update({'weekly_schedule': schedule})
         .eq('user_id', userId);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/technician_profile_model.dart';
 import '../services/technician_service.dart';
+import '../core/config/supabase_config.dart';
 import 'auth_provider.dart';
 
 final technicianServiceProvider = Provider((ref) => TechnicianService());
@@ -8,6 +9,21 @@ final technicianServiceProvider = Provider((ref) => TechnicianService());
 final technicianProfileProvider = FutureProvider.family<TechnicianProfileModel?, String>((ref, userId) async {
   final technicianService = ref.watch(technicianServiceProvider);
   return await technicianService.getProfileByUserId(userId);
+});
+
+/// Computes (averageRating, ratingCount) from app_ratings — the authoritative source for displayed ratings.
+final technicianActualRatingsProvider = FutureProvider.family<(double, int), String>((ref, technicianId) async {
+  final response = await SupabaseConfig.client
+      .from('app_ratings')
+      .select('rating')
+      .eq('technician_id', technicianId);
+  final ratings = (response as List)
+      .map((r) => (r['rating'] as num?)?.toDouble())
+      .whereType<double>()
+      .toList();
+  if (ratings.isEmpty) return (0.0, 0);
+  final avg = ratings.reduce((a, b) => a + b) / ratings.length;
+  return (avg, ratings.length);
 });
 
 // Watches the current technician's availability status.

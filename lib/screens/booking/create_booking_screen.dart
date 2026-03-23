@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/config/supabase_config.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/address_provider.dart';
-import '../../providers/rewards_provider.dart';
-import '../../models/redeemed_voucher.dart';
 import '../../services/notification_service.dart';
 import '../../services/ratings_service.dart';
 import '../../services/technician_specialty_service.dart';
+import '../../services/distance_fee_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'widgets/technician_map_sheet.dart';
 import 'widgets/location_picker_sheet.dart';
@@ -33,6 +33,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   // Repair type
   bool _isEmergency = false;
 
+  // Distance fee rate (₱ per 100m) — loaded from Supabase
+  double _distanceFeeRate = 5.0;
+
   // Step 1: Device selection
   String? _selectedDeviceType;
   String? _selectedBrand;
@@ -50,14 +53,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   List<Map<String, dynamic>> _techniciansFromDb = [];
   bool _isTechniciansLoading = false;
 
-  // Step 3: Promo code / voucher
-  final TextEditingController _promoCodeController = TextEditingController();
-  String? _appliedPromoCode;
   final String _selectedPaymentMethod = 'gcash'; // App only accepts GCash
-  double _discountAmount = 0;
-  String _discountType = 'none';
-  RedeemedVoucher? _appliedVoucher; // The actual voucher object if applied
-  List<RedeemedVoucher> _availableVouchers = [];
 
   // Pricing map based on device type and problem (PH market rates)
   final Map<String, Map<String, double>> _pricing = {
@@ -102,15 +98,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     },
   };
 
-  final List<String> _problems = [
-    'Screen Cracked',
-    'Battery Drains',
-    'Won\'t power on',
-    'Overheating',
-    'Water damage',
-    'Software Bug',
-  ];
-
   // Maps each problem to the technician specialties that cover it
   static const Map<String, List<String>> _problemToSpecialties = {
     'Screen Cracked':  ['Screen Repair', 'Display Replacement', 'iPhone Repair', 'Android Repair', 'Samsung Repair', 'Laptop Repair', 'MacBook Repair'],
@@ -134,9 +121,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   void initState() {
     super.initState();
     _isEmergency = widget.isEmergency;
+    DistanceFeeService.getRate().then((rate) {
+      if (mounted) setState(() => _distanceFeeRate = rate);
+    });
     // Load default address, vouchers, and technicians
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadVouchers();
+      _checkAndShowGcashNotice();
       _loadTechnicians();
       try {
         final addressesAsync = ref.read(userAddressesProvider);
@@ -162,17 +152,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     });
   }
 
-  Future<void> _loadVouchers() async {
-    final user = ref.read(currentUserProvider).value;
-    if (user == null) return;
-    final voucherService = ref.read(redeemedVoucherServiceProvider);
-    final vouchers = await voucherService.getUnusedVouchers(user.id);
-    if (mounted) {
-      setState(() {
-        _availableVouchers = vouchers;
-      });
-    }
-  }
 
   Future<void> _loadTechnicians() async {
     if (!mounted) return;
@@ -182,13 +161,29 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       final supabase = SupabaseConfig.client;
       final specialtyService = TechnicianSpecialtyService();
 
-      // Fetch available technician user IDs from technician_profiles first
+      // Fetch available technician profiles.
+      // Also fetch schedule, busy status and accept-while-busy preference.
       final availableProfiles = await supabase
           .from('technician_profiles')
-          .select('user_id')
+          .select('user_id, weekly_schedule, is_busy, accept_requests_while_busy')
           .eq('is_available', true);
-      final availableIds = (availableProfiles as List)
-          .map((p) => p['user_id'] as String)
+
+      // Build lookup: userId → profile data
+      final profileMap = <String, Map<String, dynamic>>{
+        for (final p in (availableProfiles as List))
+          p['user_id'] as String: Map<String, dynamic>.from(p as Map),
+      };
+
+      // Only keep technicians who pass the schedule check AND either
+      // are not busy, or are busy but accept new requests.
+      final availableIds = profileMap.entries
+          .where((e) {
+            if (!_techIsOnlineNow(e.value['weekly_schedule'])) return false;
+            final isBusy = e.value['is_busy'] as bool? ?? false;
+            final acceptWhileBusy = e.value['accept_requests_while_busy'] as bool? ?? false;
+            return !isBusy || acceptWhileBusy;
+          })
+          .map((e) => e.key)
           .toSet();
 
       // Fetch all technician users then keep only available ones
@@ -287,9 +282,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           distanceKm = (rawKm * 10).round() / 10.0;
         }
         distanceKm = double.parse(distanceKm.toStringAsFixed(1));
-        // ₱5 per 100 meters = ₱50 per km
-        final distanceFee = (distanceKm * 10).round() * 5.0;
+        // fee rate loaded from admin settings (₱ per 100m)
+        final distanceFee = (distanceKm * 10).round() * _distanceFeeRate;
 
+        final techProfile = profileMap[techId];
         results.add({
           'id': techId,
           'name': row['full_name'] as String? ?? 'Technician',
@@ -304,6 +300,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           'distanceFee': distanceFee,
           'latitude': techLat,
           'longitude': techLng,
+          'isBusy': techProfile?['is_busy'] as bool? ?? false,
         });
       }
 
@@ -342,7 +339,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     _modelController.dispose();
     _detailsController.dispose();
     _addressController.dispose();
-    _promoCodeController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -372,90 +368,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     return _getServicePrice() + _getDistanceFee();
   }
 
-  double _calculateFinalPrice() {
-    final basePrice = _calculatePrice();
-    if (_discountType == 'percentage') {
-      return basePrice - (basePrice * _discountAmount / 100);
-    } else if (_discountType == 'fixed') {
-      return basePrice - _discountAmount;
-    }
-    return basePrice;
-  }
-
-  void _applyPromoCode() {
-    final code = _promoCodeController.text.trim().toUpperCase();
-
-    // 1. Check hardcoded promo codes
-    final Map<String, Map<String, dynamic>> promoCodes = {
-      'WELCOME10': {'type': 'percentage', 'amount': 10.0},
-      'FIRST20': {'type': 'percentage', 'amount': 20.0},
-      'SAVE500': {'type': 'fixed', 'amount': 500.0},
-      'FIRSTTIME': {'type': 'percentage', 'amount': 15.0},
-    };
-
-    if (promoCodes.containsKey(code)) {
-      setState(() {
-        _appliedPromoCode = code;
-        _discountType = promoCodes[code]!['type'];
-        _discountAmount = promoCodes[code]!['amount'];
-        _appliedVoucher = null;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Promo code applied successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      return;
-    }
-
-    // 2. Check user's redeemed vouchers by code pattern VOUCHER{ID}
-    final matchingVoucher = _availableVouchers.where((v) {
-      final voucherCode = 'VOUCHER${v.voucherId}'.toUpperCase();
-      return voucherCode == code;
-    }).toList();
-
-    if (matchingVoucher.isNotEmpty) {
-      final voucher = matchingVoucher.first;
-      setState(() {
-        _appliedPromoCode = code;
-        _discountType = voucher.discountType;
-        _discountAmount = voucher.discountAmount;
-        _appliedVoucher = voucher;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Voucher "${voucher.voucherTitle}" applied!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Invalid promo code'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-
-  void _applyVoucherDirectly(RedeemedVoucher voucher) {
-    final code = 'VOUCHER${voucher.voucherId}'.toUpperCase();
-    setState(() {
-      _appliedPromoCode = code;
-      _discountType = voucher.discountType;
-      _discountAmount = voucher.discountAmount;
-      _appliedVoucher = voucher;
-      _promoCodeController.text = code;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Voucher "${voucher.voucherTitle}" applied!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+  double _calculateFinalPrice() => _calculatePrice();
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -528,9 +441,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           );
           return false;
         }
-        if (_selectedProblems.isEmpty) {
+        if (_detailsController.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select at least one problem')),
+            const SnackBar(content: Text('Please describe the problem')),
           );
           return false;
         }
@@ -583,17 +496,19 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       );
 
       // Create booking details text
+      final serviceFee = _getServicePrice();
+      final distanceFee = _getDistanceFee();
       final bookingDetails = [
         'Repair Type: ${_isEmergency ? "Emergency" : "Regular"}',
         'Device: $_selectedDeviceType',
         'Brand: $_selectedBrand',
         'Model: ${_modelController.text.trim()}',
-        'Problem: ${_selectedProblems.join(', ')}',
+        'Problem: ${_detailsController.text.trim()}',
         'Technician: ${_selectedTechData?['name'] ?? 'N/A'}',
-        if (_detailsController.text.trim().isNotEmpty) 'Details: ${_detailsController.text.trim()}',
-        if (_appliedPromoCode != null) 'Promo Code: $_appliedPromoCode',
-        if (_appliedVoucher != null) 'Redeemed Voucher ID: ${_appliedVoucher!.id}',
         'Payment Method: GCash',
+        'Service Fee: ₱${serviceFee.toStringAsFixed(2)}',
+        'Distance Fee: ₱${distanceFee.toStringAsFixed(2)}',
+        'Convenience Fee Rate: 5',
       ].join('\n');
 
       // Use the selected technician directly
@@ -841,12 +756,21 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                 Expanded(
                   flex: _currentStep == 0 ? 1 : 2,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : () {
+                    onPressed: _isLoading ? null : () async {
                       if (_currentStep < 2) {
                         if (_validateStep(_currentStep)) {
-                          setState(() {
-                            _currentStep++;
-                          });
+                          // On step 0 (tech selection), warn if busy tech selected
+                          if (_currentStep == 0) {
+                            final tech = _selectedTechData;
+                            final busy = tech?['isBusy'] as bool? ?? false;
+                            if (busy) {
+                              final proceed = await _showBusyWarning(
+                                tech?['name'] as String? ?? 'This technician',
+                              );
+                              if (proceed != true) return;
+                            }
+                          }
+                          setState(() { _currentStep++; });
                           _scrollController.jumpTo(0);
                         }
                       } else {
@@ -1077,7 +1001,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => _isEmergency = false),
+                onTap: () => setState(() {
+                  _isEmergency = false;
+                  _selectedDate = null;
+                }),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -1111,7 +1038,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
             Expanded(
               child: GestureDetector(
-                onTap: () => setState(() => _isEmergency = true),
+                onTap: () => setState(() {
+                  _isEmergency = true;
+                  _selectedDate = DateTime.now();
+                }),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -1340,89 +1270,9 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           const SizedBox(height: 20),
         ],
 
-        // Problem
+        // What's the problem?
         const Text(
           'What\'s the Problem?',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimaryColor,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Select all that apply',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ..._problems.map((problem) {
-          final isSelected = _selectedProblems.contains(problem);
-          final price = _selectedDeviceType != null ? (_pricing[_selectedDeviceType]?[problem] ?? 0.0) : 0.0;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedProblems.remove(problem);
-                  } else {
-                    _selectedProblems.add(problem);
-                  }
-                });
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.deepBlue.withValues(alpha: 0.1) : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? AppTheme.deepBlue : Colors.grey.shade200,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                      color: isSelected ? AppTheme.deepBlue : Colors.grey.shade400,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        problem,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          color: AppTheme.textPrimaryColor,
-                        ),
-                      ),
-                    ),
-                    if (_selectedDeviceType != null)
-                      Text(
-                        '₱${price.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected ? AppTheme.deepBlue : AppTheme.textSecondaryColor,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 20),
-
-        // Additional Details
-        const Text(
-          'Additional Details (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -1434,7 +1284,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           controller: _detailsController,
           maxLines: 4,
           decoration: InputDecoration(
-            hintText: 'Describe the issue in detail...',
+            hintText: 'e.g. Screen is cracked, battery drains fast...',
             filled: true,
             fillColor: Colors.grey.shade50,
             border: OutlineInputBorder(
@@ -1486,7 +1336,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '* Distance fee ₱5 per 100m varies per technician location',
+            '* Distance fee ₱${_distanceFeeRate.toStringAsFixed(0)} per 100m varies per technician location',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
@@ -1509,6 +1359,153 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         onTechnicianSelected: (id) {
           setState(() => _selectedTechnicianId = id);
         },
+      ),
+    );
+  }
+
+  Future<void> _checkAndShowGcashNotice() async {
+    final user = ref.read(currentUserProvider).value;
+    if (user == null || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'gcash_notice_seen_${user.id}';
+    if (prefs.getBool(key) == true) return;
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.payment_rounded, size: 36, color: Colors.blue.shade700),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'GCash Only',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'FixIT currently accepts GCash as the only payment method. Please make sure your GCash account is ready before proceeding with a booking.',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.6),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  await prefs.setBool(key, true);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryCyan,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Got it', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _showBusyWarning(String techName) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.engineering_rounded, size: 36, color: Colors.orange.shade700),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '$techName is currently busy',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'This technician is currently working on another job. You can still send your request — they\'ll respond once they\'re free. This may take longer than usual.',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                child: const Text('Send Request Anyway', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Find Another Technician', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1939,26 +1936,37 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: _selectDate,
+          onTap: _isEmergency ? null : _selectDate,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: _isEmergency ? Colors.orange.shade50 : Colors.grey.shade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
+              border: Border.all(
+                color: _isEmergency ? Colors.orange.shade300 : Colors.grey.shade200,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, color: AppTheme.deepBlue),
+                Icon(
+                  _isEmergency ? Icons.lock : Icons.calendar_today,
+                  color: _isEmergency ? Colors.orange.shade700 : AppTheme.deepBlue,
+                ),
                 const SizedBox(width: 12),
-                Text(
-                  _selectedDate == null
-                      ? 'Select Date'
-                      : DateFormat('MMM dd, yyyy').format(_selectedDate!),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: _selectedDate == null ? Colors.grey.shade600 : AppTheme.textPrimaryColor,
-                    fontWeight: _selectedDate == null ? FontWeight.normal : FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    _isEmergency
+                        ? 'Today — ${DateFormat('MMM dd, yyyy').format(DateTime.now())} (locked)'
+                        : (_selectedDate == null
+                            ? 'Select Date'
+                            : DateFormat('MMM dd, yyyy').format(_selectedDate!)),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _isEmergency
+                          ? Colors.orange.shade700
+                          : (_selectedDate == null ? Colors.grey.shade600 : AppTheme.textPrimaryColor),
+                      fontWeight: _isEmergency || _selectedDate != null ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
               ],
@@ -2179,6 +2187,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             return sorted;
           }()).map((tech) {
             final isSelected = _selectedTechnicianId == tech['id'];
+            final isBusy = tech['isBusy'] as bool? ?? false;
             final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
             final specialties = (tech['specialties'] as List<String>?) ?? [];
             final isRecommended = _isTechnicianRecommended(specialties);
@@ -2272,6 +2281,31 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                                             SizedBox(width: 3),
                                             Text(
                                               'Recommended',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    if (isBusy) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade600,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.engineering_rounded, color: Colors.white, size: 10),
+                                            SizedBox(width: 3),
+                                            Text(
+                                              'Busy',
                                               style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 9,
@@ -2436,9 +2470,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             _buildReviewItem('Device', _selectedDeviceType ?? ''),
             _buildReviewItem('Brand', _selectedBrand ?? ''),
             _buildReviewItem('Model', _modelController.text),
-            _buildReviewItem('Problem(s)', _selectedProblems.join(', ')),
-            if (_detailsController.text.isNotEmpty)
-              _buildReviewItem('Details', _detailsController.text),
+            _buildReviewItem('Problem', _detailsController.text),
           ],
         ),
         const SizedBox(height: 20),
@@ -2455,179 +2487,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             _buildReviewItem('Technician', _selectedTechData?['name'] ?? ''),
           ],
         ),
-        const SizedBox(height: 20),
-
-        // Promo Code
-        const Text(
-          'Promo Code (Optional)',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimaryColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _promoCodeController,
-                enabled: _appliedPromoCode == null,
-                decoration: InputDecoration(
-                  hintText: 'Enter promo code',
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  prefixIcon: const Icon(Icons.local_offer, color: AppTheme.deepBlue),
-                  suffixIcon: _appliedPromoCode != null
-                      ? IconButton(
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              _appliedPromoCode = null;
-                              _discountAmount = 0;
-                              _discountType = 'none';
-                              _appliedVoucher = null;
-                              _promoCodeController.clear();
-                            });
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            if (_appliedPromoCode == null)
-              ElevatedButton(
-                onPressed: _applyPromoCode,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.deepBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Apply'),
-              ),
-          ],
-        ),
-        if (_appliedPromoCode != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Promo code "$_appliedPromoCode" applied',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.green,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-
-        // My Vouchers section
-        if (_appliedPromoCode == null && _availableVouchers.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'Or use a voucher',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondaryColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 90,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _availableVouchers.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final voucher = _availableVouchers[index];
-                return GestureDetector(
-                  onTap: () => _applyVoucherDirectly(voucher),
-                  child: Container(
-                    width: 160,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.deepBlue.withValues(alpha: 0.08),
-                          AppTheme.primaryCyan.withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.deepBlue.withValues(alpha: 0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          voucher.voucherTitle,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.deepBlue,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          voucher.discountType == 'percentage'
-                              ? '${voucher.discountAmount.toStringAsFixed(0)}% off'
-                              : '₱${voucher.discountAmount.toStringAsFixed(0)} off',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Tap to apply',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.primaryCyan,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
         const SizedBox(height: 24),
 
         // Price Summary
@@ -2815,5 +2674,29 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
+}
+
+/// Returns true if the current day and time fall within the technician's
+/// weekly schedule. If no schedule is stored, returns true (rely on
+/// is_available flag which was already checked in the DB query).
+bool _techIsOnlineNow(dynamic weeklyScheduleJson) {
+  if (weeklyScheduleJson == null) return true;
+  const days = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+    'Friday', 'Saturday', 'Sunday',
+  ];
+  final now     = DateTime.now();
+  final dayName = days[now.weekday - 1]; // weekday: 1=Mon … 7=Sun
+  final schedule = weeklyScheduleJson as Map<String, dynamic>;
+  final dayData  = schedule[dayName] as Map<String, dynamic>?;
+  if (dayData == null || dayData['enabled'] != true) return false;
+  final startStr = (dayData['start'] as String?) ?? '09:00';
+  final endStr   = (dayData['end']   as String?) ?? '18:00';
+  final sp = startStr.split(':');
+  final ep = endStr.split(':');
+  final startMin = int.parse(sp[0]) * 60 + int.parse(sp[1]);
+  final endMin   = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+  final nowMin   = now.hour * 60 + now.minute;
+  return nowMin >= startMin && nowMin < endMin;
 }
 
