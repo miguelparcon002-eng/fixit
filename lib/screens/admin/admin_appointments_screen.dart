@@ -4,8 +4,74 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../models/admin_booking_view.dart';
+import '../../models/booking_model.dart';
 import '../../providers/admin_booking_provider.dart';
 import 'widgets/admin_notifications_dialog.dart';
+
+// ── Status helpers ─────────────────────────────────────────────────────────────
+
+String _appointmentBucket(String status) {
+  switch (status.toLowerCase()) {
+    case 'requested':
+      return 'requested';
+    case 'accepted':
+    case 'en_route':
+    case 'arrived':
+    case 'in_progress':
+    case 'scheduled':
+    case 'completed': // Awaiting Payment — still in progress until paid
+      return 'in_progress';
+    case 'paid':
+    case 'closed':
+      return 'completed';
+    case 'cancelled':
+    case 'cancellation_pending':
+    case 'refunded':
+      return 'cancelled';
+    default:
+      return 'other';
+  }
+}
+
+String _appointmentStatusLabel(String status) {
+  switch (status.toLowerCase()) {
+    case 'requested':            return 'Requested';
+    case 'accepted':             return 'Accepted';
+    case 'en_route':             return 'En Route';
+    case 'arrived':              return 'Arrived';
+    case 'in_progress':          return 'In Progress';
+    case 'completed':            return 'Awaiting Payment';
+    case 'paid':                 return 'Paid';
+    case 'closed':               return 'Completed';
+    case 'cancelled':            return 'Cancelled';
+    case 'cancellation_pending': return 'Cancel Pending';
+    case 'refunded':             return 'Refunded';
+    default:                     return status.replaceAll('_', ' ');
+  }
+}
+
+Color _appointmentStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'requested':
+      return AppTheme.warningColor;
+    case 'accepted':
+    case 'en_route':
+    case 'arrived':
+    case 'in_progress':
+      return AppTheme.lightBlue;
+    case 'completed':
+      return AppTheme.warningColor; // Awaiting Payment — not fully done yet
+    case 'paid':
+    case 'closed':
+      return AppTheme.successColor;
+    case 'cancelled':
+    case 'cancellation_pending':
+    case 'refunded':
+      return AppTheme.errorColor;
+    default:
+      return AppTheme.textSecondaryColor;
+  }
+}
 
 class AdminAppointmentsScreen extends ConsumerStatefulWidget {
   final String? initialRange; // day|week|month
@@ -325,7 +391,7 @@ class _AdminAppointmentsScreenState
                     if (!_matchesTimeRange(b.createdAt)) return false;
 
                     final status = b.status.toLowerCase();
-                    if (_statusFilter != 'all' && status != _statusFilter) {
+                    if (_statusFilter != 'all' && _appointmentBucket(status) != _statusFilter) {
                       return false;
                     }
 
@@ -498,28 +564,11 @@ class _AppointmentCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'requested':
-      case 'pending':
-        return Colors.orange;
-      case 'in_progress':
-      case 'ongoing':
-        return AppTheme.lightBlue;
-      case 'completed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final booking = item.booking;
     final status = booking.status;
-    final statusColor = _statusColor(status);
+    final statusColor = _appointmentStatusColor(status);
 
     final createdAt = booking.createdAt as DateTime?;
     final dateText = createdAt == null
@@ -557,7 +606,7 @@ class _AppointmentCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    status.toUpperCase(),
+                    _appointmentStatusLabel(status),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -773,23 +822,6 @@ class _BookingDetailSheet extends StatefulWidget {
 
 class _BookingDetailSheetState extends State<_BookingDetailSheet> {
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'requested':
-      case 'pending':
-        return Colors.orange;
-      case 'in_progress':
-      case 'ongoing':
-        return AppTheme.lightBlue;
-      case 'completed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
   String _fmt(DateTime? dt) {
     if (dt == null) return '—';
     final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -799,11 +831,121 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year} • $h:$m $period';
   }
 
+  List<_StageData> _getJobStages(BookingModel booking) {
+    final status = booking.status.toLowerCase();
+    final isCancelled =
+        status == 'cancelled' || status == 'cancellation_pending';
+
+    final stages = <_StageData>[
+      _StageData(
+        label: 'Requested',
+        icon: Icons.assignment_outlined,
+        color: AppTheme.warningColor,
+        done: true,
+        isCurrent: status == 'requested',
+        timestamp: _fmt(booking.createdAt),
+      ),
+      _StageData(
+        label: 'Accepted',
+        icon: Icons.handshake_outlined,
+        color: AppTheme.lightBlue,
+        done: booking.acceptedAt != null ||
+            {'en_route', 'arrived', 'in_progress', 'completed', 'paid', 'closed'}
+                .contains(status),
+        isCurrent: status == 'accepted',
+        timestamp: booking.acceptedAt != null ? _fmt(booking.acceptedAt) : null,
+      ),
+      _StageData(
+        label: 'En Route',
+        icon: Icons.directions_car_outlined,
+        color: AppTheme.lightBlue,
+        done: booking.enRouteAt != null ||
+            {'arrived', 'in_progress', 'completed', 'paid', 'closed'}
+                .contains(status),
+        isCurrent: status == 'en_route',
+        timestamp: booking.enRouteAt != null ? _fmt(booking.enRouteAt) : null,
+      ),
+      _StageData(
+        label: 'Arrived at Location',
+        icon: Icons.location_on_outlined,
+        color: AppTheme.lightBlue,
+        done: booking.arrivedAt != null ||
+            {'in_progress', 'completed', 'paid', 'closed'}.contains(status),
+        isCurrent: status == 'arrived',
+        timestamp: booking.arrivedAt != null ? _fmt(booking.arrivedAt) : null,
+      ),
+      _StageData(
+        label: 'Repair In Progress',
+        icon: Icons.build_outlined,
+        color: AppTheme.lightBlue,
+        done: {'in_progress', 'completed', 'paid', 'closed'}.contains(status),
+        isCurrent: status == 'in_progress',
+        timestamp: null,
+      ),
+    ];
+
+    if (!isCancelled) {
+      stages.addAll([
+        _StageData(
+          label: 'Awaiting Payment',
+          icon: Icons.payment_outlined,
+          color: AppTheme.successColor,
+          done: booking.completedAt != null ||
+              {'paid', 'closed'}.contains(status),
+          isCurrent: status == 'completed',
+          timestamp:
+              booking.completedAt != null ? _fmt(booking.completedAt) : null,
+        ),
+        _StageData(
+          label: 'Payment Received',
+          icon: Icons.receipt_long_outlined,
+          color: AppTheme.successColor,
+          done: booking.paidAt != null || status == 'closed',
+          isCurrent: status == 'paid',
+          timestamp: booking.paidAt != null ? _fmt(booking.paidAt) : null,
+        ),
+        _StageData(
+          label: 'Job Completed',
+          icon: Icons.task_alt_outlined,
+          color: AppTheme.successColor,
+          done: status == 'closed',
+          isCurrent: status == 'closed',
+          timestamp: null,
+        ),
+      ]);
+    } else {
+      stages.add(_StageData(
+        label: status == 'cancellation_pending'
+            ? 'Cancellation Pending'
+            : 'Job Cancelled',
+        icon: Icons.cancel_outlined,
+        color: AppTheme.errorColor,
+        done: true,
+        isCurrent: true,
+        timestamp:
+            booking.cancelledAt != null ? _fmt(booking.cancelledAt) : null,
+      ));
+    }
+
+    return stages;
+  }
+
+  Widget _buildJobProgress(BookingModel booking) {
+    final stages = _getJobStages(booking);
+    return _DetailsSection(
+      title: 'Job Progress',
+      children: [
+        for (int i = 0; i < stages.length; i++)
+          _TimelineStep(data: stages[i], isLast: i == stages.length - 1),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final booking = widget.item.booking;
     final status = booking.status;
-    final statusColor = _statusColor(status);
+    final statusColor = _appointmentStatusColor(status);
     final cost = booking.finalCost ?? booking.estimatedCost;
 
     return DraggableScrollableSheet(
@@ -828,7 +970,7 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      status.replaceAll('_', ' ').toUpperCase(),
+                      _appointmentStatusLabel(status),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -884,6 +1026,11 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // ── Job Progress ───────────────────────────────────────
+              _buildJobProgress(booking),
+
               const SizedBox(height: 12),
 
               // ── Schedule ──────────────────────────────────────────
@@ -967,6 +1114,136 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Job progress data + widget ────────────────────────────────────────────────
+
+class _StageData {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool done;
+  final bool isCurrent;
+  final String? timestamp;
+
+  const _StageData({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.done,
+    required this.isCurrent,
+    this.timestamp,
+  });
+}
+
+class _TimelineStep extends StatelessWidget {
+  final _StageData data;
+  final bool isLast;
+
+  const _TimelineStep({required this.data, required this.isLast});
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline indicator column
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: data.done
+                      ? data.color.withValues(alpha: 0.12)
+                      : Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: data.done ? data.color : Colors.grey.shade300,
+                    width: data.isCurrent ? 2.5 : 1.5,
+                  ),
+                ),
+                child: Icon(
+                  data.icon,
+                  size: 14,
+                  color: data.done ? data.color : Colors.grey.shade400,
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 3),
+                    color: data.done
+                        ? data.color.withValues(alpha: 0.3)
+                        : Colors.grey.shade200,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+
+          // Label + timestamp
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        data.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: data.isCurrent
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: data.done
+                              ? (data.isCurrent
+                                  ? data.color
+                                  : AppTheme.textPrimaryColor)
+                              : Colors.grey.shade400,
+                        ),
+                      ),
+                      if (data.isCurrent) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: data.color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'NOW',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: data.color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (data.timestamp != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      data.timestamp!,
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

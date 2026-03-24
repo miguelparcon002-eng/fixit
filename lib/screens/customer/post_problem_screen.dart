@@ -207,7 +207,7 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
           '---\n${_detailsController.text.trim()}',
       ].where((s) => s.isNotEmpty).join('\n');
 
-      await ref.read(jobRequestServiceProvider).createRequest(
+      final request = await ref.read(jobRequestServiceProvider).createRequest(
             customerId: user.id,
             deviceType: _deviceType!,
             problemDescription: description,
@@ -215,6 +215,13 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
             longitude: _lng!,
             address: _address,
           );
+
+      // Notify all technicians — fire-and-forget, doesn't block the UI
+      ref.read(jobRequestServiceProvider).notifyAllTechnicians(
+        deviceType: _deviceType!,
+        address: _address,
+        requestId: request.id,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -9,15 +9,26 @@ import '../theme/app_theme.dart';
       return (icon: Icons.assignment_outlined, color: AppTheme.primaryCyan);
     case 'job_accepted':
     case 'booking_accepted':
+    case 'job_request_accepted':
       return (icon: Icons.check_circle, color: AppTheme.successColor);
     case 'booking_started':
       return (icon: Icons.play_circle_outline, color: AppTheme.accentPurple);
     case 'booking_declined':
+    case 'job_request_declined':
       return (icon: Icons.cancel, color: Colors.red);
     case 'booking_cancelled':
+    case 'job_request_cancelled':
       return (icon: Icons.cancel_outlined, color: Colors.red);
     case 'booking_completed':
       return (icon: Icons.task_alt, color: AppTheme.successColor);
+    case 'booking_update':
+      return (icon: Icons.update_rounded, color: AppTheme.lightBlue);
+    case 'booking_paid':
+      return (icon: Icons.payments_rounded, color: Colors.green);
+    case 'new_job_request':
+      return (icon: Icons.notifications_active_rounded, color: AppTheme.warningColor);
+    case 'tech_proposed':
+      return (icon: Icons.person_pin_circle_rounded, color: AppTheme.deepBlue);
     case 'price_updated':
       return (icon: Icons.price_change_outlined, color: AppTheme.warningColor);
     case 'payment':

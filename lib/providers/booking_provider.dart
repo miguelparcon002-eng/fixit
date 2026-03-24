@@ -6,9 +6,9 @@ import '../core/utils/app_logger.dart';
 
 final bookingServiceProvider = Provider((ref) => BookingService(ref: ref));
 
-final bookingByIdProvider = FutureProvider.family<BookingModel?, String>((ref, bookingId) async {
+final bookingByIdProvider = StreamProvider.family<BookingModel?, String>((ref, bookingId) {
   final bookingService = ref.watch(bookingServiceProvider);
-  return bookingService.getBookingById(bookingId);
+  return bookingService.watchBookingById(bookingId);
 });
 
 final customerBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
@@ -53,6 +53,12 @@ final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
       return Stream.value([]);
     },
   );
+});
+
+/// All post-problem bookings — used by the admin job-request map to derive
+/// accurate active/completed status without relying on job_requests.status.
+final allPostProblemBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
+  return ref.watch(bookingServiceProvider).watchPostProblemBookings();
 });
 
 class BookingsByStatusParams {

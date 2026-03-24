@@ -1056,6 +1056,7 @@ class _TechJobCard extends ConsumerWidget {
       }
 
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       ref.read(techJobsInitialTabProvider.notifier).state = 1;
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1093,6 +1094,7 @@ class _TechJobCard extends ConsumerWidget {
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(notifTitle), backgroundColor: AppTheme.successColor),
@@ -1139,6 +1141,7 @@ class _TechJobCard extends ConsumerWidget {
         }
       } catch (_) {}
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Job marked as paid!'), backgroundColor: Color(0xFF059669)),
@@ -1169,6 +1172,7 @@ class _TechJobCard extends ConsumerWidget {
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1225,6 +1229,7 @@ class _TechJobCard extends ConsumerWidget {
       );
 
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1279,6 +1284,7 @@ class _TechJobCard extends ConsumerWidget {
                 priceAdjustment: amt * sign,
               );
               ref.invalidate(technicianBookingsProvider);
+              ref.invalidate(bookingByIdProvider(booking.id));
               if (context.mounted) Navigator.pop(context);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -2352,6 +2358,7 @@ class _TechJobCard extends ConsumerWidget {
 
       if (confirmed != true) return;
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2389,6 +2396,7 @@ class _TechJobCard extends ConsumerWidget {
       );
 
       ref.invalidate(technicianBookingsProvider);
+      ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

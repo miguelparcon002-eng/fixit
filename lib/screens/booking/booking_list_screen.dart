@@ -12,6 +12,7 @@ import '../../providers/ratings_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_request_provider.dart';
 import '../../services/distance_fee_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/ratings_service.dart';
 import '../../models/booking_model.dart';
 import '../../models/job_request_model.dart';
@@ -2487,6 +2488,15 @@ class _JobRequestDetailSheetState
           .read(jobRequestServiceProvider)
           .acceptRequest(widget.request.id, techId);
 
+      // Notify the technician their proposal was accepted
+      await NotificationService().sendNotification(
+        userId: techId,
+        type: 'job_request_accepted',
+        title: 'Proposal Accepted!',
+        message: 'The customer accepted your proposal for ${widget.request.deviceType} repair. Check your jobs.',
+        data: {'route': '/tech-jobs'},
+      );
+
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2507,10 +2517,24 @@ class _JobRequestDetailSheetState
 
   Future<void> _decline() async {
     setState(() => _declining = true);
+    // Save before customerDeclineRequest clears it in the DB
+    final declinedTechId = widget.request.technicianId;
     try {
       await ref
           .read(jobRequestServiceProvider)
           .customerDeclineRequest(widget.request.id);
+
+      // Notify the technician their proposal was declined
+      if (declinedTechId != null) {
+        await NotificationService().sendNotification(
+          userId: declinedTechId,
+          type: 'job_request_declined',
+          title: 'Proposal Declined',
+          message: 'The customer declined your proposal for ${widget.request.deviceType} repair. The request is still open.',
+          data: {'route': '/tech-job-map'},
+        );
+      }
+
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(

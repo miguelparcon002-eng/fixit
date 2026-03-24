@@ -130,6 +130,13 @@ class _RequestCard extends StatelessWidget {
 
   const _RequestCard({required this.request, required this.ref});
 
+  /// Cancel is allowed while no technician has started travelling yet.
+  bool get _isCancellable => const {
+        'open',
+        'pending_customer_approval',
+        'accepted',
+      }.contains(request.status);
+
   (Color, IconData, String) get _statusStyle {
     return switch (request.status) {
       'open'                       => (Colors.orange,             Icons.hourglass_top_rounded,    'Open'),
@@ -247,8 +254,8 @@ class _RequestCard extends StatelessWidget {
             ],
           ),
 
-          // Cancel button — only for open requests (not while waiting for approval)
-          if (request.status == 'open') ...[
+          // Cancel button — open, pending approval, or accepted
+          if (_isCancellable) ...[
             const SizedBox(height: 12),
             Divider(color: Colors.grey.shade100, height: 1),
             const SizedBox(height: 8),
@@ -260,8 +267,7 @@ class _RequestCard extends StatelessWidget {
                     size: 16, color: Colors.red),
                 label: const Text(
                   'Cancel Request',
-                  style:
-                      TextStyle(fontSize: 13, color: Colors.red),
+                  style: TextStyle(fontSize: 13, color: Colors.red),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
@@ -276,21 +282,29 @@ class _RequestCard extends StatelessWidget {
   }
 
   Future<void> _confirmCancel(BuildContext context) async {
+    final hasTech = request.technicianId != null;
+    final bodyText = switch (request.status) {
+      'pending_customer_approval' =>
+        'A technician has proposed to take this job. Cancelling will notify them that the request is no longer available.',
+      'accepted' =>
+        'A technician has been assigned to this job. Cancelling will notify them.',
+      _ => 'Are you sure you want to cancel this request?',
+    };
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Cancel Request'),
-        content: const Text(
-            'Are you sure you want to cancel this request?'),
+        content: Text(bodyText),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Yes, Cancel',
                 style: TextStyle(color: Colors.white)),
           ),
@@ -300,7 +314,20 @@ class _RequestCard extends StatelessWidget {
 
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(jobRequestServiceProvider).cancelRequest(request.id);
+      // Use cancelRequestByCustomer so the technician gets notified when one
+      // is assigned (pending_customer_approval or accepted).
+      await ref
+          .read(jobRequestServiceProvider)
+          .cancelRequestByCustomer(request);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(hasTech
+              ? 'Request cancelled. The technician has been notified.'
+              : 'Request cancelled.'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -7,10 +7,12 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/job_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_request_provider.dart';
+import '../../services/notification_service.dart';
 
 class TechJobMapScreen extends ConsumerStatefulWidget {
   const TechJobMapScreen({super.key});
@@ -481,6 +483,26 @@ class _JobDetailSheet extends ConsumerStatefulWidget {
 
 class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
   bool _accepting = false;
+  String? _customerName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomerName();
+  }
+
+  Future<void> _loadCustomerName() async {
+    try {
+      final data = await SupabaseConfig.client
+          .from('users')
+          .select('full_name')
+          .eq('id', widget.request.customerId)
+          .maybeSingle();
+      if (mounted && data != null) {
+        setState(() => _customerName = data['full_name'] as String?);
+      }
+    } catch (_) {}
+  }
 
   Future<void> _accept() async {
     setState(() => _accepting = true);
@@ -490,6 +512,16 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
       await ref
           .read(jobRequestServiceProvider)
           .proposeRequest(widget.request.id, user.id);
+
+      // Notify the customer that a technician is interested
+      await NotificationService().sendNotification(
+        userId: widget.request.customerId,
+        type: 'tech_proposed',
+        title: 'Technician Interested!',
+        message: 'A technician is interested in your ${widget.request.deviceType} repair request. Tap to review.',
+        data: {'route': '/my-requests'},
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -617,6 +649,14 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
               icon: Icons.location_on_outlined,
               label: 'Location',
               value: r.address,
+            ),
+            const SizedBox(height: 10),
+
+            // Customer
+            _InfoTile(
+              icon: Icons.person_outline,
+              label: 'Customer',
+              value: _customerName ?? 'Loading…',
             ),
             const SizedBox(height: 20),
 

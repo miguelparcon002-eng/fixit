@@ -6,8 +6,73 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_logo.dart';
+import '../../models/booking_model.dart';
 import '../../models/job_request_model.dart';
+import '../../providers/booking_provider.dart';
 import '../../providers/job_request_provider.dart';
+
+// ── Status helpers (shared across the whole screen) ──────────────────────────
+
+String _statusLabel(String status) => switch (status) {
+      'open' || 'pending_customer_approval' => 'Requesting',
+      'accepted' => 'Active',
+      'completed' => 'Completed',
+      'cancelled' => 'Cancelled',
+      _ => status,
+    };
+
+Color _statusColor(String status) => switch (status) {
+      'open' || 'pending_customer_approval' => AppTheme.warningColor,
+      'accepted' => AppTheme.lightBlue,
+      'completed' => AppTheme.successColor,
+      'cancelled' => AppTheme.textSecondaryColor,
+      _ => Colors.purple,
+    };
+
+IconData _statusIcon(String status) => switch (status) {
+      'open' || 'pending_customer_approval' => Icons.search_rounded,
+      'accepted' => Icons.build_rounded,
+      'completed' => Icons.check_circle_rounded,
+      'cancelled' => Icons.cancel_rounded,
+      _ => Icons.help_outline,
+    };
+
+// Normalise to the 4 display buckets (raw status only — no booking join)
+String _bucket(String status) => switch (status) {
+      'open' || 'pending_customer_approval' => 'requesting',
+      'accepted' => 'active',
+      'completed' => 'completed',
+      'cancelled' => 'cancelled',
+      _ => 'other',
+    };
+
+/// Derives the accurate display bucket for a job_request by cross-checking
+/// the most-recent post_problem booking for the same customer+tech pair.
+/// For non-accepted statuses the raw bucket is used unchanged.
+String _derivedBucket(JobRequestModel jr, List<BookingModel> bookings) {
+  if (jr.status != 'accepted') return _bucket(jr.status);
+
+  // Find the most recent post_problem booking for this customer+technician pair
+  final relevant = bookings
+      .where((b) => b.customerId == jr.customerId && b.technicianId == jr.technicianId)
+      .toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  if (relevant.isEmpty) return 'active'; // booking not yet created — just accepted
+
+  final latestStatus = relevant.first.status;
+
+  const activeStatuses = {'accepted', 'scheduled', 'en_route', 'arrived', 'in_progress'};
+  if (activeStatuses.contains(latestStatus)) return 'active';
+
+  const doneStatuses = {'completed', 'paid', 'closed'};
+  if (doneStatuses.contains(latestStatus)) return 'completed';
+
+  return 'cancelled'; // cancelled / cancellation_pending
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 class AdminJobRequestsScreen extends ConsumerStatefulWidget {
   const AdminJobRequestsScreen({super.key});
@@ -21,11 +86,17 @@ class _AdminJobRequestsScreenState
     extends ConsumerState<AdminJobRequestsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  String? _filter; // null = all
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Fix any job_requests that are stuck at 'accepted' due to bookings that
+    // were completed/cancelled before the forward-sync was in place.
+    Future.microtask(
+      () => ref.read(jobRequestServiceProvider).syncStaleStatuses(),
+    );
   }
 
   @override
@@ -34,46 +105,176 @@ class _AdminJobRequestsScreenState
     super.dispose();
   }
 
+  List<JobRequestModel> _filtered(
+      List<JobRequestModel> all, List<BookingModel> bookings) {
+    if (_filter == null) return all;
+    return all.where((r) => _derivedBucket(r, bookings) == _filter).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final requestsAsync = ref.watch(allJobRequestsProvider);
+    final bookings = ref.watch(allPostProblemBookingsProvider).valueOrNull ?? [];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F7FA),
+        backgroundColor: Colors.white,
         elevation: 0,
+        foregroundColor: AppTheme.textPrimaryColor,
+        titleSpacing: 16,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimaryColor),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
-          'Job Requests',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppTheme.deepBlue,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: AppTheme.deepBlue,
-          tabs: const [
-            Tab(icon: Icon(Icons.map_outlined), text: 'Map'),
-            Tab(icon: Icon(Icons.list_alt_outlined), text: 'List'),
+        title: Row(
+          children: [
+            const AppLogo(
+              size: 30,
+              showText: false,
+              assetPath: 'assets/images/logo_square.png',
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Job Requests Map',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.textPrimaryColor,
+              ),
+            ),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(49),
+          child: Column(
+            children: [
+              Container(height: 1, color: Colors.grey.shade200),
+              TabBar(
+                controller: _tabController,
+                labelColor: AppTheme.deepBlue,
+                unselectedLabelColor: AppTheme.textSecondaryColor,
+                indicatorColor: AppTheme.deepBlue,
+                indicatorWeight: 3,
+                tabs: const [
+                  Tab(icon: Icon(Icons.map_outlined), text: 'Map'),
+                  Tab(icon: Icon(Icons.list_alt_outlined), text: 'List'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: requestsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (requests) => TabBarView(
-          controller: _tabController,
+        data: (all) {
+          final stats = _Stats(
+            requesting: all.where((r) => _derivedBucket(r, bookings) == 'requesting').length,
+            active:     all.where((r) => _derivedBucket(r, bookings) == 'active').length,
+            completed:  all.where((r) => _derivedBucket(r, bookings) == 'completed').length,
+            cancelled:  all.where((r) => _derivedBucket(r, bookings) == 'cancelled').length,
+          );
+          final filtered = _filtered(all, bookings);
+
+          return Column(
+            children: [
+              // ── Stats bar ─────────────────────────────────────────────────
+              _StatsBar(stats: stats),
+
+              // ── Filter chips ──────────────────────────────────────────────
+              _FilterRow(
+                selected: _filter,
+                stats: stats,
+                onChanged: (v) => setState(() => _filter = v),
+              ),
+
+              // ── Tabs ──────────────────────────────────────────────────────
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _MapTab(requests: filtered),
+                    _ListTab(requests: filtered),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Stats model ───────────────────────────────────────────────────────────────
+
+class _Stats {
+  final int requesting, active, completed, cancelled;
+  const _Stats(
+      {required this.requesting,
+      required this.active,
+      required this.completed,
+      required this.cancelled});
+  int get total => requesting + active + completed + cancelled;
+}
+
+// ── Stats bar ─────────────────────────────────────────────────────────────────
+
+class _StatsBar extends StatelessWidget {
+  final _Stats stats;
+  const _StatsBar({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          _StatPill(label: 'Total', value: stats.total, color: AppTheme.deepBlue),
+          const SizedBox(width: 8),
+          _StatPill(label: 'Requesting', value: stats.requesting, color: AppTheme.warningColor),
+          const SizedBox(width: 8),
+          _StatPill(label: 'Active', value: stats.active, color: AppTheme.lightBlue),
+          const SizedBox(width: 8),
+          _StatPill(label: 'Done', value: stats.completed, color: AppTheme.successColor),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+  const _StatPill({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
           children: [
-            _MapView(requests: requests),
-            _ListView(requests: requests),
+            Text(
+              '$value',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w900, color: color),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: color.withValues(alpha: 0.8)),
+            ),
           ],
         ),
       ),
@@ -81,25 +282,136 @@ class _AdminJobRequestsScreenState
   }
 }
 
-// ── Map view ──────────────────────────────────────────────────────────────────
+// ── Filter chips ──────────────────────────────────────────────────────────────
 
-class _MapView extends StatelessWidget {
+class _FilterRow extends StatelessWidget {
+  final String? selected;
+  final _Stats stats;
+  final ValueChanged<String?> onChanged;
+  const _FilterRow(
+      {required this.selected, required this.stats, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _Chip(
+                label: 'All',
+                count: stats.total,
+                color: AppTheme.deepBlue,
+                selected: selected == null,
+                onTap: () => onChanged(null)),
+            const SizedBox(width: 8),
+            _Chip(
+                label: 'Requesting',
+                count: stats.requesting,
+                color: AppTheme.warningColor,
+                selected: selected == 'requesting',
+                onTap: () => onChanged(selected == 'requesting' ? null : 'requesting')),
+            const SizedBox(width: 8),
+            _Chip(
+                label: 'Active',
+                count: stats.active,
+                color: AppTheme.lightBlue,
+                selected: selected == 'active',
+                onTap: () => onChanged(selected == 'active' ? null : 'active')),
+            const SizedBox(width: 8),
+            _Chip(
+                label: 'Completed',
+                count: stats.completed,
+                color: AppTheme.successColor,
+                selected: selected == 'completed',
+                onTap: () => onChanged(selected == 'completed' ? null : 'completed')),
+            const SizedBox(width: 8),
+            _Chip(
+                label: 'Cancelled',
+                count: stats.cancelled,
+                color: AppTheme.textSecondaryColor,
+                selected: selected == 'cancelled',
+                onTap: () => onChanged(selected == 'cancelled' ? null : 'cancelled')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Chip(
+      {required this.label,
+      required this.count,
+      required this.color,
+      required this.selected,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? color : color.withValues(alpha: 0.3), width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : color),
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? Colors.white : color),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Map tab ───────────────────────────────────────────────────────────────────
+
+class _MapTab extends StatelessWidget {
   final List<JobRequestModel> requests;
-  const _MapView({required this.requests});
-
-  Color _pinColor(String status) => switch (status) {
-        'open'      => Colors.red,
-        'accepted'  => const Color(0xFF0EA5E9),
-        'completed' => const Color(0xFF059669),
-        'cancelled' => Colors.grey,
-        _           => Colors.purple,
-      };
+  const _MapTab({required this.requests});
 
   @override
   Widget build(BuildContext context) {
     final center = requests.isNotEmpty
         ? LatLng(requests.first.latitude, requests.first.longitude)
-        : const LatLng(14.5995, 120.9842); // Manila fallback
+        : const LatLng(14.5995, 120.9842);
 
     return Stack(
       children: [
@@ -114,37 +426,11 @@ class _MapView extends StatelessWidget {
               markers: requests
                   .map((r) => Marker(
                         point: LatLng(r.latitude, r.longitude),
-                        width: 44,
-                        height: 52,
+                        width: 48,
+                        height: 56,
                         child: GestureDetector(
                           onTap: () => _showDetail(context, r),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: _pinColor(r.status),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Colors.white, width: 2),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _pinColor(r.status)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 6,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(Icons.build,
-                                    color: Colors.white, size: 16),
-                              ),
-                              Container(
-                                width: 2,
-                                height: 8,
-                                color: _pinColor(r.status),
-                              ),
-                            ],
-                          ),
+                          child: _MapPin(status: r.status),
                         ),
                       ))
                   .toList(),
@@ -152,35 +438,66 @@ class _MapView extends StatelessWidget {
           ],
         ),
 
-        // Legend
-        Positioned(
-          bottom: 16,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1), blurRadius: 8),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _LegendDot(color: Colors.red,                  label: 'Open'),
-                const SizedBox(height: 4),
-                _LegendDot(color: const Color(0xFF0EA5E9),     label: 'Accepted'),
-                const SizedBox(height: 4),
-                _LegendDot(color: const Color(0xFF059669),     label: 'Completed'),
-                const SizedBox(height: 4),
-                _LegendDot(color: Colors.grey,                 label: 'Cancelled'),
-              ],
+        // Empty state overlay
+        if (requests.isEmpty)
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 12),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.location_off_outlined,
+                      color: Colors.grey.shade400),
+                  const SizedBox(width: 10),
+                  Text('No requests to display',
+                      style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           ),
+
+        // Legend
+        Positioned(
+          bottom: 20,
+          right: 14,
+          child: _MapLegend(),
         ),
+
+        // Tap-hint
+        if (requests.isNotEmpty)
+          Positioned(
+            top: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Tap a pin to view details',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -190,15 +507,103 @@ class _MapView extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AdminJobSheet(request: r),
+      builder: (_) => _DetailSheet(request: r),
     );
   }
 }
 
-class _LegendDot extends StatelessWidget {
+class _MapPin extends StatelessWidget {
+  final String status;
+  const _MapPin({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor(status);
+    final icon = _statusIcon(status);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.5),
+            boxShadow: [
+              BoxShadow(
+                  color: color.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 16),
+        ),
+        Container(
+          width: 2.5,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+      ],
+    );
+  }
+}
+
+class _MapLegend extends StatelessWidget {
+  const _MapLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Legend',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.5)),
+          const SizedBox(height: 6),
+          _LegendRow(color: AppTheme.warningColor,       icon: Icons.search_rounded,       label: 'Requesting'),
+          const SizedBox(height: 5),
+          _LegendRow(color: AppTheme.lightBlue,          icon: Icons.build_rounded,        label: 'Active'),
+          const SizedBox(height: 5),
+          _LegendRow(color: AppTheme.successColor,       icon: Icons.check_circle_rounded, label: 'Completed'),
+          const SizedBox(height: 5),
+          _LegendRow(color: AppTheme.textSecondaryColor, icon: Icons.cancel_rounded,       label: 'Cancelled'),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendRow extends StatelessWidget {
   final Color color;
+  final IconData icon;
   final String label;
-  const _LegendDot({required this.color, required this.label});
+  const _LegendRow({required this.color, required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -206,10 +611,12 @@ class _LegendDot extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Icon(icon, color: Colors.white, size: 11),
+        ),
+        const SizedBox(width: 7),
         Text(label,
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
       ],
@@ -217,11 +624,11 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
-// ── List view ─────────────────────────────────────────────────────────────────
+// ── List tab ──────────────────────────────────────────────────────────────────
 
-class _ListView extends StatelessWidget {
+class _ListTab extends StatelessWidget {
   final List<JobRequestModel> requests;
-  const _ListView({required this.requests});
+  const _ListTab({required this.requests});
 
   @override
   Widget build(BuildContext context) {
@@ -230,198 +637,198 @@ class _ListView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined, size: 56, color: Colors.grey.shade400),
+            Icon(Icons.inbox_outlined, size: 60, color: Colors.grey.shade300),
             const SizedBox(height: 12),
-            Text('No job requests yet',
+            Text('No requests match this filter',
                 style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade500)),
+                    color: Colors.grey.shade400)),
           ],
         ),
       );
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       itemCount: requests.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, i) => _AdminListCard(request: requests[i]),
+      itemBuilder: (context, i) => _ListCard(request: requests[i]),
     );
   }
 }
 
-class _AdminListCard extends ConsumerWidget {
+class _ListCard extends ConsumerWidget {
   final JobRequestModel request;
-  const _AdminListCard({required this.request});
-
-  (Color, String) get _statusStyle => switch (request.status) {
-        'open'      => (Colors.orange,           'Open'),
-        'accepted'  => (const Color(0xFF0EA5E9), 'Accepted'),
-        'completed' => (const Color(0xFF059669), 'Completed'),
-        'cancelled' => (Colors.grey,             'Cancelled'),
-        _           => (Colors.purple,           request.status),
-      };
+  const _ListCard({required this.request});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (color, label) = _statusStyle;
+    final color = _statusColor(request.status);
+    final label = _statusLabel(request.status);
+    final icon = _statusIcon(request.status);
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2)),
-        ],
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _DetailSheet(request: request),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  request.deviceType,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(label,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: color)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(request.problemDescription,
-              style:
-                  const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.location_on_outlined,
-                  size: 13, color: Colors.grey.shade400),
-              const SizedBox(width: 3),
-              Expanded(
-                child: Text(request.address,
-                    style: TextStyle(
-                        fontSize: 11, color: Colors.grey.shade500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Text(fmt.format(request.createdAt.toLocal()),
-                  style: TextStyle(
-                      fontSize: 10, color: Colors.grey.shade400)),
-            ],
-          ),
-
-          // Admin actions
-          if (request.status == 'open' || request.status == 'accepted') ...[
-            const SizedBox(height: 10),
-            Divider(color: Colors.grey.shade100, height: 1),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () => _confirmCancel(context, ref),
-                  icon: const Icon(Icons.cancel_outlined,
-                      size: 15, color: Colors.red),
-                  label: const Text('Cancel',
-                      style: TextStyle(fontSize: 12, color: Colors.red)),
-                  style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4)),
-                ),
-              ],
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
           ],
-        ],
-      ),
-    );
-  }
+        ),
+        child: Row(
+          children: [
+            // Colored left bar
+            Container(
+              width: 5,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(16)),
+              ),
+            ),
+            const SizedBox(width: 12),
 
-  Future<void> _confirmCancel(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Cancel Request'),
-        content: const Text('Cancel this job request?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Yes', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            // Status icon
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            request.deviceType,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: color.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(label,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: color)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request.problemDescription,
+                      style: TextStyle(
+                          fontSize: 13, color: Colors.grey.shade700),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined,
+                            size: 12, color: Colors.grey.shade400),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            request.address,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey.shade500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time_outlined,
+                            size: 12, color: Colors.grey.shade400),
+                        const SizedBox(width: 3),
+                        Text(
+                          fmt.format(request.createdAt.toLocal()),
+                          style: TextStyle(
+                              fontSize: 10, color: Colors.grey.shade400),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.grey.shade300, size: 20),
+            const SizedBox(width: 8),
+          ],
+        ),
       ),
     );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref.read(jobRequestServiceProvider).cancelRequest(request.id);
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
-      );
-    }
   }
 }
 
-// ── Admin job detail sheet ────────────────────────────────────────────────────
+// ── Detail sheet ──────────────────────────────────────────────────────────────
 
-class _AdminJobSheet extends ConsumerWidget {
+class _DetailSheet extends ConsumerWidget {
   final JobRequestModel request;
-  const _AdminJobSheet({required this.request});
-
-  (Color, String) get _statusStyle => switch (request.status) {
-        'open'      => (Colors.orange,           'Open'),
-        'accepted'  => (const Color(0xFF0EA5E9), 'Accepted'),
-        'completed' => (const Color(0xFF059669), 'Completed'),
-        'cancelled' => (Colors.grey,             'Cancelled'),
-        _           => (Colors.purple,           request.status),
-      };
+  const _DetailSheet({required this.request});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (color, label) = _statusStyle;
-    final fmt = DateFormat('MMM d, yyyy · h:mm a');
+    final color = _statusColor(request.status);
+    final label = _statusLabel(request.status);
+    final icon = _statusIcon(request.status);
+    final fmt = DateFormat('MMM d, yyyy');
+    final timeFmt = DateFormat('h:mm a');
+    final isActionable =
+        request.status == 'open' || request.status == 'pending_customer_approval' || request.status == 'accepted';
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.55,
+      initialChildSize: 0.6,
       minChildSize: 0.4,
-      maxChildSize: 0.85,
+      maxChildSize: 0.92,
       expand: false,
       builder: (_, ctrl) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: ListView(
           controller: ctrl,
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
+            // Drag handle
             Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
@@ -433,82 +840,198 @@ class _AdminJobSheet extends ConsumerWidget {
               ),
             ),
 
+            // ── Header ────────────────────────────────────────────────────
             Row(
               children: [
-                Expanded(
-                  child: Text(request.deviceType,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w800)),
-                ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text(label,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: color)),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        request.deviceType,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border:
+                              Border.all(color: color.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(label,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: color)),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(fmt.format(request.createdAt.toLocal()),
-                style:
-                    TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.access_time_outlined,
+                    size: 13, color: Colors.grey.shade400),
+                const SizedBox(width: 4),
+                Text(
+                  '${fmt.format(request.createdAt.toLocal())}  ·  ${timeFmt.format(request.createdAt.toLocal())}',
+                  style:
+                      TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            Divider(color: Colors.grey.shade100, height: 1),
+            const SizedBox(height: 20),
+
+            // ── Problem ───────────────────────────────────────────────────
+            _SheetSection(
+              title: 'Problem Description',
+              icon: Icons.report_problem_outlined,
+              color: Colors.orange.shade700,
+              child: Text(
+                request.problemDescription,
+                style: const TextStyle(
+                    fontSize: 14, color: Color(0xFF374151), height: 1.5),
+              ),
+            ),
             const SizedBox(height: 16),
 
-            _SheetRow(
-                icon: Icons.report_problem_outlined,
-                label: 'Problem',
-                value: request.problemDescription),
-            const SizedBox(height: 10),
-            _SheetRow(
-                icon: Icons.location_on_outlined,
-                label: 'Location',
-                value: request.address),
-            const SizedBox(height: 10),
-            _SheetRow(
-                icon: Icons.person_outline,
-                label: 'Customer ID',
-                value: '${request.customerId.substring(0, 12)}…'),
-            if (request.technicianId != null) ...[
-              const SizedBox(height: 10),
-              _SheetRow(
-                  icon: Icons.engineering_outlined,
-                  label: 'Technician ID',
-                  value: '${request.technicianId!.substring(0, 12)}…'),
+            // ── Location ──────────────────────────────────────────────────
+            _SheetSection(
+              title: 'Location',
+              icon: Icons.location_on_outlined,
+              color: Colors.red.shade600,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(request.address,
+                      style: const TextStyle(
+                          fontSize: 14, color: Color(0xFF374151))),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${request.latitude.toStringAsFixed(5)}, ${request.longitude.toStringAsFixed(5)}',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontFamily: 'monospace'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── People ────────────────────────────────────────────────────
+            _SheetSection(
+              title: 'People',
+              icon: Icons.people_outline,
+              color: AppTheme.deepBlue,
+              child: Column(
+                children: [
+                  _PersonRow(
+                    label: 'Customer',
+                    icon: Icons.person_outline,
+                    id: request.customerId,
+                    color: AppTheme.deepBlue,
+                  ),
+                  if (request.technicianId != null) ...[
+                    const SizedBox(height: 8),
+                    _PersonRow(
+                      label: request.status == 'pending_customer_approval'
+                          ? 'Proposed Technician'
+                          : 'Technician',
+                      icon: Icons.engineering_outlined,
+                      id: request.technicianId!,
+                      color: const Color(0xFF7C3AED),
+                    ),
+                  ],
+                  if (request.technicianId == null &&
+                      (request.status == 'open' ||
+                          request.status == 'pending_customer_approval')) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.engineering_outlined,
+                              size: 15, color: Colors.grey.shade400),
+                        ),
+                        const SizedBox(width: 10),
+                        Text('No technician assigned yet',
+                            style: TextStyle(
+                                fontSize: 13, color: Colors.grey.shade400)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // ── Status note ───────────────────────────────────────────────
+            if (request.status == 'pending_customer_approval') ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFED7AA)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.hourglass_top_rounded,
+                        size: 16, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Technician proposed — awaiting customer approval',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF92400E),
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
 
-            if (request.status == 'open' || request.status == 'accepted') ...[
-              const SizedBox(height: 20),
+            // ── Admin action ──────────────────────────────────────────────
+            if (isActionable) ...[
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    try {
-                      await ref
-                          .read(jobRequestServiceProvider)
-                          .cancelRequest(request.id);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Failed: $e'),
-                          backgroundColor: Colors.red));
-                    }
-                  },
-                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                  onPressed: () => _confirmCancel(context, ref),
+                  icon: const Icon(Icons.cancel_outlined,
+                      color: Colors.red, size: 18),
                   label: const Text('Cancel Request',
-                      style: TextStyle(color: Colors.red)),
+                      style: TextStyle(color: Colors.red, fontSize: 14)),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: Colors.red, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
               ),
@@ -518,46 +1041,126 @@ class _AdminJobSheet extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _confirmCancel(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancel Request'),
+        content: const Text(
+            'Are you sure you want to cancel this job request? This cannot be undone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Cancel Request',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    Navigator.pop(context);
+    try {
+      await ref.read(jobRequestServiceProvider).cancelRequest(request.id);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 }
 
-class _SheetRow extends StatelessWidget {
+class _SheetSection extends StatelessWidget {
+  final String title;
   final IconData icon;
-  final String label;
-  final String value;
-  const _SheetRow(
-      {required this.icon, required this.label, required this.value});
+  final Color color;
+  final Widget child;
+  const _SheetSection(
+      {required this.title,
+      required this.icon,
+      required this.color,
+      required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    letterSpacing: 0.3)),
+          ],
+        ),
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(7),
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.lightBlue.withValues(alpha: 0.12),
+            color: color.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.1)),
+          ),
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonRow extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String id;
+  final Color color;
+  const _PersonRow(
+      {required this.label,
+      required this.icon,
+      required this.id,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final shortId = id.length > 16 ? '${id.substring(0, 16)}…' : id;
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: AppTheme.deepBlue, size: 16),
+          child: Icon(icon, size: 15, color: color),
         ),
         const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w500)),
-              const SizedBox(height: 2),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A2E))),
-            ],
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500)),
+            Text(shortId,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'monospace')),
+          ],
         ),
       ],
     );

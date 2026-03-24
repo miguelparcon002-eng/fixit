@@ -8,6 +8,8 @@ import '../../providers/verification_provider.dart';
 import '../../providers/auth_provider.dart';
 import 'widgets/verification_pending_dialog.dart';
 import '../../core/utils/app_logger.dart';
+import '../../models/job_request_model.dart';
+import '../../providers/job_request_provider.dart';
 
 class TechNavigation extends ConsumerStatefulWidget {
   final Widget child;
@@ -93,8 +95,39 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
     );
   }
 
+  void _showNewJobRequestPopup(BuildContext context, JobRequestModel req) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.transparent,
+      builder: (ctx) => _NewJobRequestPopup(
+        request: req,
+        onViewMap: () {
+          Navigator.of(ctx).pop();
+          context.push('/tech-job-map');
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Show a popup banner whenever a new open job request arrives
+    ref.listen<AsyncValue<List<JobRequestModel>>>(
+      openJobRequestsProvider,
+      (previous, next) {
+        final prevList = previous?.valueOrNull;
+        final nextList = next.valueOrNull;
+        if (prevList != null &&
+            nextList != null &&
+            nextList.length > prevList.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showNewJobRequestPopup(context, nextList.first);
+          });
+        }
+      },
+    );
+
     final userAsync = ref.watch(currentUserProvider);
 
     return userAsync.when(
@@ -237,6 +270,143 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── New-job-request popup banner ─────────────────────────────────────────────
+
+class _NewJobRequestPopup extends StatefulWidget {
+  final JobRequestModel request;
+  final VoidCallback onViewMap;
+
+  const _NewJobRequestPopup({required this.request, required this.onViewMap});
+
+  @override
+  State<_NewJobRequestPopup> createState() => _NewJobRequestPopupState();
+}
+
+class _NewJobRequestPopupState extends State<_NewJobRequestPopup>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 380));
+    _slide = Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+    // Auto-dismiss after 6 seconds
+    Future.delayed(const Duration(seconds: 6), () {
+      if (mounted) Navigator.of(context).maybePop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: SlideTransition(
+            position: _slide,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.deepBlue,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.location_on_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'New Job Request!',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${widget.request.deviceType} · ${widget.request.address}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: widget.onViewMap,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text(
+                        'View',
+                        style: TextStyle(
+                          color: AppTheme.deepBlue,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: Icon(Icons.close_rounded,
+                          color: Colors.white.withValues(alpha: 0.7), size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

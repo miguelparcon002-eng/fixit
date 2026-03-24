@@ -14,6 +14,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/technician_stats_provider.dart';
 import '../../providers/address_provider.dart';
 import '../../providers/technician_provider.dart';
+import '../../providers/job_request_provider.dart';
 import 'tech_ratings_screen.dart';
 import 'tech_jobs_screen_new.dart';
 import 'widgets/customer_location_sheet.dart';
@@ -50,6 +51,10 @@ class TechHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Open job-request count for the Job Map badge
+    final openJobCount =
+        ref.watch(openJobRequestsProvider).valueOrNull?.length ?? 0;
+
     // Get current user data
     final userAsync = ref.watch(currentUserProvider);
     final userName =
@@ -786,12 +791,42 @@ class TechHomeScreen extends ConsumerWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: _QuickActionButton(
-                                icon: Icons.map_rounded,
-                                iconColor: Colors.deepOrange,
-                                iconBgColor: Colors.deepOrange.withValues(alpha: 0.15),
-                                label: 'Job Map',
-                                onTap: () => context.push('/tech-job-map'),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  _QuickActionButton(
+                                    icon: Icons.map_rounded,
+                                    iconColor: Colors.deepOrange,
+                                    iconBgColor: Colors.deepOrange.withValues(alpha: 0.15),
+                                    label: 'Job Map',
+                                    onTap: () => context.push('/tech-job-map'),
+                                  ),
+                                  if (openJobCount > 0)
+                                    Positioned(
+                                      top: -6,
+                                      right: -6,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.deepOrange,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors.white, width: 2),
+                                        ),
+                                        child: Text(
+                                          openJobCount > 99
+                                              ? '99+'
+                                              : '$openJobCount',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 12),

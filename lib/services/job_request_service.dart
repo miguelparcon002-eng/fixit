@@ -1,5 +1,6 @@
 import '../core/config/supabase_config.dart';
 import '../models/job_request_model.dart';
+import '../services/notification_service.dart';
 
 class JobRequestService {
   static const _table = 'job_requests';
@@ -87,6 +88,25 @@ class JobRequestService {
         .eq('id', id);
   }
 
+  /// Cancels a job request and notifies the assigned technician (if any).
+  Future<void> cancelRequestByCustomer(JobRequestModel request) async {
+    await SupabaseConfig.client
+        .from(_table)
+        .update({'status': 'cancelled'})
+        .eq('id', request.id);
+
+    if (request.technicianId != null) {
+      await NotificationService().sendNotification(
+        userId: request.technicianId!,
+        type: 'job_request_cancelled',
+        title: 'Job Request Cancelled',
+        message:
+            'The customer cancelled their ${request.deviceType} repair request.',
+        data: {'route': '/tech-job-map'},
+      );
+    }
+  }
+
   Future<void> completeRequest(String id) async {
     await SupabaseConfig.client
         .from(_table)
@@ -101,6 +121,72 @@ class JobRequestService {
     }).eq('id', id);
   }
 
+  /// Retroactively syncs job_request statuses that got stuck at 'accepted'
+  /// because they were completed/cancelled before the forward-sync was in place.
+  ///
+  /// For each accepted job_request it checks whether the corresponding booking
+  /// is still ACTIVE. If it is, the row is left untouched. Only rows whose
+  /// booking is fully terminal (completed/paid/closed/cancelled) are updated.
+  Future<void> syncStaleStatuses() async {
+    try {
+      // Fetch every job_request still sitting at 'accepted'
+      final staleRows = await SupabaseConfig.client
+          .from(_table)
+          .select('id, customer_id, technician_id')
+          .eq('status', 'accepted');
+
+      for (final jr in (staleRows as List)) {
+        final jrId = jr['id'] as String;
+        final cid = jr['customer_id'] as String?;
+        final tid = jr['technician_id'] as String?;
+        if (cid == null || tid == null) continue;
+
+        // Skip if there is still an active booking for this customer+tech pair
+        final activeBooking = await SupabaseConfig.client
+            .from('bookings')
+            .select('id')
+            .eq('customer_id', cid)
+            .eq('technician_id', tid)
+            .eq('booking_source', 'post_problem')
+            .inFilter('status', [
+              'accepted', 'scheduled', 'en_route', 'arrived', 'in_progress',
+            ])
+            .limit(1)
+            .maybeSingle();
+
+        if (activeBooking != null) continue; // booking still live — leave it
+
+        // No active booking — look for the most-recent terminal one
+        final terminalBooking = await SupabaseConfig.client
+            .from('bookings')
+            .select('status')
+            .eq('customer_id', cid)
+            .eq('technician_id', tid)
+            .eq('booking_source', 'post_problem')
+            .inFilter('status', [
+              'completed', 'paid', 'closed', 'cancelled', 'cancellation_pending',
+            ])
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (terminalBooking == null) continue; // nothing to go on — leave it
+
+        final newStatus =
+            ['completed', 'paid', 'closed'].contains(terminalBooking['status'])
+                ? 'completed'
+                : 'cancelled';
+
+        await SupabaseConfig.client
+            .from(_table)
+            .update({'status': newStatus})
+            .eq('id', jrId);
+      }
+    } catch (_) {
+      // Non-critical — the screen will still show whatever is in the DB
+    }
+  }
+
   /// Real-time stream of ALL job_requests rows (Supabase Realtime).
   Stream<List<JobRequestModel>> watchAllRequests() {
     return SupabaseConfig.client
@@ -112,15 +198,53 @@ class JobRequestService {
             .toList());
   }
 
+  /// Sends an in-app + FCM notification to every technician when a new
+  /// job request is posted. Runs all sends in parallel (fire-and-forget).
+  Future<void> notifyAllTechnicians({
+    required String deviceType,
+    required String address,
+    required String requestId,
+  }) async {
+    try {
+      final rows = await SupabaseConfig.client
+          .from('technician_profiles')
+          .select('user_id');
+      final techIds = (rows as List)
+          .map((r) => r['user_id'] as String)
+          .toList();
+      if (techIds.isEmpty) return;
+
+      final notifService = NotificationService();
+      await Future.wait(
+        techIds.map((techId) => notifService.sendNotification(
+              userId: techId,
+              type: 'new_job_request',
+              title: 'New Job Request Nearby!',
+              message:
+                  'A customer needs help with their $deviceType near $address.',
+              data: {
+                'route': '/tech-job-map',
+                'request_id': requestId,
+              },
+            )),
+      );
+    } catch (_) {
+      // Non-fatal — notifications are best-effort
+    }
+  }
+
   /// Real-time stream of only OPEN requests (for technician map).
+  /// NOTE: No server-side .eq() filter — Supabase Realtime does NOT fire an
+  /// event when a row transitions AWAY from the filter value (e.g. open →
+  /// pending_customer_approval), so we subscribe to ALL rows and filter
+  /// client-side to guarantee the map stays up-to-date in real time.
   Stream<List<JobRequestModel>> watchOpenRequests() {
     return SupabaseConfig.client
         .from(_table)
         .stream(primaryKey: ['id'])
-        .eq('status', 'open')
         .order('created_at', ascending: false)
         .map((rows) => rows
-            .where((e) => e['status'] == 'open') // re-filter: Realtime updates don't remove rows that no longer match the eq filter
+            .where((e) => e['status'] == 'open')
             .map((e) => JobRequestModel.fromJson(Map<String, dynamic>.from(e)))
             .toList());
   }
