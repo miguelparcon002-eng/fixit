@@ -411,7 +411,7 @@ class _MapTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final center = requests.isNotEmpty
         ? LatLng(requests.first.latitude, requests.first.longitude)
-        : const LatLng(14.5995, 120.9842);
+        : const LatLng(8.5048, 125.9676);
 
     return Stack(
       children: [

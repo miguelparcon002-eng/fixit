@@ -2066,7 +2066,7 @@ class _TechJobCard extends ConsumerWidget {
                           const Text('Parts Used',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
                           const SizedBox(height: 4),
-                          Text('Add replacement parts used during repair',
+                          Text('Select from the list or add a custom part',
                               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                           const SizedBox(height: 8),
                           if (addedParts.isNotEmpty) ...[
@@ -2107,85 +2107,254 @@ class _TechJobCard extends ConsumerWidget {
                                 );
                               }).toList(),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 8),
                           ],
-                          Column(
-                            children: [
-                              TextField(
-                                controller: newPartController,
-                                onChanged: (_) => setState(() {}),
-                                decoration: InputDecoration(
-                                  hintText: 'e.g. Replacement screen, New battery',
-                                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                          if (!saving)
+                            GestureDetector(
+                              onTap: () {
+                                final outerSetState = setState;
+                                newPartController.clear();
+                                newPartPriceController.clear();
+                                showModalBottomSheet(
+                                  context: sheetContext,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (ctx) => StatefulBuilder(
+                                    builder: (ctx2, innerSetState) {
+                                      void addPart(String name, double price) {
+                                        if (!addedParts.any((p) => p['name'] == name)) {
+                                          addedParts.add({'name': name, 'price': price});
+                                        }
+                                        innerSetState(() {});
+                                        outerSetState(() {});
+                                      }
+                                      void removePart(String name) {
+                                        addedParts.removeWhere((p) => p['name'] == name);
+                                        innerSetState(() {});
+                                        outerSetState(() {});
+                                      }
+                                      return DraggableScrollableSheet(
+                                        initialChildSize: 0.75,
+                                        minChildSize: 0.5,
+                                        maxChildSize: 0.95,
+                                        builder: (_, scrollCtrl) => Container(
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Container(
+                                                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                                                width: 40, height: 4,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade300,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                                child: Row(
+                                                  children: [
+                                                    const Text('Add Parts',
+                                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                                                    const Spacer(),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(ctx),
+                                                      child: const Text('Done'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const Divider(height: 1),
+                                              Expanded(
+                                                child: ListView(
+                                                  controller: scrollCtrl,
+                                                  padding: const EdgeInsets.all(16),
+                                                  children: [
+                                                    Text('Available Parts',
+                                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade700)),
+                                                    const SizedBox(height: 8),
+                                                    ...items.map((item) {
+                                                      final lbl         = item['label'] as String;
+                                                      final price       = item['price'] as double;
+                                                      final isAdded     = addedParts.any((p) => p['name'] == lbl);
+                                                      final isSuggested = selectedIssues.contains(lbl);
+                                                      return Container(
+                                                        margin: const EdgeInsets.only(bottom: 6),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                        decoration: BoxDecoration(
+                                                          color: isAdded ? Colors.orange.shade50 : Colors.grey.shade50,
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          border: Border.all(
+                                                            color: isAdded ? Colors.orange.shade200 : Colors.grey.shade200,
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Column(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  Row(
+                                                                    children: [
+                                                                      Text(lbl,
+                                                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                                                      if (isSuggested) ...[
+                                                                        const SizedBox(width: 6),
+                                                                        Container(
+                                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                          decoration: BoxDecoration(
+                                                                            color: Colors.blue.shade50,
+                                                                            borderRadius: BorderRadius.circular(8),
+                                                                            border: Border.all(color: Colors.blue.shade200),
+                                                                          ),
+                                                                          child: Text('Suggested',
+                                                                              style: TextStyle(fontSize: 10, color: Colors.blue.shade600, fontWeight: FontWeight.w600)),
+                                                                        ),
+                                                                      ],
+                                                                    ],
+                                                                  ),
+                                                                  const SizedBox(height: 2),
+                                                                  Text('₱${price.toStringAsFixed(2)}',
+                                                                      style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            if (isAdded)
+                                                              GestureDetector(
+                                                                onTap: () => removePart(lbl),
+                                                                child: Container(
+                                                                  padding: const EdgeInsets.all(6),
+                                                                  decoration: BoxDecoration(
+                                                                    color: Colors.red.shade50,
+                                                                    shape: BoxShape.circle,
+                                                                    border: Border.all(color: Colors.red.shade200),
+                                                                  ),
+                                                                  child: Icon(Icons.remove, size: 14, color: Colors.red.shade400),
+                                                                ),
+                                                              )
+                                                            else
+                                                              GestureDetector(
+                                                                onTap: () => addPart(lbl, price),
+                                                                child: Container(
+                                                                  padding: const EdgeInsets.all(6),
+                                                                  decoration: BoxDecoration(
+                                                                    color: Colors.blue.shade50,
+                                                                    shape: BoxShape.circle,
+                                                                    border: Border.all(color: Colors.blue.shade200),
+                                                                  ),
+                                                                  child: Icon(Icons.add, size: 14, color: Colors.blue.shade600),
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }),
+                                                    const SizedBox(height: 12),
+                                                    const Divider(),
+                                                    const SizedBox(height: 12),
+                                                    Text('Custom Part',
+                                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey.shade700)),
+                                                    const SizedBox(height: 8),
+                                                    TextField(
+                                                      controller: newPartController,
+                                                      onChanged: (_) => innerSetState(() {}),
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Part name (e.g. Replacement screen)',
+                                                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                                        enabledBorder: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          borderSide: BorderSide(color: Colors.grey.shade300),
+                                                        ),
+                                                        focusedBorder: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                                                        ),
+                                                        filled: true,
+                                                        fillColor: Colors.grey.shade50,
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: TextField(
+                                                            controller: newPartPriceController,
+                                                            onChanged: (_) => innerSetState(() {}),
+                                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                            decoration: InputDecoration(
+                                                              hintText: 'Price',
+                                                              prefixText: '₱ ',
+                                                              hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                                              enabledBorder: OutlineInputBorder(
+                                                                borderRadius: BorderRadius.circular(12),
+                                                                borderSide: BorderSide(color: Colors.grey.shade300),
+                                                              ),
+                                                              focusedBorder: OutlineInputBorder(
+                                                                borderRadius: BorderRadius.circular(12),
+                                                                borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
+                                                              ),
+                                                              filled: true,
+                                                              fillColor: Colors.grey.shade50,
+                                                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        ElevatedButton(
+                                                          onPressed: newPartController.text.trim().isEmpty ? null : () {
+                                                            final name  = newPartController.text.trim();
+                                                            final price = double.tryParse(newPartPriceController.text.trim()) ?? 0.0;
+                                                            addPart(name, price);
+                                                            newPartController.clear();
+                                                            newPartPriceController.clear();
+                                                          },
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: AppTheme.deepBlue,
+                                                            foregroundColor: Colors.white,
+                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                                            elevation: 0,
+                                                          ),
+                                                          child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 20),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.grey.shade50,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                );
+                              },
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppTheme.deepBlue.withValues(alpha: 0.5)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: AppTheme.deepBlue.withValues(alpha: 0.04),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_circle_outline, size: 18, color: AppTheme.deepBlue),
+                                    const SizedBox(width: 8),
+                                    Text('Add Parts',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.deepBlue)),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: newPartPriceController,
-                                      onChanged: (_) => setState(() {}),
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      decoration: InputDecoration(
-                                        hintText: 'Part price',
-                                        prefixText: '₱ ',
-                                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: BorderSide(color: Colors.grey.shade300),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: AppTheme.deepBlue, width: 2),
-                                        ),
-                                        filled: true,
-                                        fillColor: Colors.grey.shade50,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: (saving || newPartController.text.trim().isEmpty)
-                                        ? null
-                                        : () {
-                                            final name  = newPartController.text.trim();
-                                            final price = double.tryParse(newPartPriceController.text.trim()) ?? 0.0;
-                                            if (name.isNotEmpty) {
-                                              setState(() {
-                                                addedParts.add({'name': name, 'price': price});
-                                                newPartController.clear();
-                                                newPartPriceController.clear();
-                                              });
-                                            }
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.deepBlue,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                      elevation: 0,
-                                    ),
-                                    child: const Text('Add', style: TextStyle(fontWeight: FontWeight.w700)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
                           const SizedBox(height: 20),
 
                           // ── Diagnosis Notes ──────────────────────────

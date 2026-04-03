@@ -43,8 +43,8 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      ).timeout(const Duration(seconds: 15));
       if (mounted) {
         setState(() {
           _techLocation = LatLng(pos.latitude, pos.longitude);
@@ -137,7 +137,7 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (requests) {
           final proposals = proposalsAsync.valueOrNull ?? [];
-          final center = _techLocation ?? const LatLng(14.5995, 120.9842);
+          final center = _techLocation ?? const LatLng(8.5048, 125.9676);
           return Stack(
             children: [
               FlutterMap(

@@ -2,7 +2,7 @@
 
 A full-featured Flutter application connecting customers with certified mobile phone and laptop repair technicians — with a complete admin panel, real-time push notifications, verified technician marketplace, and analytics.
 
-**Version:** 1.0.0 | **Platform:** Android, Web
+**Version:** 1.2.0 | **Platform:** Android, Web
 
 ---
 
@@ -83,6 +83,7 @@ flutter run -d chrome
 - **Emergency Booking** — Priority repair request flow
 - **Booking Management** — View active, pending, completed, and cancelled bookings; pull-to-refresh and manual refresh button
 - **Device Details** — Attach device information (brand, model, issue description) to bookings
+- **Post a Problem** — Drop a pin on a map to request a nearby technician; works on physical devices and emulators (GPS timeout + medium accuracy + fallback coordinates)
 - **Real-time Chat** — Message technicians directly within a booking
 - **Payments** — In-app Stripe payment processing per booking
 - **Ratings & Reviews** — Rate and review technicians after service completion; rating saved with `technician_id` UUID for accurate attribution
@@ -101,6 +102,8 @@ flutter run -d chrome
 - **Read-only Mode** — Unverified technicians can browse but not accept jobs; status banner shown
 - **Verification Status Banner** — Shows pending/rejected/resubmit status with direct action links
 - **Jobs Management** — View and manage assigned jobs (pending, in-progress, completed)
+- **Job Request Map** — Live map of open Post a Problem requests; pins disappear immediately after acceptance via client-side stream filtering; popup banner notifies technician of new requests in real time; customer name displayed in the job detail sheet
+- **Assess & Price** — Record diagnosis, service fee, and parts used per booking; Parts Used opens a picker sheet listing all catalogue parts with **Suggested** badges for identified issues, plus a custom part entry for anything not in the catalogue
 - **Earnings Tracker** — View total earnings calculated from completed bookings, per-job breakdown
 - **Ratings & Reviews** — View all customer ratings and feedback; correct count and average combining UUID-keyed and legacy name-matched rows; no duplicates
 - **Service Management** — Add, edit, and manage offered repair services and specialties
@@ -112,7 +115,8 @@ flutter run -d chrome
 
 ### Admin
 - **Admin Dashboard** — Real-time stats: total bookings, active technicians, customers, revenue, bookings today
-- **Appointments Management** — View, filter, and manage all bookings across the platform by date range and status
+- **Appointments Management** — View, filter, and manage all bookings across the platform by date range and status; "Awaiting Payment" bookings correctly grouped under In Progress; only fully closed bookings appear in Completed
+- **Job Requests Map** — Live map of all Post a Problem job requests; Active/Completed/Cancelled tabs derive status by joining live booking data (not stale `job_requests.status`), so counts are always accurate; stale `accepted` records auto-synced on screen open via `syncStaleStatuses()`
 - **Technician Verification Review** — Multi-tab review screen (Pending / Resubmit / Rejected / Approved) with:
   - View submitted ID and documents
   - Approve, reject, or request resubmission with notes
@@ -193,6 +197,7 @@ lib/
 |---|---|
 | `users` | All users (customers, technicians, admin) with role, bio, FCM token |
 | `bookings` | All service bookings with status, costs, assigned technician |
+| `job_requests` | Post a Problem requests — status: `open` → `accepted` → `completed`/`cancelled` |
 | `app_ratings` | Customer reviews — linked via `technician_id` UUID + legacy `technician` name field |
 | `app_technician_stats` | Cached technician stats (rating avg, job count, earnings) — auto-updated |
 | `verification_requests` | Technician verification submissions with document URLs |

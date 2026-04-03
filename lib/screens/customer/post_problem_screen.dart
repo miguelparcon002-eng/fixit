@@ -32,6 +32,10 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
   bool _reverseGeocoding = false;
   String? _locationError;
 
+  // Default map centre (San Francisco, Agusan del Sur) — used when GPS is unavailable
+  static const double _defaultLat = 8.5048;
+  static const double _defaultLng = 125.9676;
+
   // Device
   String? _deviceType; // 'Mobile' or 'Laptop'
   String? _brand;
@@ -129,35 +133,53 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
     return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
   }
 
+  void _fallbackToDefault(String errorMsg) {
+    if (!mounted) return;
+    setState(() {
+      _locationError = errorMsg;
+      _lat ??= _defaultLat;
+      _lng ??= _defaultLng;
+      _locating = false;
+    });
+  }
+
   Future<void> _getLocation() async {
     setState(() { _locating = true; _locationError = null; });
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() { _locationError = 'Location services are disabled.'; _locating = false; });
+        _fallbackToDefault('GPS unavailable. Tap the map to pin your location.');
         return;
       }
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() { _locationError = 'Location permission denied.'; _locating = false; });
+          _fallbackToDefault('Location permission denied. Tap the map to pin manually.');
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        setState(() { _locationError = 'Location permanently denied. Enable in settings.'; _locating = false; });
+        _fallbackToDefault('Location permanently denied. Tap the map to pin manually.');
         return;
       }
+      // Use medium accuracy + 15-second timeout — emulators often can't get a
+      // high-accuracy GPS fix and will hang indefinitely without a timeout.
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      ).timeout(const Duration(seconds: 15));
       final addr = await _reverseGeocodeCoords(pos.latitude, pos.longitude);
       if (mounted) {
-        setState(() { _lat = pos.latitude; _lng = pos.longitude; _address = addr; _locating = false; });
+        setState(() {
+          _lat = pos.latitude;
+          _lng = pos.longitude;
+          _address = addr;
+          _locating = false;
+          _locationError = null;
+        });
       }
-    } catch (e) {
-      if (mounted) setState(() { _locationError = 'Failed to get location.'; _locating = false; });
+    } catch (_) {
+      _fallbackToDefault('Could not detect GPS. Tap the map to pin your location.');
     }
   }
 
@@ -632,114 +654,128 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
                           color: const Color(0xFFF3F4F6),
                           child: const Center(child: CircularProgressIndicator()),
                         )
-                      : _locationError != null
-                          ? Container(
-                              color: const Color(0xFFF3F4F6),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.location_off_rounded, color: Colors.red.shade400, size: 40),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _locationError!,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    TextButton.icon(
-                                      onPressed: _getLocation,
-                                      icon: const Icon(Icons.refresh_rounded),
-                                      label: const Text('Retry'),
-                                    ),
-                                  ],
+                      : Stack(
+                          children: [
+                            FlutterMap(
+                              mapController: _mapController,
+                              options: MapOptions(
+                                initialCenter: LatLng(
+                                  _lat ?? _defaultLat,
+                                  _lng ?? _defaultLng,
                                 ),
+                                initialZoom: 16,
+                                onTap: _onMapTap,
                               ),
-                            )
-                          : Stack(
                               children: [
-                                FlutterMap(
-                                  mapController: _mapController,
-                                  options: MapOptions(
-                                    initialCenter: LatLng(_lat!, _lng!),
-                                    initialZoom: 16,
-                                    onTap: _onMapTap,
-                                  ),
-                                  children: [
-                                    TileLayer(
-                                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                      userAgentPackageName: 'com.fixit.app',
-                                    ),
-                                    MarkerLayer(
-                                      markers: [
-                                        Marker(
-                                          point: LatLng(_lat!, _lng!),
-                                          width: 44,
-                                          height: 44,
-                                          child: Stack(
-                                            alignment: Alignment.topCenter,
-                                            children: [
-                                              Container(
-                                                margin: const EdgeInsets.only(top: 2),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.deepBlue,
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: AppTheme.deepBlue.withValues(alpha: 0.4),
-                                                      blurRadius: 8,
-                                                      spreadRadius: 2,
-                                                    ),
-                                                  ],
-                                                ),
-                                                padding: const EdgeInsets.all(6),
-                                                child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 18),
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.fixit.app',
+                                ),
+                                if (_lat != null && _lng != null)
+                                  MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: LatLng(_lat!, _lng!),
+                                        width: 44,
+                                        height: 44,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(top: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.deepBlue,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: AppTheme.deepBlue.withValues(alpha: 0.4),
+                                                blurRadius: 8,
+                                                spreadRadius: 2,
                                               ),
                                             ],
                                           ),
+                                          padding: const EdgeInsets.all(6),
+                                          child: const Icon(Icons.my_location_rounded, color: Colors.white, size: 18),
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                // Hint banner
-                                Positioned(
-                                  top: 8,
-                                  left: 0,
-                                  right: 0,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.65),
-                                        borderRadius: BorderRadius.circular(20),
                                       ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.touch_app_rounded, color: Colors.white, size: 14),
-                                          SizedBox(width: 5),
-                                          Text(
-                                            'Tap map to pin your exact location',
-                                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                if (_reverseGeocoding)
-                                  const Positioned(
-                                    bottom: 10,
-                                    right: 10,
-                                    child: SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                                    ),
+                                    ],
                                   ),
                               ],
                             ),
+
+                            // GPS error banner — map still usable, customer can tap to pin
+                            if (_locationError != null)
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  color: Colors.orange.shade800.withValues(alpha: 0.9),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.gps_off_rounded, color: Colors.white, size: 14),
+                                      const SizedBox(width: 6),
+                                      const Expanded(
+                                        child: Text(
+                                          'GPS unavailable — tap the map to pin your location',
+                                          style: TextStyle(color: Colors.white, fontSize: 11),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: _getLocation,
+                                        child: const Text(
+                                          'Retry',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            decoration: TextDecoration.underline,
+                                            decorationColor: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                            // Tap-to-pin hint
+                            Positioned(
+                              top: 8,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.65),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.touch_app_rounded, color: Colors.white, size: 14),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Tap map to pin your exact location',
+                                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            if (_reverseGeocoding)
+                              const Positioned(
+                                bottom: 10,
+                                right: 10,
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
                 ),
               ),
 
