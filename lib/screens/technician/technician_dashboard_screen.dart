@@ -8,23 +8,15 @@ import '../../models/booking_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/earnings_provider.dart';
 import 'tech_jobs_screen_new.dart';
-
-// Provider for date filter selection
 enum DateFilter { today, week, month }
-
 final dateFilterProvider = StateProvider<DateFilter>((ref) => DateFilter.today);
-
-// Provider for monthly earnings goal (can be customized by technician)
 final monthlyGoalProvider = StateProvider<double>((ref) => 50000.0);
-
 class TechnicianDashboardScreen extends ConsumerWidget {
   const TechnicianDashboardScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedFilter = ref.watch(dateFilterProvider);
     final bookingsAsync = ref.watch(technicianBookingsProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -54,7 +46,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Date Filter Tabs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Container(
@@ -91,7 +82,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
               ),
             ),
           ),
-          // Main Content
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
@@ -128,37 +118,30 @@ class TechnicianDashboardScreen extends ConsumerWidget {
       ),
     );
   }
-
   Widget _buildDashboardContent(
     BuildContext context,
     WidgetRef ref,
     List<BookingModel> allBookings,
     DateFilter filter,
   ) {
-    // Get date range based on filter
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     DateTime startDate;
     DateTime endDate = now.add(const Duration(days: 1));
-
     switch (filter) {
       case DateFilter.today:
         startDate = todayStart;
         endDate = todayStart.add(const Duration(days: 1));
         break;
       case DateFilter.week:
-        // Start from beginning of current week (Monday)
         startDate = todayStart.subtract(Duration(days: todayStart.weekday - 1));
         endDate = startDate.add(const Duration(days: 7));
         break;
       case DateFilter.month:
-        // Start from beginning of current month
         startDate = DateTime(now.year, now.month, 1);
         endDate = DateTime(now.year, now.month + 1, 1);
         break;
     }
-
-    // Calculate PREVIOUS period for comparison
     DateTime prevStartDate;
     DateTime prevEndDate;
     switch (filter) {
@@ -175,24 +158,18 @@ class TechnicianDashboardScreen extends ConsumerWidget {
         prevEndDate = DateTime(now.year, now.month, 1);
         break;
     }
-
-    // Filter bookings by date range
     final filteredBookings = allBookings.where((booking) {
       if (booking.scheduledDate == null) return false;
       final bookingDate = booking.scheduledDate!;
       return bookingDate.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
           bookingDate.isBefore(endDate);
     }).toList();
-
-    // Filter PREVIOUS period bookings for comparison
     final prevFilteredBookings = allBookings.where((booking) {
       if (booking.scheduledDate == null) return false;
       final bookingDate = booking.scheduledDate!;
       return bookingDate.isAfter(prevStartDate.subtract(const Duration(seconds: 1))) &&
           bookingDate.isBefore(prevEndDate);
     }).toList();
-
-    // Calculate stats
     final requestedCount = filteredBookings.where((b) =>
       b.status == 'requested' || b.status == 'accepted'
     ).length;
@@ -200,42 +177,29 @@ class TechnicianDashboardScreen extends ConsumerWidget {
     final completedCount = filteredBookings.where((b) => b.status == 'completed').length;
     final cancelledCount = filteredBookings.where((b) => b.status == 'cancelled').length;
     final totalJobsCount = filteredBookings.length;
-
-    // Previous period stats for trends
     final prevCompletedCount = prevFilteredBookings.where((b) => b.status == 'completed').length;
-
-    // Calculate earnings for the period
     final earnings = filteredBookings
         .where((b) => b.status == 'completed')
         .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
-
-    // Previous period earnings for trend
     final prevEarnings = prevFilteredBookings
         .where((b) => b.status == 'completed')
         .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
-
-    // Calculate trends (percentage change)
     double earningsTrend = 0;
     if (prevEarnings > 0) {
       earningsTrend = ((earnings - prevEarnings) / prevEarnings) * 100;
     } else if (earnings > 0) {
       earningsTrend = 100;
     }
-
     double completedTrend = 0;
     if (prevCompletedCount > 0) {
       completedTrend = ((completedCount - prevCompletedCount) / prevCompletedCount) * 100;
     } else if (completedCount > 0) {
       completedTrend = 100;
     }
-
-    // Calculate completion rate
     final totalFinishedJobs = completedCount + cancelledCount;
     final completionRate = totalFinishedJobs > 0
         ? (completedCount / totalFinishedJobs) * 100
         : 100.0;
-
-    // Monthly goal progress
     final monthlyGoal = ref.watch(monthlyGoalProvider);
     final monthStart = DateTime(now.year, now.month, 1);
     final monthEnd = DateTime(now.year, now.month + 1, 1);
@@ -248,15 +212,12 @@ class TechnicianDashboardScreen extends ConsumerWidget {
         })
         .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
     final goalProgress = (monthlyEarnings / monthlyGoal).clamp(0.0, 1.0);
-
-    // Calculate weekly performance data (last 7 days)
     final weeklyData = <String, double>{};
     final weeklyJobCounts = <String, int>{};
     for (int i = 6; i >= 0; i--) {
       final day = todayStart.subtract(Duration(days: i));
       final dayEnd = day.add(const Duration(days: 1));
       final dayLabel = DateFormat('EEE').format(day);
-
       final dayEarnings = allBookings
           .where((b) {
             if (b.scheduledDate == null) return false;
@@ -265,7 +226,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
                 b.scheduledDate!.isBefore(dayEnd);
           })
           .fold<double>(0, (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0));
-
       final dayJobCount = allBookings
           .where((b) {
             if (b.scheduledDate == null) return false;
@@ -274,17 +234,11 @@ class TechnicianDashboardScreen extends ConsumerWidget {
                 b.scheduledDate!.isBefore(dayEnd);
           })
           .length;
-
       weeklyData[dayLabel] = dayEarnings;
       weeklyJobCounts[dayLabel] = dayJobCount;
     }
-
-    // Calculate average rating (mock - would come from reviews table)
-    // For now, we'll simulate based on completed jobs
     final avgRating = completedCount > 0 ? 4.5 + (completedCount % 5) * 0.1 : 0.0;
     final totalReviews = (completedCount * 0.7).round(); // Assume 70% leave reviews
-
-    // Get period label
     String periodLabel;
     switch (filter) {
       case DateFilter.today:
@@ -297,13 +251,11 @@ class TechnicianDashboardScreen extends ConsumerWidget {
         periodLabel = DateFormat('MMMM yyyy').format(now);
         break;
     }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Period Label
           Text(
             periodLabel,
             style: const TextStyle(
@@ -313,8 +265,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Stats Grid with Trend Indicators
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -369,8 +319,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Performance Metrics Row
           const Text(
             'Performance Metrics',
             style: TextStyle(
@@ -382,7 +330,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              // Completion Rate
               Expanded(
                 child: _MetricCard(
                   title: 'Completion Rate',
@@ -397,7 +344,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Customer Rating
               Expanded(
                 child: _MetricCard(
                   title: 'Customer Rating',
@@ -412,16 +358,12 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Monthly Goal Progress
           _MonthlyGoalCard(
             currentEarnings: monthlyEarnings,
             goal: monthlyGoal,
             progress: goalProgress,
           ),
           const SizedBox(height: 24),
-
-          // Weekly Performance Chart
           const Text(
             'Weekly Performance',
             style: TextStyle(
@@ -436,8 +378,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             jobCounts: weeklyJobCounts,
           ),
           const SizedBox(height: 24),
-
-          // Job Status Distribution (Donut Chart)
           const Text(
             'Job Status Distribution',
             style: TextStyle(
@@ -455,8 +395,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             total: totalJobsCount,
           ),
           const SizedBox(height: 24),
-
-          // Quick Actions
           const Text(
             'Quick Actions',
             style: TextStyle(
@@ -488,7 +426,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          // Recent Jobs Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -514,7 +451,6 @@ class TechnicianDashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // Recent Jobs List (show latest 5)
           if (filteredBookings.isEmpty)
             Center(
               child: Padding(
@@ -548,18 +484,15 @@ class TechnicianDashboardScreen extends ConsumerWidget {
     );
   }
 }
-
 class _FilterTab extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _FilterTab({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -585,20 +518,17 @@ class _FilterTab extends StatelessWidget {
     );
   }
 }
-
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
   final VoidCallback onTap;
-
   const _QuickActionCard({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -647,16 +577,13 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
 class _RecentJobCard extends StatelessWidget {
   final BookingModel booking;
   final VoidCallback onTap;
-
   const _RecentJobCard({
     required this.booking,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     Color statusColor;
@@ -682,7 +609,6 @@ class _RecentJobCard extends StatelessWidget {
         statusColor = Colors.grey;
         statusText = booking.status;
     }
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -754,10 +680,6 @@ class _RecentJobCard extends StatelessWidget {
     );
   }
 }
-
-// ==================== NEW INFOGRAPHIC WIDGETS ====================
-
-/// Stat card with optional trend indicator
 class _DashboardStatCardWithTrend extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -766,7 +688,6 @@ class _DashboardStatCardWithTrend extends StatelessWidget {
   final String label;
   final double? trend;
   final VoidCallback onTap;
-
   const _DashboardStatCardWithTrend({
     required this.icon,
     required this.iconColor,
@@ -776,7 +697,6 @@ class _DashboardStatCardWithTrend extends StatelessWidget {
     this.trend,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -860,8 +780,6 @@ class _DashboardStatCardWithTrend extends StatelessWidget {
     );
   }
 }
-
-/// Metric card for completion rate and rating
 class _MetricCard extends StatelessWidget {
   final String title;
   final String value;
@@ -870,7 +788,6 @@ class _MetricCard extends StatelessWidget {
   final String subtitle;
   final bool showStars;
   final double rating;
-
   const _MetricCard({
     required this.title,
     required this.value,
@@ -880,7 +797,6 @@ class _MetricCard extends StatelessWidget {
     this.showStars = false,
     this.rating = 0,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -969,24 +885,19 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
-
-/// Monthly goal progress card
 class _MonthlyGoalCard extends StatelessWidget {
   final double currentEarnings;
   final double goal;
   final double progress;
-
   const _MonthlyGoalCard({
     required this.currentEarnings,
     required this.goal,
     required this.progress,
   });
-
   @override
   Widget build(BuildContext context) {
     final remaining = goal - currentEarnings;
     final percentComplete = (progress * 100).toStringAsFixed(0);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1039,7 +950,6 @@ class _MonthlyGoalCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          // Progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
@@ -1123,22 +1033,17 @@ class _MonthlyGoalCard extends StatelessWidget {
     );
   }
 }
-
-/// Weekly performance bar chart
 class _WeeklyPerformanceChart extends StatelessWidget {
   final Map<String, double> data;
   final Map<String, int> jobCounts;
-
   const _WeeklyPerformanceChart({
     required this.data,
     required this.jobCounts,
   });
-
   @override
   Widget build(BuildContext context) {
     final maxValue = data.values.isEmpty ? 1.0 : data.values.reduce(math.max);
     final maxHeight = maxValue > 0 ? maxValue : 1.0;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1155,7 +1060,6 @@ class _WeeklyPerformanceChart extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Chart
           SizedBox(
             height: 150,
             child: Row(
@@ -1165,7 +1069,6 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                 final barHeight = maxHeight > 0 ? (entry.value / maxHeight) * 120 : 0.0;
                 final isToday = entry.key == DateFormat('EEE').format(DateTime.now());
                 final jobCount = jobCounts[entry.key] ?? 0;
-
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
@@ -1220,7 +1123,6 @@ class _WeeklyPerformanceChart extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // Legend
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -1260,15 +1162,12 @@ class _WeeklyPerformanceChart extends StatelessWidget {
     );
   }
 }
-
-/// Job status donut chart
 class _JobStatusChart extends StatelessWidget {
   final int requested;
   final int active;
   final int completed;
   final int cancelled;
   final int total;
-
   const _JobStatusChart({
     required this.requested,
     required this.active,
@@ -1276,11 +1175,9 @@ class _JobStatusChart extends StatelessWidget {
     required this.cancelled,
     required this.total,
   });
-
   @override
   Widget build(BuildContext context) {
     final hasData = total > 0;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1297,7 +1194,6 @@ class _JobStatusChart extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Donut Chart
           SizedBox(
             width: 120,
             height: 120,
@@ -1334,7 +1230,6 @@ class _JobStatusChart extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 20),
-          // Legend
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1374,20 +1269,17 @@ class _JobStatusChart extends StatelessWidget {
     );
   }
 }
-
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String label;
   final int value;
   final double percentage;
-
   const _LegendItem({
     required this.color,
     required this.label,
     required this.value,
     required this.percentage,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1430,15 +1322,12 @@ class _LegendItem extends StatelessWidget {
     );
   }
 }
-
-/// Custom painter for donut chart
 class _DonutChartPainter extends CustomPainter {
   final int requested;
   final int active;
   final int completed;
   final int cancelled;
   final int total;
-
   _DonutChartPainter({
     required this.requested,
     required this.active,
@@ -1446,36 +1335,26 @@ class _DonutChartPainter extends CustomPainter {
     required this.cancelled,
     required this.total,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 8;
     const strokeWidth = 16.0;
-
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-
-    // Draw background circle
     paint.color = Colors.grey.shade200;
     canvas.drawCircle(center, radius, paint);
-
     if (total == 0) return;
-
-    // Calculate angles
     const startAngle = -math.pi / 2;
     double currentAngle = startAngle;
-
-    // Draw segments
     final segments = [
       (requested, const Color(0xFFFF9800)),
       (active, const Color(0xFF2196F3)),
       (completed, const Color(0xFF4CAF50)),
       (cancelled, Colors.red),
     ];
-
     for (final segment in segments) {
       if (segment.$1 > 0) {
         final sweepAngle = (segment.$1 / total) * 2 * math.pi;
@@ -1491,7 +1370,6 @@ class _DonutChartPainter extends CustomPainter {
       }
     }
   }
-
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

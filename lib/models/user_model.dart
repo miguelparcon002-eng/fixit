@@ -16,7 +16,6 @@ class UserModel {
   final DateTime? updatedAt;
   final bool? profileSetupComplete;
   final bool isSuspended;
-
   UserModel({
     required this.id,
     required this.email,
@@ -36,7 +35,6 @@ class UserModel {
     this.profileSetupComplete,
     this.isSuspended = false,
   });
-
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: (json['id'] as String?) ?? '',
@@ -60,7 +58,6 @@ class UserModel {
       isSuspended: json['is_suspended'] as bool? ?? false,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -81,7 +78,6 @@ class UserModel {
       'profile_setup_complete': profileSetupComplete,
     };
   }
-
   UserModel copyWith({
     String? id,
     String? email,

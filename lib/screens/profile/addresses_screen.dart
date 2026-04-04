@@ -7,14 +7,11 @@ import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_address.dart';
 import '../booking/widgets/location_picker_sheet.dart';
-
 class AddressesScreen extends ConsumerWidget {
   const AddressesScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final addressesAsync = ref.watch(userAddressesProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -108,7 +105,6 @@ class AddressesScreen extends ConsumerWidget {
       ),
     );
   }
-
   void _showAddEditSheet(BuildContext context, WidgetRef ref,
       {UserAddress? address}) {
     showModalBottomSheet(
@@ -118,7 +114,6 @@ class AddressesScreen extends ConsumerWidget {
       builder: (_) => _AddEditAddressSheet(address: address),
     );
   }
-
   void _showDeleteDialog(
       BuildContext context, WidgetRef ref, UserAddress address) {
     showDialog(
@@ -204,15 +199,9 @@ class AddressesScreen extends ConsumerWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty state
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
   const _EmptyState({required this.onAdd});
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -268,30 +257,22 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Address card
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _AddressCard extends StatelessWidget {
   final UserAddress address;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onSetDefault;
-
   const _AddressCard({
     required this.address,
     required this.onEdit,
     required this.onDelete,
     required this.onSetDefault,
   });
-
   @override
   Widget build(BuildContext context) {
     final isDefault = address.isDefault;
     final hasPinned =
         address.latitude != null && address.longitude != null;
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -318,7 +299,6 @@ class _AddressCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -336,8 +316,6 @@ class _AddressCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 14),
-
-                // Label + address
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,12 +401,9 @@ class _AddressCard extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 14),
             const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
             const SizedBox(height: 10),
-
-            // Actions row
             Row(
               children: [
                 if (!isDefault)
@@ -460,20 +435,17 @@ class _AddressCard extends StatelessWidget {
     );
   }
 }
-
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
-
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -503,21 +475,13 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Add / Edit sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _AddEditAddressSheet extends ConsumerStatefulWidget {
   final UserAddress? address;
-
   const _AddEditAddressSheet({this.address});
-
   @override
   ConsumerState<_AddEditAddressSheet> createState() =>
       _AddEditAddressSheetState();
 }
-
 class _AddEditAddressSheetState
     extends ConsumerState<_AddEditAddressSheet> {
   late final TextEditingController _labelController;
@@ -525,7 +489,6 @@ class _AddEditAddressSheetState
   late bool _isDefault;
   LatLng? _pickedLatLng;
   bool _saving = false;
-
   @override
   void initState() {
     super.initState();
@@ -540,14 +503,12 @@ class _AddEditAddressSheetState
           LatLng(widget.address!.latitude!, widget.address!.longitude!);
     }
   }
-
   @override
   void dispose() {
     _labelController.dispose();
     _addressController.dispose();
     super.dispose();
   }
-
   Future<void> _openLocationPicker() async {
     final result = await showModalBottomSheet<PickedLocation>(
       context: context,
@@ -560,7 +521,6 @@ class _AddEditAddressSheetState
       setState(() => _pickedLatLng = result.latLng);
     }
   }
-
   Future<void> _save() async {
     if (_labelController.text.isEmpty ||
         _addressController.text.isEmpty) {
@@ -572,12 +532,10 @@ class _AddEditAddressSheetState
       );
       return;
     }
-
     setState(() => _saving = true);
     final service = ref.read(addressServiceProvider);
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
-
     if (widget.address == null) {
       await service.addAddress(
         userId: user.id,
@@ -597,7 +555,6 @@ class _AddEditAddressSheetState
         isDefault: _isDefault,
       );
     }
-
     if (!mounted) return;
     ref.invalidate(userAddressesProvider);
     Navigator.pop(context);
@@ -610,11 +567,9 @@ class _AddEditAddressSheetState
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.address != null;
-
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -629,7 +584,6 @@ class _AddEditAddressSheetState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // drag handle
               Center(
                 child: Container(
                   width: 40,
@@ -641,8 +595,6 @@ class _AddEditAddressSheetState
                   ),
                 ),
               ),
-
-              // Header
               Row(
                 children: [
                   Container(
@@ -693,8 +645,6 @@ class _AddEditAddressSheetState
                 ],
               ),
               const SizedBox(height: 28),
-
-              // Label
               _FieldLabel('Label', Icons.label_outline_rounded),
               const SizedBox(height: 10),
               _TextField(
@@ -702,8 +652,6 @@ class _AddEditAddressSheetState
                 hint: 'e.g., Home, Work, Office',
               ),
               const SizedBox(height: 20),
-
-              // Address
               _FieldLabel('Full Address', Icons.home_rounded),
               const SizedBox(height: 10),
               _TextField(
@@ -712,8 +660,6 @@ class _AddEditAddressSheetState
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-
-              // Pin on map button
               GestureDetector(
                 onTap: _openLocationPicker,
                 child: Container(
@@ -781,8 +727,6 @@ class _AddEditAddressSheetState
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Set as default toggle
               GestureDetector(
                 onTap: () => setState(() => _isDefault = !_isDefault),
                 child: Container(
@@ -847,8 +791,6 @@ class _AddEditAddressSheetState
                 ),
               ),
               const SizedBox(height: 28),
-
-              // Action buttons
               Row(
                 children: [
                   Expanded(
@@ -919,16 +861,10 @@ class _AddEditAddressSheetState
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Small helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _FieldLabel extends StatelessWidget {
   final String text;
   final IconData icon;
   const _FieldLabel(this.text, this.icon);
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -947,18 +883,15 @@ class _FieldLabel extends StatelessWidget {
     );
   }
 }
-
 class _TextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final int maxLines;
-
   const _TextField({
     required this.controller,
     required this.hint,
     this.maxLines = 1,
   });
-
   @override
   Widget build(BuildContext context) {
     return TextField(

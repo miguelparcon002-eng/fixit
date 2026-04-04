@@ -5,10 +5,8 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/earnings_provider.dart';
 import '../auth/privacy_policy_screen.dart';
 import '../auth/terms_conditions_screen.dart';
-
 class TechTermsPoliciesScreen extends StatelessWidget {
   const TechTermsPoliciesScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,7 +47,6 @@ class TechTermsPoliciesScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header banner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -104,11 +101,8 @@ class TechTermsPoliciesScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Legal section header
               _SectionLabel(label: 'Legal Documents'),
               const SizedBox(height: 12),
-
               _PolicyTile(
                 icon: Icons.description_rounded,
                 iconColor: AppTheme.lightBlue,
@@ -130,13 +124,9 @@ class TechTermsPoliciesScreen extends StatelessWidget {
                       builder: (_) => const PrivacyPolicyScreen()),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // Technician section header
               _SectionLabel(label: 'Technician Policies'),
               const SizedBox(height: 12),
-
               _PolicyTile(
                 icon: Icons.handshake_rounded,
                 iconColor: Colors.orange,
@@ -169,13 +159,9 @@ class TechTermsPoliciesScreen extends StatelessWidget {
                       builder: (_) => const _TechCodeOfConductScreen()),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // About section header
               _SectionLabel(label: 'About'),
               const SizedBox(height: 12),
-
               _PolicyTile(
                 icon: Icons.info_rounded,
                 iconColor: AppTheme.deepBlue,
@@ -192,13 +178,9 @@ class TechTermsPoliciesScreen extends StatelessWidget {
     );
   }
 }
-
-// ── Section label ──────────────────────────────────────────────────────────────
-
 class _SectionLabel extends StatelessWidget {
   final String label;
   const _SectionLabel({required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Text(
@@ -212,16 +194,12 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
-// ── Policy tile ────────────────────────────────────────────────────────────────
-
 class _PolicyTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _PolicyTile({
     required this.icon,
     required this.iconColor,
@@ -229,7 +207,6 @@ class _PolicyTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -291,14 +268,8 @@ class _PolicyTile extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TECHNICIAN AGREEMENT SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _TechAgreementScreen extends StatelessWidget {
   const _TechAgreementScreen();
-
   @override
   Widget build(BuildContext context) {
     return _PolicyFullScreen(
@@ -361,18 +332,11 @@ class _TechAgreementScreen extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PAYMENT TERMS SCREEN (with live earnings summary)
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _TechPaymentTermsScreen extends ConsumerWidget {
   const _TechPaymentTermsScreen();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final weekEarningsAsync = ref.watch(weekEarningsProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -402,7 +366,6 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Weekly earnings summary card ──────────────────────────
               weekEarningsAsync.when(
                 loading: () => _WeeklyEarningsCard(
                     gross: null, loading: true),
@@ -411,10 +374,7 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
                 data: (gross) => _WeeklyEarningsCard(
                     gross: gross, loading: false),
               ),
-
               const SizedBox(height: 24),
-
-              // ── Earning structure ─────────────────────────────────────
               _InfoCard(
                 icon: Icons.account_balance_wallet_rounded,
                 iconColor: AppTheme.successColor,
@@ -469,10 +429,7 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ── Payment schedule ──────────────────────────────────────
               _InfoCard(
                 icon: Icons.calendar_month_rounded,
                 iconColor: AppTheme.lightBlue,
@@ -494,10 +451,7 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ── Refunds & disputes ────────────────────────────────────
               _InfoCard(
                 icon: Icons.gavel_rounded,
                 iconColor: Colors.orange,
@@ -519,10 +473,7 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // ── Tax info ──────────────────────────────────────────────
               _InfoCard(
                 icon: Icons.receipt_long_rounded,
                 iconColor: Colors.purple,
@@ -549,21 +500,15 @@ class _TechPaymentTermsScreen extends ConsumerWidget {
     );
   }
 }
-
-// Weekly earnings summary card
 class _WeeklyEarningsCard extends StatelessWidget {
   final double? gross;
   final bool loading;
-
   static const double _feeRate = 0.03;
-
   const _WeeklyEarningsCard({required this.gross, required this.loading});
-
   @override
   Widget build(BuildContext context) {
     final fee = gross != null ? gross! * _feeRate : 0.0;
     final net = gross != null ? gross! - fee : 0.0;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -677,20 +622,17 @@ class _WeeklyEarningsCard extends StatelessWidget {
     );
   }
 }
-
 class _EarningSummaryItem extends StatelessWidget {
   final String label;
   final String value;
   final String sub;
   final Color? valueColor;
-
   const _EarningSummaryItem({
     required this.label,
     required this.value,
     required this.sub,
     this.valueColor,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -727,20 +669,17 @@ class _EarningSummaryItem extends StatelessWidget {
     );
   }
 }
-
 class _EarningsRow extends StatelessWidget {
   final String label;
   final String value;
   final Color valueColor;
   final bool bold;
-
   const _EarningsRow({
     required this.label,
     required this.value,
     required this.valueColor,
     this.bold = false,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -766,14 +705,8 @@ class _EarningsRow extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CODE OF CONDUCT SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _TechCodeOfConductScreen extends StatelessWidget {
   const _TechCodeOfConductScreen();
-
   @override
   Widget build(BuildContext context) {
     return _PolicyFullScreen(
@@ -851,14 +784,8 @@ class _TechCodeOfConductScreen extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ABOUT FIXIT SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _TechAboutScreen extends StatelessWidget {
   const _TechAboutScreen();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -889,7 +816,6 @@ class _TechAboutScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
           child: Column(
             children: [
-              // Logo card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 36),
@@ -958,9 +884,7 @@ class _TechAboutScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
-
               _InfoCard(
                 icon: Icons.info_rounded,
                 iconColor: AppTheme.deepBlue,
@@ -1019,18 +943,12 @@ class _TechAboutScreen extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REUSABLE FULL-SCREEN POLICY LAYOUT
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _PolicySection {
   final String title;
   final IconData icon;
   final Color iconColor;
   final String? content;
   final List<String>? bullets;
-
   const _PolicySection({
     required this.title,
     required this.icon,
@@ -1039,14 +957,12 @@ class _PolicySection {
     this.bullets,
   });
 }
-
 class _PolicyFullScreen extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color iconColor;
   final String lastUpdated;
   final List<_PolicySection> sections;
-
   const _PolicyFullScreen({
     required this.title,
     required this.icon,
@@ -1054,7 +970,6 @@ class _PolicyFullScreen extends StatelessWidget {
     required this.lastUpdated,
     required this.sections,
   });
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1086,7 +1001,6 @@ class _PolicyFullScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -1138,8 +1052,6 @@ class _PolicyFullScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Sections
               ...sections.map((s) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: _InfoCard(
@@ -1169,24 +1081,17 @@ class _PolicyFullScreen extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final Widget child;
-
   const _InfoCard({
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.child,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1237,11 +1142,9 @@ class _InfoCard extends StatelessWidget {
     );
   }
 }
-
 class _BulletItem extends StatelessWidget {
   final String text;
   const _BulletItem({required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Padding(

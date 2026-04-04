@@ -6,7 +6,6 @@ class RewardVoucher {
   final int discountAmount;
   final String discountType; // 'percentage' or 'fixed'
   final bool isRedeemed;
-
   RewardVoucher({
     required this.id,
     required this.title,
@@ -16,7 +15,6 @@ class RewardVoucher {
     required this.discountType,
     this.isRedeemed = false,
   });
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
@@ -26,7 +24,6 @@ class RewardVoucher {
     'discountType': discountType,
     'isRedeemed': isRedeemed,
   };
-
   factory RewardVoucher.fromJson(Map<String, dynamic> json) => RewardVoucher(
     id: json['id'] as String,
     title: json['title'] as String,
@@ -36,7 +33,6 @@ class RewardVoucher {
     discountType: json['discountType'] as String,
     isRedeemed: json['isRedeemed'] as bool? ?? false,
   );
-
   RewardVoucher copyWith({
     String? id,
     String? title,

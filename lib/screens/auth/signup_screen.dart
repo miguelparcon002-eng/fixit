@@ -8,14 +8,11 @@ import '../../services/user_session_service.dart';
 import 'terms_conditions_screen.dart';
 import 'privacy_policy_screen.dart';
 import '../../core/utils/app_logger.dart';
-
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
-
   @override
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
-
 class _SignupScreenState extends ConsumerState<SignupScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
@@ -28,11 +25,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _agreedToTerms = true;
-
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
-
   @override
   void initState() {
     super.initState();
@@ -49,7 +44,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
     _animController.forward();
   }
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -59,10 +53,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
     _animController.dispose();
     super.dispose();
   }
-
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
-
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -74,11 +66,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       );
       return;
     }
-
     setState(() => _isLoading = true);
-
     final authService = ref.read(authServiceProvider);
-
     try {
       final response = await authService.signUpWithEmail(
         email: _emailController.text.trim(),
@@ -87,13 +76,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
         role: _selectedRole,
         contactNumber: '',
       );
-
       if (response.user != null) {
         final sessionService = ref.read(userSessionServiceProvider);
         await sessionService.onUserSignup(response.user!.id);
         AppLogger.p('Signup: New user ${_emailController.text} initialized with fresh data');
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -118,10 +105,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
         );
       }
     }
-
     setState(() => _isLoading = false);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,19 +140,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
                     child: Column(
                       children: [
                         const SizedBox(height: 24),
-                        // Back button
                         Align(
                           alignment: Alignment.centerLeft,
                           child: _buildBackButton(),
                         ),
                         const SizedBox(height: 16),
-                        // Logo + header
                         _buildHeader(),
                         const SizedBox(height: 24),
-                        // Form card
                         _buildFormCard(),
                         const SizedBox(height: 24),
-                        // Login link
                         _buildLoginLink(),
                         const SizedBox(height: 32),
                       ],
@@ -181,7 +162,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ),
     );
   }
-
   Widget _buildBackButton() {
     return GestureDetector(
       onTap: () => context.go('/role-selection'),
@@ -196,7 +176,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ),
     );
   }
-
   Widget _buildHeader() {
     return Column(
       children: [
@@ -249,7 +228,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ],
     );
   }
-
   Widget _buildFormCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -267,7 +245,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Role selection
           const Text(
             'I am a:',
             style: TextStyle(
@@ -285,8 +262,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
             ],
           ),
           const SizedBox(height: 20),
-
-          // Full Name
           _fieldLabel('Full Name'),
           const SizedBox(height: 8),
           TextFormField(
@@ -296,8 +271,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
             validator: (v) => v == null || v.isEmpty ? 'Please enter your name' : null,
           ),
           const SizedBox(height: 16),
-
-          // Email
           _fieldLabel('Email'),
           const SizedBox(height: 8),
           TextFormField(
@@ -312,8 +285,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
                     : null,
           ),
           const SizedBox(height: 16),
-
-          // Password
           _fieldLabel('Password'),
           const SizedBox(height: 8),
           TextFormField(
@@ -337,8 +308,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
                     : null,
           ),
           const SizedBox(height: 16),
-
-          // Confirm Password
           _fieldLabel('Confirm Password'),
           const SizedBox(height: 8),
           TextFormField(
@@ -362,8 +331,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
             },
           ),
           const SizedBox(height: 20),
-
-          // Terms checkbox
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -424,8 +391,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
             ],
           ),
           const SizedBox(height: 24),
-
-          // Create Account button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -456,7 +421,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ),
     );
   }
-
   Widget _roleCard(String label, IconData icon, String role) {
     final isSelected = _selectedRole == role;
     return GestureDetector(
@@ -489,7 +453,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ),
     );
   }
-
   Widget _fieldLabel(String text) {
     return Text(
       text,
@@ -500,7 +463,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ),
     );
   }
-
   Widget _buildLoginLink() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -528,7 +490,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen>
       ],
     );
   }
-
   InputDecoration _inputDecoration({required String hint, required IconData icon}) {
     return InputDecoration(
       hintText: hint,

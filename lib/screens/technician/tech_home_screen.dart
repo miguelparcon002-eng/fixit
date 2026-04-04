@@ -18,27 +18,17 @@ import '../../providers/job_request_provider.dart';
 import 'tech_ratings_screen.dart';
 import 'tech_jobs_screen_new.dart';
 import 'widgets/customer_location_sheet.dart';
-
-// Monthly goal provider - can be updated by technician
 final monthlyGoalProvider = StateProvider<double>((ref) => 50000);
-
-// Date filter enum
 enum TechDateFilter { today, week, month }
-
-// Provider for date filter
 final techDateFilterProvider = StateProvider<TechDateFilter>(
   (ref) => TechDateFilter.today,
 );
-
 enum CompletionRateFilter { day, week, month, all }
-
 final completionRateFilterProvider = StateProvider<CompletionRateFilter>(
   (ref) => CompletionRateFilter.day,
 );
-
 class TechHomeScreen extends ConsumerWidget {
   const TechHomeScreen({super.key});
-
   static void _showNotifications(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
@@ -47,60 +37,40 @@ class TechHomeScreen extends ConsumerWidget {
       builder: (_) => const _TechNotificationsSheet(),
     );
   }
-
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Open job-request count for the Job Map badge
     final openJobCount =
         ref.watch(openJobRequestsProvider).valueOrNull?.length ?? 0;
-
-    // Get current user data
     final userAsync = ref.watch(currentUserProvider);
     final userName =
         userAsync.whenOrNull(data: (user) => user?.fullName) ?? 'Technician';
     final currentUserId = userAsync.whenOrNull(data: (u) => u?.id);
-
-    // Use the stable userId-keyed notifier that seeds itself from DB once.
     final isAvailable = currentUserId != null
         ? (ref.watch(techAvailabilityProviderFamily(currentUserId))
             .valueOrNull ?? true)
         : true;
-
-    // Use saved addresses (same mechanism customers use) so technicians also
-    // see/manage their real "default address".
     final defaultAddress = ref.watch(defaultAddressProvider);
     final addressesAsync = ref.watch(userAddressesProvider);
     final firstSavedAddress = addressesAsync.whenOrNull(
       data: (addresses) => addresses.isNotEmpty ? addresses.first : null,
     );
-
     final profileAddressFallback =
         userAsync.whenOrNull(data: (user) => user?.address) ?? '';
     final displayAddress =
         defaultAddress?.address ??
         firstSavedAddress?.address ??
         profileAddressFallback;
-
-    // Use Supabase bookings instead of local bookings
     final bookingsAsync = ref.watch(technicianBookingsProvider);
-
-    // Get technician stats (for rating)
     final statsAsync = ref.watch(technicianStatsProvider);
     final technicianRating =
         statsAsync.whenOrNull(data: (stats) => stats.averageRating) ?? 0.0;
     final totalReviews =
         statsAsync.whenOrNull(data: (stats) => stats.totalReviews) ?? 0;
-
-    // Get selected date filter
     final selectedFilter = ref.watch(techDateFilterProvider);
-
-    // Get date range based on filter
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     DateTime startDate;
     DateTime endDate;
-
     switch (selectedFilter) {
       case TechDateFilter.today:
         startDate = todayStart;
@@ -115,8 +85,6 @@ class TechHomeScreen extends ConsumerWidget {
         endDate = DateTime(now.year, now.month + 1, 1);
         break;
     }
-
-    // Get filter label
     String filterLabel;
     switch (selectedFilter) {
       case TechDateFilter.today:
@@ -129,7 +97,6 @@ class TechHomeScreen extends ConsumerWidget {
         filterLabel = 'This Month';
         break;
     }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -203,7 +170,6 @@ class TechHomeScreen extends ConsumerWidget {
           ),
         ),
         data: (allBookings) {
-          // Filter by scheduledDate for active/completed/earnings cards (unchanged behaviour).
           final filteredBookings = allBookings.where((booking) {
             if (booking.scheduledDate == null) return false;
             final bookingDate = booking.scheduledDate!;
@@ -212,16 +178,12 @@ class TechHomeScreen extends ConsumerWidget {
                 ) &&
                 bookingDate.isBefore(endDate);
           }).toList();
-
-          // Job Requests count: only pending (requested) bookings.
-          // Accepted bookings are counted separately under Today's Jobs.
           final techScheduledCount = allBookings
               .where((booking) =>
                   booking.status == 'requested' &&
                   booking.createdAt.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
                   booking.createdAt.isBefore(endDate))
               .length;
-
           final techActiveCount = filteredBookings
               .where((booking) =>
                   booking.status == 'accepted' ||
@@ -230,20 +192,15 @@ class TechHomeScreen extends ConsumerWidget {
           final techCompletedCount = filteredBookings
               .where((booking) => booking.status == 'completed')
               .length;
-
-          // Calculate earnings for the period
           final periodEarnings = filteredBookings
               .where((b) => b.status == 'completed')
               .fold<double>(
                 0,
                 (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
               );
-
-          // Calculate previous period for comparison
           final periodDuration = endDate.difference(startDate);
           final prevStartDate = startDate.subtract(periodDuration);
           final prevEndDate = startDate;
-
           final prevFilteredBookings = allBookings.where((booking) {
             if (booking.scheduledDate == null) return false;
             final bookingDate = booking.scheduledDate!;
@@ -252,23 +209,18 @@ class TechHomeScreen extends ConsumerWidget {
                 ) &&
                 bookingDate.isBefore(prevEndDate);
           }).toList();
-
           final prevPeriodEarnings = prevFilteredBookings
               .where((b) => b.status == 'completed')
               .fold<double>(
                 0,
                 (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
               );
-
-          // Calculate trends
           final earningsTrend = prevPeriodEarnings > 0
               ? ((periodEarnings - prevPeriodEarnings) /
                         prevPeriodEarnings *
                         100)
                     .toDouble()
               : (periodEarnings > 0 ? 100.0 : 0.0);
-
-          // Completion rate with its own independent filter
           final crFilter = ref.watch(completionRateFilterProvider);
           DateTime crStart;
           DateTime crEnd = now;
@@ -298,8 +250,6 @@ class TechHomeScreen extends ConsumerWidget {
           final crCompleted = crBookings.where((b) => b.status == 'completed').length;
           final crTotal = crBookings.length;
           final crRate = crTotal > 0 ? (crCompleted / crTotal * 100) : 0.0;
-
-          // Calculate weekly data for chart (last 7 days)
           final weeklyData = <double>[];
           for (int i = 6; i >= 0; i--) {
             final dayStart = DateTime(
@@ -324,8 +274,6 @@ class TechHomeScreen extends ConsumerWidget {
                 );
             weeklyData.add(dayEarnings);
           }
-
-          // Job status counts for donut chart
           final pendingCount = allBookings
               .where((b) => b.status == 'requested' || b.status == 'accepted')
               .length;
@@ -338,8 +286,6 @@ class TechHomeScreen extends ConsumerWidget {
           final cancelledCount = allBookings
               .where((b) => b.status == 'cancelled')
               .length;
-
-          // Monthly earnings for goal tracking
           final monthStart = DateTime(now.year, now.month, 1);
           final monthEnd = DateTime(now.year, now.month + 1, 1);
           final monthlyEarnings = allBookings
@@ -356,29 +302,21 @@ class TechHomeScreen extends ConsumerWidget {
                 0,
                 (sum, b) => sum + (b.finalCost ?? b.estimatedCost ?? 0),
               );
-
           final monthlyGoal = ref.watch(monthlyGoalProvider);
           final goalProgress = monthlyGoal > 0
               ? (monthlyEarnings / monthlyGoal).clamp(0.0, 1.0)
               : 0.0;
-
-          // Bookings to show in "Today's Schedule".
-          // Based on when the booking was CREATED (createdAt), not the scheduled date.
-          // This ensures new requests show up immediately the day they are made.
           final todayEnd = todayStart.add(const Duration(days: 1));
-
           final scheduleBookings = allBookings
               .where((b) {
                 final activeStatuses = {
                   'requested', 'accepted', 'scheduled', 'en_route', 'in_progress'
                 };
                 if (!activeStatuses.contains(b.status)) return false;
-
                 return b.createdAt.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
                     b.createdAt.isBefore(todayEnd);
               })
               .toList();
-
           scheduleBookings.sort((a, b) {
             final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
             if (prio != 0) return prio;
@@ -386,7 +324,6 @@ class TechHomeScreen extends ConsumerWidget {
             final bTime = b.scheduledDate ?? b.createdAt;
             return aTime.compareTo(bTime); // earlier appointments first
           });
-
           return Container(
             color: const Color(0xFFF5F7FA),
             child: SingleChildScrollView(
@@ -394,7 +331,6 @@ class TechHomeScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Technician summary
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -480,8 +416,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Date Filter Tabs
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                     child: Container(
@@ -530,7 +464,6 @@ class TechHomeScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Stats Grid
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                     child: GridView.count(
@@ -548,7 +481,6 @@ class TechHomeScreen extends ConsumerWidget {
                           value: '$techActiveCount',
                           label: '$filterLabel\'s Jobs',
                           onTap: () {
-                            // Set tab to Active (1) before navigating
                             ref
                                     .read(techJobsInitialTabProvider.notifier)
                                     .state =
@@ -563,7 +495,6 @@ class TechHomeScreen extends ConsumerWidget {
                           value: '$techCompletedCount',
                           label: 'Completed',
                           onTap: () {
-                            // Set tab to Complete (2) before navigating
                             ref
                                     .read(techJobsInitialTabProvider.notifier)
                                     .state =
@@ -578,7 +509,6 @@ class TechHomeScreen extends ConsumerWidget {
                           value: '$techScheduledCount',
                           label: 'Job Requests',
                           onTap: () {
-                            // Set tab to Request (0) before navigating
                             ref
                                     .read(techJobsInitialTabProvider.notifier)
                                     .state =
@@ -598,7 +528,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Performance Metrics
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -616,7 +545,6 @@ class TechHomeScreen extends ConsumerWidget {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Completion Rate card with filter inside
                             Expanded(
                               child: Container(
                                 padding: const EdgeInsets.all(14),
@@ -634,7 +562,6 @@ class TechHomeScreen extends ConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // Icon + filter button on same row
                                     Row(
                                       children: [
                                         Container(
@@ -719,7 +646,6 @@ class TechHomeScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Customer Rating card - tappable, navigates to ratings screen
                             Expanded(
                               child: GestureDetector(
                                 onTap: () => Navigator.push(
@@ -743,7 +669,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Monthly Goal Progress
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _MonthlyGoalCard(
@@ -753,7 +678,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Weekly Performance Chart
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _WeeklyPerformanceChart(
@@ -762,7 +686,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Job Status Distribution
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _JobStatusChart(
@@ -773,7 +696,6 @@ class TechHomeScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Quick Actions
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -873,7 +795,6 @@ class TechHomeScreen extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Today's Schedule
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -915,14 +836,12 @@ class TechHomeScreen extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // Dynamic Job Cards - Show schedule bookings for the selected period
                         ...scheduleBookings.map((booking) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _SimpleJobCard(booking: booking),
                           );
                         }),
-                        // Show message if no bookings in schedule
                         if (scheduleBookings.isEmpty)
                           Center(
                             child: Padding(
@@ -960,13 +879,10 @@ class TechHomeScreen extends ConsumerWidget {
     );
   }
 }
-
 class _MiniPill extends StatelessWidget {
   final IconData icon;
   final String label;
-
   const _MiniPill({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -994,14 +910,12 @@ class _MiniPill extends StatelessWidget {
     );
   }
 }
-
 class _QuickActionButton extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final Color iconBgColor;
   final String label;
   final VoidCallback onTap;
-
   const _QuickActionButton({
     required this.icon,
     required this.iconColor,
@@ -1009,7 +923,6 @@ class _QuickActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -1060,7 +973,6 @@ class _QuickActionButton extends StatelessWidget {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -1068,7 +980,6 @@ class _StatCard extends StatelessWidget {
   final String value;
   final String label;
   final VoidCallback? onTap;
-
   const _StatCard({
     required this.icon,
     required this.iconColor,
@@ -1077,7 +988,6 @@ class _StatCard extends StatelessWidget {
     required this.label,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1138,16 +1048,13 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _TechNotificationsSheet extends ConsumerWidget {
   const _TechNotificationsSheet();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = AsyncData<List<AppNotification>>(
         ref.watch(filteredNotificationsProvider));
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
-
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
@@ -1160,7 +1067,6 @@ class _TechNotificationsSheet extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: 40,
@@ -1170,7 +1076,6 @@ class _TechNotificationsSheet extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
               child: Row(
@@ -1235,7 +1140,6 @@ class _TechNotificationsSheet extends ConsumerWidget {
                   ),
                 ),
               ),
-            // Notifications list
             Expanded(
               child: notificationsAsync.when(
                 data: (items) {
@@ -1308,22 +1212,18 @@ class _TechNotificationsSheet extends ConsumerWidget {
     );
   }
 }
-
 class _TechNotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
-
   const _TechNotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
   });
-
   @override
   Widget build(BuildContext context) {
     final mapped = mapNotificationIcon(notification.type);
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1426,12 +1326,9 @@ class _TechNotificationCard extends StatelessWidget {
     );
   }
 }
-
 class _SimpleJobCard extends ConsumerWidget {
   final BookingModel booking;
-
   const _SimpleJobCard({required this.booking});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
@@ -1452,7 +1349,6 @@ class _SimpleJobCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1502,7 +1398,6 @@ class _SimpleJobCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Details
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1592,7 +1487,6 @@ class _SimpleJobCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // Price and actions
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1606,7 +1500,6 @@ class _SimpleJobCard extends ConsumerWidget {
                 ),
                 GestureDetector(
                   onTap: () {
-                    // Set tab to Active (1) before navigating
                     ref.read(techJobsInitialTabProvider.notifier).state = 1;
                     context.go('/tech-jobs');
                   },
@@ -1637,13 +1530,10 @@ class _SimpleJobCard extends ConsumerWidget {
     );
   }
 }
-
 class _CrFilterSheet extends StatelessWidget {
   final CompletionRateFilter current;
   final ValueChanged<CompletionRateFilter> onSelect;
-
   const _CrFilterSheet({required this.current, required this.onSelect});
-
   @override
   Widget build(BuildContext context) {
     final options = [
@@ -1652,7 +1542,6 @@ class _CrFilterSheet extends StatelessWidget {
       (CompletionRateFilter.month, 'This Month', Icons.calendar_month),
       (CompletionRateFilter.all, 'All Time', Icons.all_inclusive),
     ];
-
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1719,33 +1608,23 @@ class _CrFilterSheet extends StatelessWidget {
     );
   }
 }
-
-// ─── Availability toggle button ────────────────────────────────────────────────
-
 class _AvailabilityToggleButton extends ConsumerWidget {
   final String? userId;
-
   const _AvailabilityToggleButton({required this.userId, required bool isAvailable});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = userId;
     if (uid == null) {
       return const SizedBox.shrink();
     }
-
-    // Use the stable notifier for instant local state updates + DB sync
     final notifierState = ref.watch(techAvailabilityProviderFamily(uid));
     final isAvailable = notifierState.valueOrNull ?? true;
     final isLoading = notifierState.isLoading;
-
     final iconColor = isAvailable ? Colors.red.shade400 : Colors.green;
     final iconBgColor = isAvailable
         ? Colors.red.withValues(alpha: 0.12)
         : Colors.green.withValues(alpha: 0.12);
-    // If online → show "Go Offline", if offline → show "Go Online"
     final label = isAvailable ? 'Go\nOffline' : 'Go\nOnline';
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1818,45 +1697,33 @@ class _AvailabilityToggleButton extends ConsumerWidget {
     );
   }
 }
-
-// ─── Availability bottom sheet ──────────────────────────────────────────────────
-
 class _AvailabilitySheet extends ConsumerStatefulWidget {
   final String userId;
   final bool isAvailable;
-
   const _AvailabilitySheet({required this.userId, required this.isAvailable});
-
   @override
   ConsumerState<_AvailabilitySheet> createState() => _AvailabilitySheetState();
 }
-
 class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
   late bool _pendingValue;
-
   @override
   void initState() {
     super.initState();
     _pendingValue = widget.isAvailable;
   }
-
   Future<void> _confirm() async {
     await ref
         .read(techAvailabilityProviderFamily(widget.userId).notifier)
         .setAvailability(_pendingValue);
-
     if (mounted) Navigator.pop(context);
   }
-
   @override
   Widget build(BuildContext context) {
     final notifierState = ref.watch(techAvailabilityProviderFamily(widget.userId));
     final isLoading = notifierState.isLoading;
     final hasError = notifierState.hasError;
-
     final willBeOnline = _pendingValue;
     final color = willBeOnline ? Colors.green : Colors.grey.shade600;
-
     return SafeArea(
       top: false,
       child: Container(
@@ -1868,7 +1735,6 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
@@ -1877,8 +1743,6 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Status icon
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               width: 72, height: 72,
@@ -1893,7 +1757,6 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
               ),
             ),
             const SizedBox(height: 16),
-
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: Text(
@@ -1930,8 +1793,6 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
               ),
             ],
             const SizedBox(height: 28),
-
-            // Switch row
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
@@ -1962,8 +1823,6 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Confirm button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -2003,20 +1862,15 @@ class _AvailabilitySheetState extends ConsumerState<_AvailabilitySheet> {
     );
   }
 }
-
-// ─── Date filter tab ──────────────────────────────────────────────────────────
-
 class _DateFilterTab extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _DateFilterTab({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -2042,15 +1896,12 @@ class _DateFilterTab extends StatelessWidget {
     );
   }
 }
-
-// Performance Metric Card
 class _MetricCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
   final String subtitle;
-
   const _MetricCard({
     required this.label,
     required this.value,
@@ -2058,7 +1909,6 @@ class _MetricCard extends StatelessWidget {
     required this.color,
     required this.subtitle,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2118,19 +1968,15 @@ class _MetricCard extends StatelessWidget {
     );
   }
 }
-
-// Monthly Goal Progress Card
 class _MonthlyGoalCard extends StatelessWidget {
   final double currentEarnings;
   final double goalAmount;
   final double progress;
-
   const _MonthlyGoalCard({
     required this.currentEarnings,
     required this.goalAmount,
     required this.progress,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2219,24 +2065,19 @@ class _MonthlyGoalCard extends StatelessWidget {
     );
   }
 }
-
-// Weekly Performance Chart
 class _WeeklyPerformanceChart extends StatelessWidget {
   final List<double> weeklyData;
   final double earningsTrend;
-
   const _WeeklyPerformanceChart({
     required this.weeklyData,
     required this.earningsTrend,
   });
-
   @override
   Widget build(BuildContext context) {
     final maxValue = weeklyData.isNotEmpty ? weeklyData.reduce(max) : 1.0;
     final dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final now = DateTime.now();
     final todayIndex = 6; // Last item is today
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -2310,7 +2151,6 @@ class _WeeklyPerformanceChart extends StatelessWidget {
                 final dayOffset = 6 - index;
                 final dayDate = now.subtract(Duration(days: dayOffset));
                 final dayLabel = dayLabels[dayDate.weekday - 1];
-
                 return Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -2361,25 +2201,20 @@ class _WeeklyPerformanceChart extends StatelessWidget {
     );
   }
 }
-
-// Job Status Distribution Chart
 class _JobStatusChart extends StatelessWidget {
   final int pending;
   final int inProgress;
   final int completed;
   final int cancelled;
-
   const _JobStatusChart({
     required this.pending,
     required this.inProgress,
     required this.completed,
     required this.cancelled,
   });
-
   @override
   Widget build(BuildContext context) {
     final total = pending + inProgress + completed + cancelled;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -2479,19 +2314,15 @@ class _JobStatusChart extends StatelessWidget {
     );
   }
 }
-
-// Legend Item
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String label;
   final int count;
-
   const _LegendItem({
     required this.color,
     required this.label,
     required this.count,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -2523,26 +2354,21 @@ class _LegendItem extends StatelessWidget {
     );
   }
 }
-
-// Donut Chart Painter
 class _DonutChartPainter extends CustomPainter {
   final int pending;
   final int inProgress;
   final int completed;
   final int cancelled;
-
   _DonutChartPainter({
     required this.pending,
     required this.inProgress,
     required this.completed,
     required this.cancelled,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
     final total = pending + inProgress + completed + cancelled;
     if (total == 0) {
-      // Draw empty circle
       final paint = Paint()
         ..color = Colors.grey.shade200
         ..style = PaintingStyle.stroke
@@ -2554,17 +2380,14 @@ class _DonutChartPainter extends CustomPainter {
       );
       return;
     }
-
     final rect = Rect.fromLTWH(10, 10, size.width - 20, size.height - 20);
     const strokeWidth = 20.0;
-
     final segments = [
       (pending / total, const Color(0xFFFF6B35)),
       (inProgress / total, const Color(0xFF9C27B0)),
       (completed / total, const Color(0xFF00C853)),
       (cancelled / total, Colors.grey),
     ];
-
     var startAngle = -pi / 2;
     for (final segment in segments) {
       if (segment.$1 > 0) {
@@ -2579,7 +2402,6 @@ class _DonutChartPainter extends CustomPainter {
       }
     }
   }
-
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

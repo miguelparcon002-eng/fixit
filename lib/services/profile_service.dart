@@ -3,10 +3,8 @@ import '../core/constants/db_constants.dart';
 import 'storage_service.dart';
 import 'technician_specialty_service.dart';
 import '../core/utils/app_logger.dart';
-
 class ProfileService {
   String? get _userId => StorageService.currentUserId;
-
   Future<Map<String, String>> loadProfileData() async {
     if (_userId == null) {
       return {
@@ -16,24 +14,20 @@ class ProfileService {
         'memberSince': 'New Member',
       };
     }
-
     try {
       final response = await SupabaseConfig.client
           .from(DBConstants.users)
           .select()
           .eq('id', _userId!)
           .single();
-
       final createdAt = DateTime.tryParse(response['created_at'] ?? '');
       final memberSince = createdAt != null
           ? _formatMemberSince(createdAt)
           : 'New Member';
-
       final location = response['address'] ??
           (response['city'] != null && response['neighborhood'] != null
               ? '${response['city']}, ${response['neighborhood']}'
               : 'Not set');
-
       return {
         'email': response['email'] ?? '',
         'phone': response['contact_number'] ?? 'Not set',
@@ -51,7 +45,6 @@ class ProfileService {
       };
     }
   }
-
   String _formatMemberSince(DateTime date) {
     const months = [
       'January', 'February', 'March', 'April', 'May', 'June',
@@ -59,7 +52,6 @@ class ProfileService {
     ];
     return '${months[date.month - 1]} ${date.year}';
   }
-
   Future<void> updateEmail(String email) async {
     if (_userId == null) return;
     await SupabaseConfig.client
@@ -67,7 +59,6 @@ class ProfileService {
         .update({'email': email})
         .eq('id', _userId!);
   }
-
   Future<void> updatePhone(String phone) async {
     if (_userId == null) return;
     await SupabaseConfig.client
@@ -75,7 +66,6 @@ class ProfileService {
         .update({'contact_number': phone})
         .eq('id', _userId!);
   }
-
   Future<void> updateLocation(String location) async {
     if (_userId == null) return;
     await SupabaseConfig.client
@@ -83,7 +73,6 @@ class ProfileService {
         .update({'address': location})
         .eq('id', _userId!);
   }
-
   Future<void> updateLocationWithCoords({
     required String address,
     required double latitude,
@@ -95,7 +84,6 @@ class ProfileService {
         .update({'address': address, 'latitude': latitude, 'longitude': longitude})
         .eq('id', _userId!);
   }
-
   Future<void> updateProfile({
     String? email,
     String? phone,
@@ -104,14 +92,12 @@ class ProfileService {
     String? neighborhood,
   }) async {
     if (_userId == null) return;
-
     final updates = <String, dynamic>{};
     if (email != null) updates['email'] = email;
     if (phone != null) updates['contact_number'] = phone;
     if (address != null) updates['address'] = address;
     if (city != null) updates['city'] = city;
     if (neighborhood != null) updates['neighborhood'] = neighborhood;
-
     if (updates.isNotEmpty) {
       await SupabaseConfig.client
           .from(DBConstants.users)
@@ -119,7 +105,6 @@ class ProfileService {
           .eq('id', _userId!);
     }
   }
-
   Future<void> updateBio(String bio) async {
     if (_userId == null) return;
     await SupabaseConfig.client
@@ -127,7 +112,6 @@ class ProfileService {
         .update({'bio': bio})
         .eq('id', _userId!);
   }
-
   Future<void> updateSpecialties(List<String> specialties) async {
     if (_userId == null) return;
     final specialtyService = TechnicianSpecialtyService();
@@ -136,10 +120,8 @@ class ProfileService {
       specialtyNames: specialties,
     );
   }
-
   Future<List<String>> loadSpecialties() async {
     if (_userId == null) return <String>[];
-
     try {
       final specialtyService = TechnicianSpecialtyService();
       final specialties = await specialtyService.getTechnicianSpecialties(_userId!);
@@ -149,7 +131,6 @@ class ProfileService {
       return <String>[];
     }
   }
-
   Future<void> updateProfileImageUrl(String imageUrl) async {
     if (_userId == null) return;
     await SupabaseConfig.client
@@ -157,10 +138,8 @@ class ProfileService {
         .update({'profile_image_url': imageUrl})
         .eq('id', _userId!);
   }
-
   Future<String?> loadProfileImageUrl() async {
     if (_userId == null) return null;
-
     try {
       final response = await SupabaseConfig.client
           .from(DBConstants.users)

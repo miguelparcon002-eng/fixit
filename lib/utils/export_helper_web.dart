@@ -1,7 +1,5 @@
-// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'dart:convert';
-
 Future<void> exportCsvFile(String content, String filename) async {
   final bytes = utf8.encode(content);
   final blob = html.Blob([bytes], 'text/csv');

@@ -1,40 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../services/payment_service.dart';
-
 class AdminTransactionsScreen extends StatefulWidget {
   const AdminTransactionsScreen({super.key});
-
   @override
   State<AdminTransactionsScreen> createState() =>
       _AdminTransactionsScreenState();
 }
-
 class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
   List<Map<String, dynamic>> _allPayments = [];
   bool _loading = true;
   String _jobFilter = 'all';
   String _feeFilter = 'all';
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _load();
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
@@ -49,41 +41,28 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
       setState(() => _loading = false);
     }
   }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   bool _isCancellationFee(Map<String, dynamic> p) {
-    // Primary: payment_type column (requires SQL migration).
     final pType = p['payment_type'] as String?;
     if (pType == 'cancellation_fee') return true;
-    // Fallback: booking status join.
     final bStatus =
         (p['bookings'] as Map<String, dynamic>?)?['status'] as String?;
     return bStatus == 'cancelled';
   }
-
   List<Map<String, dynamic>> get _jobPayments =>
       _allPayments.where((p) => !_isCancellationFee(p)).toList();
-
   List<Map<String, dynamic>> get _cancellationFees =>
       _allPayments.where(_isCancellationFee).toList();
-
   List<Map<String, dynamic>> _filtered(
       List<Map<String, dynamic>> list, String filter) {
     if (filter == 'all') return list;
     return list.where((p) => p['status'] == filter).toList();
   }
-
   int _pendingCount(List<Map<String, dynamic>> list) =>
       list.where((p) => p['status'] == 'pending_verification').length;
-
-  // ── UI ────────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final jobPending = _pendingCount(_jobPayments);
     final feePending = _pendingCount(_cancellationFees);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -168,7 +147,6 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
             ),
     );
   }
-
   Future<void> _confirmPayment(Map<String, dynamic> payment) async {
     final isFee = _isCancellationFee(payment);
     final confirmed = await showDialog<bool>(
@@ -203,9 +181,7 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
         ],
       ),
     );
-
     if (confirmed != true) return;
-
     try {
       await PaymentService.updatePaymentStatus(
         paymentId: payment['id'].toString(),
@@ -225,7 +201,6 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
       );
     }
   }
-
   void _showRejectDialog(Map<String, dynamic> payment) {
     final noteCtrl = TextEditingController();
     showDialog(
@@ -303,9 +278,6 @@ class _AdminTransactionsScreenState extends State<AdminTransactionsScreen>
     );
   }
 }
-
-// ─── Reusable list + filter for one tab ──────────────────────────────────────
-
 class _PaymentList extends StatelessWidget {
   final List<Map<String, dynamic>> payments;
   final List<Map<String, dynamic>> allPayments;
@@ -316,7 +288,6 @@ class _PaymentList extends StatelessWidget {
   final void Function(Map<String, dynamic>) onReject;
   final String emptyLabel;
   final Color accentColor;
-
   const _PaymentList({
     required this.payments,
     required this.allPayments,
@@ -328,16 +299,13 @@ class _PaymentList extends StatelessWidget {
     required this.emptyLabel,
     this.accentColor = AppTheme.deepBlue,
   });
-
   int _count(String status) => status == 'all'
       ? allPayments.length
       : allPayments.where((p) => p['status'] == status).length;
-
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Filter chips
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -419,22 +387,17 @@ class _PaymentList extends StatelessWidget {
     );
   }
 }
-
-// ─── Payment card ─────────────────────────────────────────────────────────────
-
 class _PaymentCard extends StatelessWidget {
   final Map<String, dynamic> payment;
   final Future<void> Function(Map<String, dynamic>) onVerify;
   final void Function(Map<String, dynamic>) onReject;
   final Color accentColor;
-
   const _PaymentCard({
     required this.payment,
     required this.onVerify,
     required this.onReject,
     required this.accentColor,
   });
-
   void _showProofImage(BuildContext context, String url) {
     showDialog(
       context: context,
@@ -478,7 +441,6 @@ class _PaymentCard extends StatelessWidget {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final status = payment['status'] as String? ?? 'pending_verification';
@@ -487,7 +449,6 @@ class _PaymentCard extends StatelessWidget {
       'rejected' => (Colors.red, 'Rejected'),
       _ => (Colors.orange, 'Pending'),
     };
-
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
     final createdAt = payment['created_at'] != null
         ? DateFormat('MMM dd, yyyy h:mm a')
@@ -495,7 +456,6 @@ class _PaymentCard extends StatelessWidget {
         : '-';
     final bookingId = payment['booking_id'] as String? ?? '';
     final shortId = bookingId.length >= 8 ? bookingId.substring(0, 8) : bookingId;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -506,7 +466,6 @@ class _PaymentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Expanded(
@@ -538,7 +497,6 @@ class _PaymentCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-
           _Row(Icons.person_outline, 'Sender', payment['sender_name'] ?? '-'),
           const SizedBox(height: 6),
           _Row(Icons.receipt_long, 'Reference #',
@@ -548,14 +506,11 @@ class _PaymentCard extends StatelessWidget {
               '₱${amount.toStringAsFixed(2)}'),
           const SizedBox(height: 6),
           _Row(Icons.schedule, 'Submitted', createdAt),
-
           if (payment['admin_note'] != null &&
               (payment['admin_note'] as String).isNotEmpty) ...[
             const SizedBox(height: 6),
             _Row(Icons.note_outlined, 'Note', payment['admin_note']),
           ],
-
-          // View proof
           if (payment['proof_image_url'] != null) ...[
             const SizedBox(height: 10),
             SizedBox(
@@ -576,8 +531,6 @@ class _PaymentCard extends StatelessWidget {
               ),
             ),
           ],
-
-          // Verify / Reject
           if (status == 'pending_verification') ...[
             const SizedBox(height: 10),
             Row(
@@ -620,13 +573,11 @@ class _PaymentCard extends StatelessWidget {
     );
   }
 }
-
 class _Row extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   const _Row(this.icon, this.label, this.value);
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -651,7 +602,6 @@ class _Row extends StatelessWidget {
     );
   }
 }
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final int count;
@@ -665,7 +615,6 @@ class _FilterChip extends StatelessWidget {
     required this.onTap,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -689,11 +638,9 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
 class _Badge extends StatelessWidget {
   final int count;
   const _Badge({required this.count});
-
   @override
   Widget build(BuildContext context) {
     return Container(

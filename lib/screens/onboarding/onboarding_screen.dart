@@ -2,18 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
-
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
-
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
-
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       icon: Icons.build_circle_rounded,
@@ -48,7 +44,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       iconColor: const Color(0xFF311B92),
     ),
   ];
-
   void _onNextPressed() {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
@@ -59,11 +54,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _completeOnboarding();
     }
   }
-
   void _onSkipPressed() {
     _completeOnboarding();
   }
-
   Future<void> _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
@@ -71,13 +64,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context.go('/welcome');
     }
   }
-
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,7 +76,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Skip button
             Align(
               alignment: Alignment.topRight,
               child: Padding(
@@ -103,8 +93,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
-            // Page content
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -119,8 +107,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
-
-            // Bottom section: dots + button
             Padding(
               padding: const EdgeInsets.only(
                 left: 32,
@@ -130,14 +116,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Page indicator dots
                   Row(
                     children: List.generate(
                       _pages.length,
                       (index) => _buildDot(index),
                     ),
                   ),
-                  // Next / Get Started button
                   GestureDetector(
                     onTap: _onNextPressed,
                     child: AnimatedContainer(
@@ -182,7 +166,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
-
   Widget _buildPage(OnboardingPage page) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -190,7 +173,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Spacer(flex: 1),
-          // Illustration container
           Container(
             width: 280,
             height: 280,
@@ -208,7 +190,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Background decorative ring
                 Container(
                   width: 220,
                   height: 220,
@@ -220,7 +201,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ),
-                // Logo inside gradient circle
                 Container(
                   width: 140,
                   height: 140,
@@ -252,7 +232,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ),
-                // Secondary floating icon
                 Positioned(
                   top: 30,
                   right: 30,
@@ -277,7 +256,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ),
-                // Small decorative dot
                 Positioned(
                   bottom: 40,
                   left: 25,
@@ -294,7 +272,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 48),
-          // Title
           Text(
             page.title,
             textAlign: TextAlign.center,
@@ -306,7 +283,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Subtitle
           Text(
             page.subtitle,
             textAlign: TextAlign.center,
@@ -322,7 +298,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
-
   Widget _buildDot(int index) {
     bool isActive = _currentPage == index;
     return AnimatedContainer(
@@ -337,7 +312,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 }
-
 class OnboardingPage {
   final IconData icon;
   final IconData secondaryIcon;
@@ -345,7 +319,6 @@ class OnboardingPage {
   final String subtitle;
   final List<Color> gradientColors;
   final Color iconColor;
-
   const OnboardingPage({
     required this.icon,
     required this.secondaryIcon,

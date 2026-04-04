@@ -10,31 +10,23 @@ import '../../providers/technician_stats_provider.dart';
 import '../../services/user_session_service.dart';
 import '../../services/technician_service.dart';
 import 'tech_jobs_screen_new.dart';
-
-// Uses currentUserProvider.user.profilePicture (users.profile_picture) for avatar
-
 class TechProfileScreen extends ConsumerStatefulWidget {
   const TechProfileScreen({super.key});
-
   @override
   ConsumerState<TechProfileScreen> createState() => _TechProfileScreenState();
 }
-
 class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Reload stats when screen is opened
     Future.microtask(() {
       ref.read(technicianStatsProvider.notifier).reload();
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
     final statsAsync = ref.watch(technicianStatsProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -63,7 +55,6 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Column(
             children: [
-              // Profile header card
               userAsync.when(
                 data: (user) => _buildProfileHeader(
                   name: user?.fullName ?? 'Technician',
@@ -88,32 +79,18 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Stats cards - now using real data
               _StatsCards(stats: statsAsync.value),
               const SizedBox(height: 24),
-
-              // Personal Information
               const _PersonalInfoCard(),
               const SizedBox(height: 20),
-
-              // Bio / About Me
               const _BioCard(),
               const SizedBox(height: 20),
-
-              // Specialties
               const _SpecialtiesCard(),
               const SizedBox(height: 20),
-
-              // Availability Schedule
               const _ScheduleCard(),
               const SizedBox(height: 20),
-
-              // Job Preferences
               const _JobPreferencesCard(),
               const SizedBox(height: 20),
-
-              // Settings & Support
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -171,8 +148,6 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Logout Button
               Container(
                 width: double.infinity,
                 height: 56,
@@ -193,11 +168,7 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () {
-                      // Navigate away immediately so technician screens don't
-                      // briefly render stream/provider errors during sign-out.
                       context.go('/login');
-
-                      // Perform logout cleanup after navigation.
                       Future.microtask(() async {
                         await ref.read(userSessionServiceProvider).onUserLogout();
                         await ref.read(authServiceProvider).signOut();
@@ -231,7 +202,6 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
       ),
     );
   }
-
   Widget _buildProfileHeader({
     required String name,
     required bool isVerified,
@@ -239,13 +209,11 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
     required int jobsDone,
     required String? profileImageUrl,
   }) {
-    // Get initials from name
     final initials = name.split(' ')
         .where((s) => s.isNotEmpty)
         .take(2)
         .map((s) => s[0].toUpperCase())
         .join();
-
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -371,18 +339,14 @@ class _TechProfileScreenState extends ConsumerState<TechProfileScreen> {
     );
   }
 }
-
 class _StatsCards extends ConsumerWidget {
   final TechnicianStats? stats;
-
   const _StatsCards({this.stats});
-
   void _showExperienceDetails(BuildContext context) {
     final completedJobs = stats?.completedJobs ?? 0;
     final totalReviews = stats?.totalReviews ?? 0;
     final averageRating = stats?.averageRating ?? 0.0;
     final currentLevel = stats?.experience ?? 'New';
-
     const levels = <String, int>{
       'New': 0,
       'Beginner': 1,
@@ -391,8 +355,6 @@ class _StatsCards extends ConsumerWidget {
       'Expert': 4,
       'Master': 5,
     };
-
-    // Thresholds must match TechnicianStats.calculateExperience
     const thresholds = <String, int>{
       'New': 0,
       'Beginner': 1,
@@ -401,7 +363,6 @@ class _StatsCards extends ConsumerWidget {
       'Expert': 50,
       'Master': 100,
     };
-
     final currentRank = levels[currentLevel] ?? 0;
     final nextLevel = levels.entries
         .firstWhere(
@@ -409,10 +370,8 @@ class _StatsCards extends ConsumerWidget {
           orElse: () => const MapEntry('Master', 5),
         )
         .key;
-
     final nextThreshold = thresholds[nextLevel] ?? 100;
     final remainingJobs = (nextThreshold - completedJobs).clamp(0, 1000000);
-
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -513,13 +472,11 @@ class _StatsCards extends ConsumerWidget {
       },
     );
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final experience = stats?.experience ?? 'New';
     final rating = stats?.averageRating ?? 0.0;
     final jobsDone = stats?.completedJobs ?? 0;
-
     return IntrinsicHeight(
       child: Row(
         children: [
@@ -550,7 +507,6 @@ class _StatsCards extends ConsumerWidget {
               label: 'Jobs Done',
               value: '$jobsDone',
               onTap: () {
-                // Jump to Completed tab
                 ref.read(techJobsInitialTabProvider.notifier).state = 2;
                 context.go('/tech-jobs');
               },
@@ -561,14 +517,12 @@ class _StatsCards extends ConsumerWidget {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
   final String value;
   final VoidCallback? onTap;
-
   const _StatCard({
     required this.icon,
     required this.iconColor,
@@ -576,7 +530,6 @@ class _StatCard extends StatelessWidget {
     required this.value,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -631,13 +584,10 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _ExperienceRow extends StatelessWidget {
   final String label;
   final String value;
-
   const _ExperienceRow({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -667,12 +617,9 @@ class _ExperienceRow extends StatelessWidget {
     );
   }
 }
-
 class _ChecklistItem extends StatelessWidget {
   final String text;
-
   const _ChecklistItem({required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -700,17 +647,14 @@ class _ChecklistItem extends StatelessWidget {
     );
   }
 }
-
 class _PersonalInfoCard extends ConsumerWidget {
   const _PersonalInfoCard();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
     final userAsync = ref.watch(currentUserProvider);
     final lat = userAsync.value?.latitude;
     final lng = userAsync.value?.longitude;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -868,7 +812,6 @@ class _PersonalInfoCard extends ConsumerWidget {
       ),
     );
   }
-
   void _showPinnedLocationMap(BuildContext context, double lat, double lng) {
     final point = LatLng(lat, lng);
     showModalBottomSheet(
@@ -953,20 +896,17 @@ class _PersonalInfoCard extends ConsumerWidget {
     );
   }
 }
-
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
   final String value;
-
   const _InfoRow({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.value,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1007,14 +947,11 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-
 class _BioCard extends ConsumerWidget {
   const _BioCard();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1090,7 +1027,6 @@ class _BioCard extends ConsumerWidget {
       ),
     );
   }
-
   void _showBioDialog(BuildContext context, WidgetRef ref, String currentBio) {
     final controller = TextEditingController(text: currentBio);
     showDialog(
@@ -1162,8 +1098,6 @@ class _BioCard extends ConsumerWidget {
     );
   }
 }
-
-// Available specialties for phone and laptop repair
 const List<String> availableSpecialties = [
   'Screen Repair',
   'Battery Replacement',
@@ -1191,14 +1125,11 @@ const List<String> availableSpecialties = [
   'Power Button Repair',
   'Volume Button Repair',
 ];
-
 class _SpecialtiesCard extends ConsumerWidget {
   const _SpecialtiesCard();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1277,7 +1208,6 @@ class _SpecialtiesCard extends ConsumerWidget {
       ),
     );
   }
-
   void _showSpecialtiesDialog(BuildContext context, WidgetRef ref, List<String> currentSpecialties) {
     showDialog(
       context: context,
@@ -1298,29 +1228,23 @@ class _SpecialtiesCard extends ConsumerWidget {
     );
   }
 }
-
 class _SpecialtiesDialog extends StatefulWidget {
   final List<String> initialSpecialties;
   final Function(List<String>) onSave;
-
   const _SpecialtiesDialog({
     required this.initialSpecialties,
     required this.onSave,
   });
-
   @override
   State<_SpecialtiesDialog> createState() => _SpecialtiesDialogState();
 }
-
 class _SpecialtiesDialogState extends State<_SpecialtiesDialog> {
   late Set<String> _selectedSpecialties;
-
   @override
   void initState() {
     super.initState();
     _selectedSpecialties = Set.from(widget.initialSpecialties);
   }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -1372,16 +1296,13 @@ class _SpecialtiesDialogState extends State<_SpecialtiesDialog> {
     );
   }
 }
-
 class _SpecialtyChip extends StatelessWidget {
   final String label;
   final bool isSelected;
-
   const _SpecialtyChip({
     required this.label,
     this.isSelected = false,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1408,20 +1329,17 @@ class _SpecialtyChip extends StatelessWidget {
     );
   }
 }
-
 class _SettingsItem extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String label;
   final VoidCallback onTap;
-
   const _SettingsItem({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1460,26 +1378,16 @@ class _SettingsItem extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Availability Schedule Card
-// ─────────────────────────────────────────────────────────────────────────────
-
 const List<String> _kDays = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
 ];
-
 class _ScheduleCard extends ConsumerStatefulWidget {
   const _ScheduleCard();
-
   @override
   ConsumerState<_ScheduleCard> createState() => _ScheduleCardState();
 }
-
 class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
   final _service = TechnicianService();
-
-  // Local mutable schedule state: day → {enabled, start, end}
   final Map<String, Map<String, dynamic>> _schedule = {
     for (final d in _kDays)
       d: {
@@ -1488,16 +1396,13 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
         'end': const TimeOfDay(hour: 18, minute: 0),
       },
   };
-
   bool _loaded = false;
   bool _saving = false;
-
   @override
   void initState() {
     super.initState();
     _loadSchedule();
   }
-
   Future<void> _loadSchedule() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
@@ -1519,22 +1424,18 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
     }
     setState(() => _loaded = true);
   }
-
   TimeOfDay _parseTime(String hhmm) {
     final parts = hhmm.split(':');
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
-
   String _fmtTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
   String _displayTime(TimeOfDay t) {
     final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
     final m = t.minute.toString().padLeft(2, '0');
     final period = t.period == DayPeriod.am ? 'AM' : 'PM';
     return '$h:$m $period';
   }
-
   bool get _isOnlineNow {
     final now = DateTime.now();
     final dayName = _kDays[now.weekday - 1];
@@ -1547,7 +1448,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
     final endMin   = end.hour * 60 + end.minute;
     return nowMin >= startMin && nowMin < endMin;
   }
-
   Future<void> _pickTime(String day, bool isStart) async {
     final current = _schedule[day]![isStart ? 'start' : 'end'] as TimeOfDay;
     final picked = await showTimePicker(
@@ -1559,7 +1459,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
       ),
     );
     if (picked == null || !mounted) return;
-    // Enforce start < end
     if (isStart) {
       final end = _schedule[day]!['end'] as TimeOfDay;
       final pickedMin = picked.hour * 60 + picked.minute;
@@ -1574,7 +1473,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
       setState(() => _schedule[day]!['end'] = picked);
     }
   }
-
   Future<void> _save() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
@@ -1605,12 +1503,10 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final onlineNow = _loaded ? _isOnlineNow : false;
     final anyEnabled = _schedule.values.any((d) => d['enabled'] == true);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1628,7 +1524,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -1646,7 +1541,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
                 ),
               ),
-              // Online/offline badge
               if (_loaded)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1693,21 +1587,18 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
             style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 16),
-
           if (!_loaded)
             const Center(child: Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: CircularProgressIndicator(strokeWidth: 2),
             ))
           else ...[
-            // Day rows
             ...List.generate(_kDays.length, (i) {
               final day = _kDays[i];
               final d = _schedule[day]!;
               final enabled = d['enabled'] as bool;
               final start   = d['start'] as TimeOfDay;
               final end     = d['end']   as TimeOfDay;
-
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: AnimatedContainer(
@@ -1726,7 +1617,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
                     children: [
                       Row(
                         children: [
-                          // Toggle
                           GestureDetector(
                             onTap: _saving ? null : () => setState(() => d['enabled'] = !enabled),
                             child: AnimatedContainer(
@@ -1751,7 +1641,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Day name
                           Expanded(
                             child: Text(
                               day,
@@ -1762,7 +1651,6 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
                               ),
                             ),
                           ),
-                          // Day-off label or time range
                           if (!enabled)
                             Text('Day off',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade400))
@@ -1790,10 +1678,7 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
                 ),
               );
             }),
-
             const SizedBox(height: 8),
-
-            // Save button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -1823,13 +1708,10 @@ class _ScheduleCardState extends ConsumerState<_ScheduleCard> {
     );
   }
 }
-
 class _TimeButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
-
   const _TimeButton({required this.label, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1853,32 +1735,22 @@ class _TimeButton extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Job Preferences Card
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _JobPreferencesCard extends ConsumerStatefulWidget {
   const _JobPreferencesCard();
-
   @override
   ConsumerState<_JobPreferencesCard> createState() => _JobPreferencesCardState();
 }
-
 class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
   final _service = TechnicianService();
-
   bool _acceptWhileBusy = false;
   bool _isBusy = false;
   bool _loaded = false;
   bool _saving = false;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   Future<void> _load() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
@@ -1890,7 +1762,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
       _loaded = true;
     });
   }
-
   Future<void> _toggle(bool value) async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
@@ -1907,7 +1778,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1927,7 +1797,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -1945,7 +1814,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor),
                 ),
               ),
-              // Busy indicator badge
               if (_loaded && _isBusy)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1975,14 +1843,12 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
             ],
           ),
           const SizedBox(height: 16),
-
           if (!_loaded)
             const Center(child: Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: CircularProgressIndicator(strokeWidth: 2),
             ))
           else ...[
-            // Toggle row
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(14),
@@ -1999,7 +1865,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
               ),
               child: Row(
                 children: [
-                  // Custom toggle
                   GestureDetector(
                     onTap: _saving ? null : () => _toggle(!_acceptWhileBusy),
                     child: AnimatedContainer(
@@ -2057,7 +1922,6 @@ class _JobPreferencesCardState extends ConsumerState<_JobPreferencesCard> {
               ),
             ),
             const SizedBox(height: 10),
-            // Info note
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(

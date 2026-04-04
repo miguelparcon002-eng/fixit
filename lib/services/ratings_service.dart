@@ -1,6 +1,5 @@
 import '../core/config/supabase_config.dart';
 import '../core/utils/app_logger.dart';
-
 class Rating {
   final String id;
   final String customerName;
@@ -11,7 +10,6 @@ class Rating {
   final String service;
   final String device;
   final String bookingId;
-
   Rating({
     required this.id,
     required this.customerName,
@@ -23,7 +21,6 @@ class Rating {
     required this.device,
     required this.bookingId,
   });
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'customer_name': customerName,
@@ -35,7 +32,6 @@ class Rating {
     'device': device,
     'booking_id': bookingId,
   };
-
   factory Rating.fromJson(Map<String, dynamic> json) => Rating(
     id: json['id'] as String,
     customerName: json['customer_name'] as String,
@@ -47,8 +43,6 @@ class Rating {
     device: json['device'] as String,
     bookingId: json['booking_id'] as String? ?? '',
   );
-
-  // Convert from Supabase response
   factory Rating.fromSupabase(Map<String, dynamic> json) => Rating(
     id: json['id'] as String,
     customerName: json['customer_name'] as String,
@@ -61,19 +55,15 @@ class Rating {
     bookingId: '', // Not stored in app_ratings table
   );
 }
-
 class RatingsService {
   static const String _tableName = 'app_ratings';
-
   Future<List<Rating>> getAllRatings() async {
     try {
       AppLogger.p('RatingsService: Loading all ratings from Supabase...');
-
       final response = await SupabaseConfig.client
           .from(_tableName)
           .select()
           .order('created_at', ascending: false);
-
       AppLogger.p('RatingsService: Loaded ${response.length} ratings');
       return (response as List).map((item) => Rating.fromSupabase(item)).toList();
     } catch (e) {
@@ -81,17 +71,14 @@ class RatingsService {
       return [];
     }
   }
-
   Future<List<Rating>> getRatingsForTechnician(String technician) async {
     try {
       AppLogger.p('RatingsService: Loading ratings for $technician...');
-
       final response = await SupabaseConfig.client
           .from(_tableName)
           .select()
           .ilike('technician', technician)
           .order('created_at', ascending: false);
-
       AppLogger.p('RatingsService: Found ${response.length} ratings for $technician');
       return (response as List).map((item) => Rating.fromSupabase(item)).toList();
     } catch (e) {
@@ -99,11 +86,9 @@ class RatingsService {
       return [];
     }
   }
-
   Future<void> addRating(Rating rating) async {
     try {
       AppLogger.p('RatingsService: Adding rating to Supabase...');
-
       await SupabaseConfig.client
           .from(_tableName)
           .insert({
@@ -115,14 +100,11 @@ class RatingsService {
             'service': rating.service,
             'device': rating.device,
           });
-
       AppLogger.p('RatingsService: Rating added successfully');
     } catch (e) {
       AppLogger.p('RatingsService: Error adding rating - $e');
     }
   }
-
-  /// Same flexible name matching used by the technician's own ratings screen
   static bool _nameMatches(String storedTech, String technicianName) {
     final stored = storedTech.toLowerCase().trim();
     final myName = technicianName.toLowerCase().trim();
@@ -132,15 +114,9 @@ class RatingsService {
     if (parts.length > 1 && stored == parts.last.toLowerCase()) return true;
     return false;
   }
-
-  /// Fetch all reviews for a technician from app_ratings.
-  /// Primary: query by technician_id UUID (reliable).
-  /// Fallback: flexible name matching for older rows without technician_id.
   Future<List<Rating>> getAllReviewsForTechnician(String technicianName, String technicianId) async {
     final results = <Rating>[];
     final seenIds = <String>{};
-
-    // 1. From app_ratings by technician_id UUID (most reliable, post-SQL-migration)
     try {
       final r1 = await SupabaseConfig.client
           .from('app_ratings')
@@ -152,10 +128,7 @@ class RatingsService {
         if (seenIds.add(rating.id)) results.add(rating);
       }
     } catch (_) {
-      // technician_id column not yet added — fall through to name matching
     }
-
-    // 2. Fallback: name matching for legacy rows without technician_id
     try {
       final r2 = await SupabaseConfig.client
           .from('app_ratings')
@@ -174,8 +147,6 @@ class RatingsService {
     } catch (e) {
       AppLogger.p('RatingsService: app_ratings name-fallback query failed — $e');
     }
-
-    // Deduplicate by row id
     final seen = <String>{};
     final deduped = <Rating>[];
     for (final r in results) {
@@ -184,16 +155,10 @@ class RatingsService {
     }
     return deduped;
   }
-
   Future<bool> hasRatingForBooking(String bookingId) async {
-    // For now, since we don't store booking_id in app_ratings,
-    // we'll return false. You can enhance this later if needed.
     return false;
   }
-
   Future<Rating?> getRatingForBooking(String bookingId) async {
-    // For now, since we don't store booking_id in app_ratings,
-    // we'll return null. You can enhance this later if needed.
     return null;
   }
 }

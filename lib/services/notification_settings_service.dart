@@ -1,25 +1,16 @@
 import '../core/config/supabase_config.dart';
 import '../core/utils/app_logger.dart';
-
-/// Mirrors the columns in `user_notification_settings`.
 class NotificationSettings {
   final String userId;
-
-  // General
   final bool pushNotifications;
   final bool emailNotifications;
   final bool smsNotifications;
-
-  // Booking & Service
   final bool bookingUpdates;
   final bool technicianMessages;
   final bool serviceCompleted;
   final bool paymentReminders;
-
-  // Promotions
   final bool promotional;
   final bool newOffers;
-
   const NotificationSettings({
     required this.userId,
     this.pushNotifications = true,
@@ -32,7 +23,6 @@ class NotificationSettings {
     this.promotional = true,
     this.newOffers = false,
   });
-
   factory NotificationSettings.fromJson(Map<String, dynamic> json) {
     return NotificationSettings(
       userId: json['user_id'] as String,
@@ -47,7 +37,6 @@ class NotificationSettings {
       newOffers: (json['new_offers'] as bool?) ?? false,
     );
   }
-
   Map<String, dynamic> toJson() => {
         'user_id': userId,
         'push_notifications': pushNotifications,
@@ -60,7 +49,6 @@ class NotificationSettings {
         'promotional': promotional,
         'new_offers': newOffers,
       };
-
   NotificationSettings copyWith({
     bool? pushNotifications,
     bool? emailNotifications,
@@ -85,17 +73,13 @@ class NotificationSettings {
       newOffers: newOffers ?? this.newOffers,
     );
   }
-
-  /// Returns true if the given notification [type] should be shown to the user.
   bool allows(String type) {
     switch (type) {
-      // Booking & service types
       case 'job_request':
       case 'booking_request':
       case 'job_accepted':
         return bookingUpdates;
       case 'reminder':
-        // "scheduled" / "cancelled" / "en_route" / "in_progress" are all reminders
         return bookingUpdates;
       case 'payment':
         return paymentReminders;
@@ -103,12 +87,10 @@ class NotificationSettings {
         return technicianMessages;
       case 'service_completed':
         return serviceCompleted;
-      // Promotional types
       case 'promotional':
         return promotional;
       case 'new_offer':
         return newOffers;
-      // System / verification — always shown
       case 'verification_result':
       case 'rating':
       default:
@@ -116,12 +98,9 @@ class NotificationSettings {
     }
   }
 }
-
 class NotificationSettingsService {
   final _supabase = SupabaseConfig.client;
   static const _table = 'user_notification_settings';
-
-  /// Fetch the current user's settings. Returns defaults if no row exists yet.
   Future<NotificationSettings> getSettings(String userId) async {
     try {
       final response = await _supabase
@@ -129,7 +108,6 @@ class NotificationSettingsService {
           .select()
           .eq('user_id', userId)
           .maybeSingle();
-
       if (response == null) {
         return NotificationSettings(userId: userId);
       }
@@ -139,8 +117,6 @@ class NotificationSettingsService {
       return NotificationSettings(userId: userId);
     }
   }
-
-  /// Upsert (create or update) the user's settings row.
   Future<void> saveSettings(NotificationSettings settings) async {
     try {
       await _supabase.from(_table).upsert(

@@ -7,18 +7,13 @@ import '../core/utils/app_logger.dart';
 import '../core/utils/technician_verification_guard.dart';
 import '../services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 class BookingService {
   final _supabase = SupabaseConfig.client;
   final _uuid = const Uuid();
-
-  // Optional ref for enforcing technician verification in write operations.
   Ref? _ref;
-
   BookingService({Ref? ref}) {
     _ref = ref;
   }
-
   Future<BookingModel> createBooking({
     required String customerId,
     required String technicianId,
@@ -33,7 +28,6 @@ class BookingService {
     String bookingSource = 'booking',
   }) async {
     final bookingId = _uuid.v4();
-
     final response = await _supabase.from(DBConstants.bookings).insert({
       'id': bookingId,
       'customer_id': customerId,
@@ -49,10 +43,8 @@ class BookingService {
       'payment_status': 'pending',
       'booking_source': bookingSource,
     }).select().single();
-
     return BookingModel.fromJson(response);
   }
-
   Future<void> updateBookingStatus({
     required String bookingId,
     required String status,
@@ -62,26 +54,17 @@ class BookingService {
     if (_ref != null) {
       await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
     }
-
-    // Use an RPC function so the WHERE clause is UUID = UUID (no type-cast
-    // ambiguity that causes "operator does not exist: uuid = text").
     await _supabase.rpc('set_booking_status', params: {
       'p_booking_id': bookingId,
       'p_status': status,
       'p_cancel_reason': cancellationReason,
       'p_cancel_fee': cancellationFee,
     });
-
-    // Auto-update technician busy status based on active booking count.
     await _syncTechnicianBusy(bookingId, status);
-
-    // Sync the linked job_request status when the booking finishes/cancels.
     await _syncJobRequestStatus(bookingId, status);
   }
-
   Future<void> _syncTechnicianBusy(String bookingId, String newStatus) async {
     try {
-      // Fetch the technician_id for this booking
       final row = await _supabase
           .from(DBConstants.bookings)
           .select('technician_id')
@@ -90,12 +73,10 @@ class BookingService {
       if (row == null) return;
       final techUserId = row['technician_id'] as String?;
       if (techUserId == null) return;
-
       if (newStatus == AppConstants.bookingAccepted ||
           newStatus == AppConstants.bookingEnRoute ||
           newStatus == AppConstants.bookingArrived ||
           newStatus == AppConstants.bookingInProgress) {
-        // Technician is now working — mark busy
         await _supabase
             .from(DBConstants.technicianProfiles)
             .update({'is_busy': true})
@@ -105,7 +86,6 @@ class BookingService {
                  newStatus == AppConstants.bookingClosed ||
                  newStatus == AppConstants.bookingCancelled ||
                  newStatus == AppConstants.bookingCancellationPending) {
-        // Only clear busy if there are no other active bookings
         final active = await _supabase
             .from(DBConstants.bookings)
             .select('id')
@@ -123,12 +103,8 @@ class BookingService {
         }
       }
     } catch (_) {
-      // Non-critical — the Supabase trigger handles this server-side too
     }
   }
-
-  /// When a post-problem booking finishes or is cancelled, mirror the final
-  /// status back to the originating job_request row so the map stays accurate.
   Future<void> _syncJobRequestStatus(String bookingId, String newStatus) async {
     try {
       final isTerminal = newStatus == AppConstants.bookingCompleted ||
@@ -136,18 +112,15 @@ class BookingService {
           newStatus == AppConstants.bookingClosed;
       final isCancelled = newStatus == AppConstants.bookingCancelled;
       if (!isTerminal && !isCancelled) return;
-
       final row = await _supabase
           .from(DBConstants.bookings)
           .select('customer_id, technician_id, booking_source')
           .filter('id::text', 'eq', bookingId)
           .maybeSingle();
       if (row == null || row['booking_source'] != 'post_problem') return;
-
       final customerId = row['customer_id'] as String?;
       final technicianId = row['technician_id'] as String?;
       if (customerId == null || technicianId == null) return;
-
       await _supabase
           .from('job_requests')
           .update({'status': isTerminal ? 'completed' : 'cancelled'})
@@ -155,10 +128,8 @@ class BookingService {
           .eq('technician_id', technicianId)
           .eq('status', 'accepted');
     } catch (_) {
-      // Non-critical
     }
   }
-
   Future<void> updateDiagnosticNotes({
     required String bookingId,
     required String notes,
@@ -167,16 +138,10 @@ class BookingService {
   }) async {
     String updatedNotes = notes;
     final updates = <String, dynamic>{};
-
     if (partsList != null) updates['parts_list'] = partsList;
-
     if (finalCost != null) {
-      // Check if there's a voucher discount on this booking and keep it applied.
-      // Without this, assess & price would overwrite final_cost with the raw tech
-      // total, inflating the back-calculated voucher discount in the breakdown UI.
       final booking = await getBookingById(bookingId);
       final discountStr = booking?.discountAmount;
-
       if (discountStr != null) {
         double effectiveCost;
         if (discountStr.endsWith('%')) {
@@ -188,7 +153,6 @@ class BookingService {
               0.0;
           effectiveCost = (finalCost - fixed).clamp(0.0, double.infinity);
         }
-        // Keep the stored "Original Price" note in sync with the new tech total
         updatedNotes = updatedNotes.replaceFirst(
           RegExp(r'Original Price: ₱[\d.]+'),
           'Original Price: ₱${finalCost.toStringAsFixed(2)}',
@@ -198,29 +162,22 @@ class BookingService {
         updates['final_cost'] = finalCost;
       }
     }
-
     updates['diagnostic_notes'] = updatedNotes;
-
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)
         .filter('id::text', 'eq', bookingId);
   }
-
-  /// Update booking details (notes and price adjustment)
   Future<void> updateBookingDetails({
     required String bookingId,
     String? technicianNotes,
     double? priceAdjustment,
   }) async {
     final updates = <String, dynamic>{};
-
     if (technicianNotes != null && technicianNotes.isNotEmpty) {
       updates['diagnostic_notes'] = technicianNotes;
     }
-
     if (priceAdjustment != null) {
-      // Get current booking to calculate new final cost
       final booking = await getBookingById(bookingId);
       if (booking != null) {
         final currentCost = booking.estimatedCost ?? 0.0;
@@ -228,7 +185,6 @@ class BookingService {
         updates['final_cost'] = newFinalCost > 0 ? newFinalCost : 0.0;
       }
     }
-
     if (updates.isNotEmpty) {
       await _supabase
           .from(DBConstants.bookings)
@@ -236,27 +192,17 @@ class BookingService {
           .filter('id::text', 'eq', bookingId);
     }
   }
-
-  /// Add technician notes to existing booking (preserves customer details)
   Future<void> addTechnicianNotes({
     required String bookingId,
     required String technicianNotes,
     double? priceAdjustment,
   }) async {
-    // Get current booking
     final booking = await getBookingById(bookingId);
     if (booking == null) return;
-
-    // Get existing diagnostic notes (customer's original booking details)
     String updatedNotes = booking.diagnosticNotes ?? '';
-
-    // Split into customer portion and existing technician section
     final parts = updatedNotes.split('---TECHNICIAN NOTES---');
     final customerDetails = parts[0].trim();
     final existingTechNotes = parts.length > 1 ? parts[1].trim() : '';
-
-    // Append the new note to whatever the technician already wrote
-    // (preserves service fee, parts, assessment from assess & price)
     if (technicianNotes.isNotEmpty) {
       final combined = existingTechNotes.isNotEmpty
           ? '$existingTechNotes\n$technicianNotes'
@@ -267,73 +213,46 @@ class BookingService {
           ? '$customerDetails\n\n---TECHNICIAN NOTES---\n$existingTechNotes'
           : customerDetails;
     }
-
     final updates = <String, dynamic>{
       'diagnostic_notes': updatedNotes,
     };
-
-    // Handle price adjustment if provided - MAINTAIN DISCOUNT
     if (priceAdjustment != null && priceAdjustment != 0) {
-      // Check if there's a discount applied
       final promoCode = booking.promoCode;
       final discountAmountStr = booking.discountAmount;
       final originalPriceStr = booking.originalPrice;
-
       if (promoCode != null && discountAmountStr != null && originalPriceStr != null) {
-        // There's a discount - we need to maintain it
-        // Parse original price
         final originalPrice = double.tryParse(originalPriceStr.replaceAll('₱', '').replaceAll(',', '').trim()) ?? 0.0;
-
-        // Calculate new original price (before discount)
         final newOriginalPrice = originalPrice + priceAdjustment;
-
-        // Determine if it's a percentage or fixed discount
         if (discountAmountStr.contains('%')) {
-          // Percentage discount
           final percentageStr = discountAmountStr.replaceAll('%', '').trim();
           final percentage = double.tryParse(percentageStr) ?? 0.0;
-
-          // Apply percentage to new original price
           final discountAmount = newOriginalPrice * (percentage / 100);
           final newFinalCost = newOriginalPrice - discountAmount;
-
           updates['final_cost'] = newFinalCost > 0 ? newFinalCost : 0.0;
-
-          // Update the diagnostic notes with new prices
           updatedNotes = updatedNotes.replaceFirst(
             RegExp(r'Original Price: ₱[\d.]+'),
             'Original Price: ₱${newOriginalPrice.toStringAsFixed(2)}'
           );
         } else {
-          // Fixed amount discount
           final fixedDiscount = double.tryParse(discountAmountStr.replaceAll('₱', '').replaceAll(',', '').trim()) ?? 0.0;
           final newFinalCost = newOriginalPrice - fixedDiscount;
-
           updates['final_cost'] = newFinalCost > 0 ? newFinalCost : 0.0;
-
-          // Update the diagnostic notes with new price
           updatedNotes = updatedNotes.replaceFirst(
             RegExp(r'Original Price: ₱[\d.]+'),
             'Original Price: ₱${newOriginalPrice.toStringAsFixed(2)}'
           );
         }
-
-        // Update the notes with the corrected prices
         updates['diagnostic_notes'] = updatedNotes;
       } else {
-        // No discount - just add the adjustment
         final currentCost = booking.finalCost ?? booking.estimatedCost ?? 0.0;
         final newFinalCost = currentCost + priceAdjustment;
         updates['final_cost'] = newFinalCost > 0 ? newFinalCost : 0.0;
       }
     }
-
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)
         .filter('id::text', 'eq', bookingId);
-
-    // Notify customer if price was adjusted
     if (priceAdjustment != null && priceAdjustment != 0) {
       final newCost = (updates['final_cost'] as num?)?.toDouble()
           ?? (booking.finalCost ?? booking.estimatedCost ?? 0.0) + priceAdjustment;
@@ -347,54 +266,44 @@ class BookingService {
       );
     }
   }
-
   Future<List<BookingModel>> getCustomerBookings(String customerId) async {
     final response = await _supabase
         .from(DBConstants.bookings)
         .select()
         .eq('customer_id', customerId)
         .order('created_at', ascending: false);
-
     return (response as List).map((e) => BookingModel.fromJson(e)).toList();
   }
-
   Future<List<BookingModel>> getTechnicianBookings(String technicianId) async {
     final response = await _supabase
         .from(DBConstants.bookings)
         .select()
         .eq('technician_id', technicianId)
         .order('created_at', ascending: false);
-
     return (response as List).map((e) => BookingModel.fromJson(e)).toList();
   }
-
   Future<List<BookingModel>> getBookingsByStatus({
     required String userId,
     required String status,
     bool isTechnician = false,
   }) async {
     final field = isTechnician ? 'technician_id' : 'customer_id';
-
     final response = await _supabase
         .from(DBConstants.bookings)
         .select()
         .eq(field, userId)
         .eq('status', status)
         .order('created_at', ascending: false);
-
     return (response as List).map((e) => BookingModel.fromJson(e)).toList();
   }
-
   Future<BookingModel?> getBookingById(String bookingId) async {
     final response = await _supabase
         .from(DBConstants.bookings)
         .select()
         .filter('id::text', 'eq', bookingId)
         .single();
-
     return BookingModel.fromJson(response);
   }
-
   Stream<BookingModel?> watchBookingById(String bookingId) {
     return _supabase
         .from(DBConstants.bookings)
@@ -402,7 +311,6 @@ class BookingService {
         .eq('id', bookingId)
         .map((data) => data.isEmpty ? null : BookingModel.fromJson(data.first));
   }
-
   Future<void> rateBooking({
     required String bookingId,
     required int rating,
@@ -413,10 +321,8 @@ class BookingService {
       'review': review,
     }).filter('id::text', 'eq', bookingId);
   }
-
   Stream<List<BookingModel>> watchCustomerBookings(String customerId) {
     AppLogger.p('🔍 BOOKING SERVICE: Starting stream for customer $customerId');
-
     return _supabase
         .from(DBConstants.bookings)
         .stream(primaryKey: ['id'])
@@ -431,10 +337,6 @@ class BookingService {
           return bookings;
         });
   }
-
-  /// Streams every booking that originated from a job-request (post_problem).
-  /// Uses booking_source (immutable) as the filter so ALL status updates are
-  /// received reliably — unlike filtering on a mutable column such as status.
   Stream<List<BookingModel>> watchPostProblemBookings() {
     return _supabase
         .from(DBConstants.bookings)
@@ -444,10 +346,8 @@ class BookingService {
         .map((data) =>
             data.map((e) => BookingModel.fromJson(e)).toList());
   }
-
   Stream<List<BookingModel>> watchTechnicianBookings(String technicianId) {
     AppLogger.p('🔍 BOOKING SERVICE: Starting stream for technician $technicianId');
-
     return _supabase
         .from(DBConstants.bookings)
         .stream(primaryKey: ['id'])
@@ -462,7 +362,6 @@ class BookingService {
           return bookings;
         });
   }
-
   Future<void> updatePaymentStatus({
     required String bookingId,
     required String paymentStatus,
@@ -471,11 +370,9 @@ class BookingService {
     final updates = <String, dynamic>{
       'payment_status': paymentStatus,
     };
-
     if (paymentMethod != null) {
       updates['payment_method'] = paymentMethod;
     }
-
     await _supabase
         .from(DBConstants.bookings)
         .update(updates)

@@ -1,36 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../services/feedback_service.dart';
-
 class AdminFeedbackScreen extends StatefulWidget {
   const AdminFeedbackScreen({super.key});
-
   @override
   State<AdminFeedbackScreen> createState() => _AdminFeedbackScreenState();
 }
-
 class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _allFeedback = [];
   bool _loading = true;
   String _filterStatus = 'all';
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadFeedback();
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   Future<void> _loadFeedback() async {
     setState(() => _loading = true);
     try {
@@ -45,7 +38,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       setState(() => _loading = false);
     }
   }
-
   List<Map<String, dynamic>> _getFiltered(String type) {
     var items = _allFeedback.where((f) => f['type'] == type).toList();
     if (_filterStatus != 'all') {
@@ -53,11 +45,9 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
     }
     return items;
   }
-
   int _countNew(String type) => _allFeedback
       .where((f) => f['type'] == type && f['status'] == 'new')
       .length;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,7 +116,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
             )
           : Column(
               children: [
-                // Filter chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -156,7 +145,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
             ),
     );
   }
-
   Widget _buildFilterChip(String label, String status) {
     final isSelected = _filterStatus == status;
     return GestureDetector(
@@ -181,10 +169,8 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       ),
     );
   }
-
   Widget _buildList(String type) {
     final items = _getFiltered(type);
-
     if (items.isEmpty) {
       return Center(
         child: Column(
@@ -210,7 +196,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: _loadFeedback,
       child: ListView.builder(
@@ -225,7 +210,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       ),
     );
   }
-
   Widget _buildFeedbackCard(Map<String, dynamic> item) {
     final type = item['type'] as String? ?? 'feedback';
     final status = item['status'] as String? ?? 'new';
@@ -237,16 +221,13 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
             .format(DateTime.parse(item['created_at']).toLocal())
         : '-';
     final adminNote = item['admin_note'] as String?;
-
     final isBug = type == 'bug_report';
     final accentColor = isBug ? AppTheme.errorColor : AppTheme.primaryCyan;
-
     final (statusColor, statusLabel) = switch (status) {
       'reviewed' => (Colors.orange, 'Reviewed'),
       'resolved' => (AppTheme.successColor, 'Resolved'),
       _ => (AppTheme.lightBlue, 'New'),
     };
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -257,7 +238,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -316,8 +296,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
               ),
             ],
           ),
-
-          // Rating (if feedback with rating)
           if (rating != null && rating > 0) ...[
             const SizedBox(height: 10),
             Row(
@@ -331,8 +309,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
               ),
             ),
           ],
-
-          // Message
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -350,8 +326,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
               ),
             ),
           ),
-
-          // Admin note
           if (adminNote != null && adminNote.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -383,8 +357,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
               ),
             ),
           ],
-
-          // Action buttons
           if (status == 'new' || status == 'reviewed') ...[
             const SizedBox(height: 10),
             Row(
@@ -427,7 +399,6 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       ),
     );
   }
-
   Future<void> _updateStatus(
       Map<String, dynamic> item, String status) async {
     try {
@@ -450,10 +421,8 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
       );
     }
   }
-
   void _showResolveDialog(Map<String, dynamic> item) {
     final noteController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -529,11 +498,9 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen>
     );
   }
 }
-
 class _BadgeCount extends StatelessWidget {
   final int count;
   const _BadgeCount({required this.count});
-
   @override
   Widget build(BuildContext context) {
     return Container(

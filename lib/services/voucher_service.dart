@@ -1,10 +1,8 @@
 import '../core/config/supabase_config.dart';
 import '../core/constants/db_constants.dart';
 import '../core/utils/app_logger.dart';
-
 class VoucherService {
   final _supabase = SupabaseConfig.client;
-
   Future<bool> isProfileSetupComplete(String userId) async {
     try {
       final response = await _supabase
@@ -18,7 +16,6 @@ class VoucherService {
       return false;
     }
   }
-
   Future<void> markProfileSetupComplete(String userId) async {
     try {
       await _supabase

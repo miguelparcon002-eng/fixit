@@ -5,47 +5,39 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/payment_service.dart';
-
 class PaymentScreen extends ConsumerStatefulWidget {
   final String bookingId;
   final double amount;
   final bool isCancellationFee;
-
   const PaymentScreen({
     super.key,
     required this.bookingId,
     required this.amount,
     this.isCancellationFee = false,
   });
-
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
-
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _referenceController = TextEditingController();
   final _senderNameController = TextEditingController();
   final _amountController = TextEditingController();
-
   Map<String, dynamic>? _qrSettings;
   bool _loadingQr = true;
   XFile? _proofImage;
   Uint8List? _proofImageBytes; // used on web
   bool _submitting = false;
   Map<String, dynamic>? _existingPayment;
-
   @override
   void initState() {
     super.initState();
     _amountController.text = widget.amount.toStringAsFixed(2);
     _loadData();
   }
-
   @override
   void dispose() {
     _referenceController.dispose();
@@ -53,7 +45,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     _amountController.dispose();
     super.dispose();
   }
-
   Future<void> _loadData() async {
     final results = await Future.wait([
       PaymentService.getAdminQrSettings(),
@@ -69,7 +60,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _loadingQr = false;
     });
   }
-
   Future<void> _pickProofImage() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
@@ -93,7 +83,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       }
     }
   }
-
   Future<void> _submitPayment() async {
     if (!_formKey.currentState!.validate()) return;
     if (_proofImage == null) {
@@ -105,21 +94,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
       return;
     }
-
     setState(() => _submitting = true);
-
     try {
       final userId =
           SupabaseConfig.client.auth.currentUser?.id ?? '';
-
-      // Upload proof image
       final proofUrl = await PaymentService.uploadPaymentProof(
         bookingId: widget.bookingId,
         customerId: userId,
         imageFile: _proofImage!,
       );
-
-      // Submit payment record
       await PaymentService.submitPayment(
         bookingId: widget.bookingId,
         customerId: userId,
@@ -129,7 +112,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         proofImageUrl: proofUrl,
         paymentType: widget.isCancellationFee ? 'cancellation_fee' : 'booking',
       );
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -150,7 +132,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (mounted) setState(() => _submitting = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -180,11 +161,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               : _buildPaymentForm(),
     );
   }
-
   Future<void> _resubmitPayment() async {
     final paymentId = _existingPayment?['id']?.toString();
     if (paymentId == null) return;
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -212,16 +191,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         ],
       ),
     );
-
     if (confirmed != true || !mounted) return;
-
     try {
       await PaymentService.deletePayment(paymentId);
-      // Reset booking payment status so it shows "Pay Now" again
       await SupabaseConfig.client.from('bookings').update({
         'payment_status': 'pending',
       }).eq('id', widget.bookingId);
-
       if (!mounted) return;
       setState(() {
         _existingPayment = null;
@@ -237,7 +212,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
     }
   }
-
   Widget _buildExistingPaymentView() {
     final status = _existingPayment!['status'] as String? ?? 'pending';
     final (statusColor, statusLabel, statusIcon, statusMessage) = switch (status) {
@@ -260,16 +234,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           'Your payment proof has been submitted and is awaiting admin verification.'
         ),
     };
-
     final proofUrl = _existingPayment!['proof_image_url'] as String?;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           const SizedBox(height: 16),
-
-          // Status header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -301,8 +271,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Payment details card
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -335,8 +303,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Proof image
           if (proofUrl != null && proofUrl.isNotEmpty)
             Container(
               width: double.infinity,
@@ -375,8 +341,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ),
           const SizedBox(height: 20),
-
-          // Action buttons
           if (status != 'verified') ...[
             SizedBox(
               width: double.infinity,
@@ -402,7 +366,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
     );
   }
-
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -434,7 +397,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
     );
   }
-
   Widget _buildPaymentForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -443,7 +405,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Amount card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -486,8 +447,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // GCash QR Code section
             _buildSectionLabel('GCash QR Code'),
             const SizedBox(height: 8),
             Container(
@@ -606,8 +565,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     ),
             ),
             const SizedBox(height: 20),
-
-            // Payment details form
             _buildSectionLabel('Payment Details'),
             const SizedBox(height: 8),
             Container(
@@ -664,8 +621,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Proof of payment
             _buildSectionLabel('Proof of Payment'),
             const SizedBox(height: 8),
             GestureDetector(
@@ -756,8 +711,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ),
             const SizedBox(height: 28),
-
-            // Submit button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -796,7 +749,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
     );
   }
-
   Widget _buildSectionLabel(String text) {
     return Text(
       text,
@@ -807,7 +759,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
     );
   }
-
   InputDecoration _inputDecoration({
     required String label,
     required String hint,

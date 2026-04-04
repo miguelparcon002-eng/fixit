@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/config/supabase_config.dart';
 import '../../models/verification_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../services/notification_service.dart';
-
 class VerificationReviewScreen extends ConsumerWidget {
   const VerificationReviewScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
@@ -19,12 +16,10 @@ class VerificationReviewScreen extends ConsumerWidget {
     final resubmitAsync = ref.watch(resubmitVerificationsProvider);
     final rejectedAsync = ref.watch(rejectedVerificationsProvider);
     final approvedAsync = ref.watch(approvedVerificationsProvider);
-
     final pendingCount = pendingAsync.valueOrNull?.length ?? 0;
     final resubmitCount = resubmitAsync.valueOrNull?.length ?? 0;
     final rejectedCount = rejectedAsync.valueOrNull?.length ?? 0;
     final approvedCount = approvedAsync.valueOrNull?.length ?? 0;
-
     void openDetails(VerificationRequestModel req, {bool showActions = false, bool showAllowResubmit = false}) async {
       final admin = userAsync.valueOrNull;
       if (admin == null) return;
@@ -41,7 +36,6 @@ class VerificationReviewScreen extends ConsumerWidget {
         ),
       );
     }
-
     return DefaultTabController(
       length: 4,
       child: Scaffold(
@@ -183,12 +177,10 @@ class VerificationReviewScreen extends ConsumerWidget {
     );
   }
 }
-
 class _TabBadge extends StatelessWidget {
   final int count;
   final Color color;
   const _TabBadge({required this.count, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -208,7 +200,6 @@ class _TabBadge extends StatelessWidget {
     );
   }
 }
-
 class _VerificationList extends StatelessWidget {
   final AsyncValue<List<VerificationRequestModel>> asyncData;
   final String emptyMessage;
@@ -218,7 +209,6 @@ class _VerificationList extends StatelessWidget {
   final Color statusColor;
   final bool showActions;
   final void Function(VerificationRequestModel) onTap;
-
   const _VerificationList({
     required this.asyncData,
     required this.emptyMessage,
@@ -229,7 +219,6 @@ class _VerificationList extends StatelessWidget {
     required this.showActions,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return asyncData.when(
@@ -263,7 +252,6 @@ class _VerificationList extends StatelessWidget {
             ),
           );
         }
-
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: requests.length,
@@ -283,14 +271,12 @@ class _VerificationList extends StatelessWidget {
     );
   }
 }
-
 class _VerificationCard extends StatelessWidget {
   final VerificationRequestModel request;
   final String statusLabel;
   final Color statusColor;
   final bool showActions;
   final VoidCallback onTap;
-
   const _VerificationCard({
     required this.request,
     required this.statusLabel,
@@ -298,13 +284,11 @@ class _VerificationCard extends StatelessWidget {
     required this.showActions,
     required this.onTap,
   });
-
   String _formatDate(DateTime dt) {
     final local = dt.toLocal();
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${months[local.month - 1]} ${local.day}, ${local.year}';
   }
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -414,36 +398,30 @@ class _VerificationCard extends StatelessWidget {
     );
   }
 }
-
 class _VerificationDetailsSheet extends ConsumerStatefulWidget {
   final VerificationRequestModel request;
   final String adminId;
   final bool showActions;
   final bool showAllowResubmit;
-
   const _VerificationDetailsSheet({
     required this.request,
     required this.adminId,
     required this.showActions,
     this.showAllowResubmit = false,
   });
-
   @override
   ConsumerState<_VerificationDetailsSheet> createState() =>
       _VerificationDetailsSheetState();
 }
-
 class _VerificationDetailsSheetState
     extends ConsumerState<_VerificationDetailsSheet> {
   final TextEditingController _notesController = TextEditingController();
   bool _busy = false;
-
   @override
   void dispose() {
     _notesController.dispose();
     super.dispose();
   }
-
   Future<String?> _fetchTechnicianEmail(String userId) async {
     try {
       final row = await SupabaseConfig.client
@@ -456,7 +434,6 @@ class _VerificationDetailsSheetState
       return null;
     }
   }
-
   Future<void> _act(
     Future<void> Function() fn,
     String action,
@@ -465,7 +442,6 @@ class _VerificationDetailsSheetState
     setState(() => _busy = true);
     try {
       await fn();
-
       if (mounted) {
         ref.invalidate(pendingVerificationsProvider);
         ref.invalidate(resubmitVerificationsProvider);
@@ -473,8 +449,6 @@ class _VerificationDetailsSheetState
         ref.invalidate(approvedVerificationsProvider);
         Navigator.of(context, rootNavigator: true).pop();
       }
-
-      // Send email in background — don't await so it doesn't block the UI
       final notes = _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim();
@@ -490,7 +464,6 @@ class _VerificationDetailsSheetState
           );
         }
       }).catchError((e) {
-        // Show email error as a snackbar so it's visible during testing
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -511,12 +484,10 @@ class _VerificationDetailsSheetState
       if (mounted) setState(() => _busy = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final req = widget.request;
     final service = ref.read(verificationServiceProvider);
-
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -690,13 +661,10 @@ class _VerificationDetailsSheetState
     );
   }
 }
-
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
-
   const _Section({required this.title, required this.child});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -725,30 +693,20 @@ class _Section extends StatelessWidget {
     );
   }
 }
-
 class _DocThumb extends StatelessWidget {
   final String url;
-
   const _DocThumb({required this.url});
-
   static String labelFromUrl(String url) {
-    // Try to extract the file name before query params.
     final noQuery = url.split('?').first;
     final file = noQuery.split('/').last;
-
-    // Expected pattern: {timestamp}_{type}.jpg OR {timestamp}_{type}_something.jpg
     final parts = file.split('_');
     if (parts.length >= 2) {
-      // Join everything after timestamp and remove extension
       final namePart = parts.sublist(1).join('_');
       final base = namePart.split('.').first;
       return base.replaceAll('_', ' ');
     }
-
-    // Fallback: strip extension
     return file.split('.').first.replaceAll('_', ' ');
   }
-
   bool get _looksLikeImage {
     final u = url.toLowerCase();
     return u.contains('.jpg') ||
@@ -757,11 +715,9 @@ class _DocThumb extends StatelessWidget {
         u.contains('.webp') ||
         u.contains('image');
   }
-
   @override
   Widget build(BuildContext context) {
     final label = labelFromUrl(url);
-
     return InkWell(
       onTap: () {
         showDialog(
@@ -860,13 +816,10 @@ class _DocThumb extends StatelessWidget {
     );
   }
 }
-
 class _Row extends StatelessWidget {
   final String label;
   final String value;
-
   const _Row({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Padding(

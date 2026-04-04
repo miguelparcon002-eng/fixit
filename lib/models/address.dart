@@ -4,7 +4,6 @@ class Address {
   final String city;
   final String neighborhood;
   final bool isDefault;
-
   Address({
     required this.id,
     required this.street,
@@ -12,7 +11,6 @@ class Address {
     required this.neighborhood,
     this.isDefault = false,
   });
-
   Address copyWith({
     String? id,
     String? street,
@@ -28,7 +26,6 @@ class Address {
       isDefault: isDefault ?? this.isDefault,
     );
   }
-
   Map<String, dynamic> toJson() => {
     'id': id,
     'street': street,
@@ -36,7 +33,6 @@ class Address {
     'neighborhood': neighborhood,
     'isDefault': isDefault,
   };
-
   factory Address.fromJson(Map<String, dynamic> json) => Address(
     id: json['id'] as String,
     street: json['street'] as String,

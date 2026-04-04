@@ -1,31 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-
 class TechnicianMapSheet extends StatefulWidget {
   final List<Map<String, dynamic>> technicians;
   final String? selectedTechnicianId;
   final ValueChanged<String> onTechnicianSelected;
-
   const TechnicianMapSheet({
     super.key,
     required this.technicians,
     required this.selectedTechnicianId,
     required this.onTechnicianSelected,
   });
-
   @override
   State<TechnicianMapSheet> createState() => _TechnicianMapSheetState();
 }
-
 class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
-  // San Francisco, Agusan del Sur, Philippines
   static const LatLng _sfCenter = LatLng(8.5048, 125.9676);
-
   late final MapController _mapController;
   late final Map<String, LatLng> _techLocations;
   String? _focusedTechId;
-
   @override
   void initState() {
     super.initState();
@@ -33,7 +26,6 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
     _focusedTechId = widget.selectedTechnicianId;
     _techLocations = _generateLocations();
   }
-
   Map<String, LatLng> _generateLocations() {
     final Map<String, LatLng> locations = {};
     for (final tech in widget.technicians) {
@@ -43,11 +35,9 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
       if (lat != null && lng != null) {
         locations[id] = LatLng(lat, lng);
       }
-      // Technicians without a saved location are omitted from the map
     }
     return locations;
   }
-
   void _selectTech(String techId) {
     if (_focusedTechId == techId) return;
     setState(() => _focusedTechId = techId);
@@ -56,7 +46,6 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
       _mapController.move(loc, 14.5);
     }
   }
-
   List<Marker> _buildMarkers() {
     return widget.technicians.map((tech) {
       final id = tech['id'] as String;
@@ -78,13 +67,11 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
       );
     }).whereType<Marker>().toList();
   }
-
   @override
   Widget build(BuildContext context) {
     final focusedTech = _focusedTechId != null
         ? widget.technicians.where((t) => t['id'] == _focusedTechId).firstOrNull
         : null;
-
     return Container(
       height: MediaQuery.of(context).size.height * 0.82,
       decoration: const BoxDecoration(
@@ -102,8 +89,6 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -129,8 +114,6 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Map
           Expanded(
             child: FlutterMap(
               mapController: _mapController,
@@ -159,8 +142,6 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
               ],
             ),
           ),
-
-          // Bottom card
           _BottomCard(
             tech: focusedTech,
             onSelect: () {
@@ -172,20 +153,16 @@ class _TechnicianMapSheetState extends State<TechnicianMapSheet> {
       ),
     );
   }
-
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
   }
 }
-
 class _BottomCard extends StatelessWidget {
   final Map<String, dynamic>? tech;
   final VoidCallback onSelect;
-
   const _BottomCard({required this.tech, required this.onSelect});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -207,7 +184,6 @@ class _BottomCard extends StatelessWidget {
             ),
     );
   }
-
   Widget _buildTechRow(Map<String, dynamic> tech) {
     final name = tech['name'] as String? ?? 'Technician';
     final rating = (tech['rating'] as num?)?.toDouble() ?? 0.0;
@@ -220,7 +196,6 @@ class _BottomCard extends StatelessWidget {
         .take(2)
         .map((s) => s[0].toUpperCase())
         .join();
-
     return Row(
       children: [
         CircleAvatar(

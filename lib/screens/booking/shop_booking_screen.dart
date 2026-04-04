@@ -2,17 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/redeemed_voucher.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/rewards_provider.dart';
-
-// ─────────────────────────────────────────────
-// Data class passed from home screen → router
-// ─────────────────────────────────────────────
 class ShopInfo {
   final String shopName;
   final String ownerName;
@@ -23,9 +18,7 @@ class ShopInfo {
   final bool isOpen;
   final List<Color> gradientColors;
   final String shopAddress;
-  // The shop's dedicated technician ID (nullable — if null we pick any available)
   final String? technicianId;
-
   const ShopInfo({
     required this.shopName,
     required this.ownerName,
@@ -39,50 +32,33 @@ class ShopInfo {
     this.technicianId,
   });
 }
-
-// ─────────────────────────────────────────────
-// Screen
-// ─────────────────────────────────────────────
 class ShopBookingScreen extends ConsumerStatefulWidget {
   final ShopInfo shop;
-
   const ShopBookingScreen({super.key, required this.shop});
-
   @override
   ConsumerState<ShopBookingScreen> createState() => _ShopBookingScreenState();
 }
-
 class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-
-  // Step 1 — Device
   bool _isEmergency = false;
   String? _selectedDeviceType;
   String? _selectedBrand;
   final TextEditingController _modelController = TextEditingController();
   Set<String> _selectedProblems = {};
   final TextEditingController _detailsController = TextEditingController();
-
-  // Step 2 — Drop-off schedule
   DateTime? _selectedDate;
   TimeOfDay _selectedTime = TimeOfDay.now();
   final TextEditingController _notesController = TextEditingController();
-
-  // Step 3 — Promo / voucher
   final TextEditingController _promoCodeController = TextEditingController();
   String? _appliedPromoCode;
   double _discountAmount = 0;
   String _discountType = 'none';
   RedeemedVoucher? _appliedVoucher;
   List<RedeemedVoucher> _availableVouchers = [];
-
-  // Resolved technician ID (fetched from DB if shop doesn't provide one)
   String? _resolvedTechId;
   String? _resolvedTechName;
-
-  // ── Pricing ──────────────────────────────────────────────
   final Map<String, Map<String, double>> _pricing = {
     'Mobile Phone': {
       'Screen Cracked': 800.0,
@@ -101,7 +77,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       'Software Bug': 500.0,
     },
   };
-
   final Map<String, Map<String, List<String>>> _brandDevices = {
     'Mobile Phone': {
       'Apple': ['iPhone 16 Pro Max', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro Max', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro Max', 'iPhone 14', 'iPhone 13', 'iPhone 12', 'iPhone SE'],
@@ -123,12 +98,10 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       'Other': [],
     },
   };
-
   final List<String> _problems = [
     'Screen Cracked', 'Battery Drains', 'Won\'t power on',
     'Overheating', 'Water damage', 'Software Bug',
   ];
-
   @override
   void initState() {
     super.initState();
@@ -137,7 +110,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       _resolveTechnician();
     });
   }
-
   Future<void> _loadVouchers() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
@@ -145,10 +117,8 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     final vouchers = await voucherService.getUnusedVouchers(user.id);
     if (mounted) setState(() => _availableVouchers = vouchers);
   }
-
   Future<void> _resolveTechnician() async {
     if (widget.shop.technicianId != null) {
-      // Shop provides a specific technician
       final row = await SupabaseConfig.client
           .from('users')
           .select('id, full_name')
@@ -161,7 +131,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         });
       }
     } else {
-      // No specific technician — pick the first available verified technician
       final rows = await SupabaseConfig.client
           .from('users')
           .select('id, full_name')
@@ -176,7 +145,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       }
     }
   }
-
   @override
   void dispose() {
     _modelController.dispose();
@@ -186,9 +154,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-
-  // ── Pricing helpers ───────────────────────────────────────
-
   double _getServicePrice() {
     if (_selectedDeviceType == null || _selectedProblems.isEmpty) return 0.0;
     double base = 0.0;
@@ -197,16 +162,12 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     }
     return _isEmergency ? base * 1.10 : base;
   }
-
   double _calculateFinalPrice() {
     final base = _getServicePrice();
     if (_discountType == 'percentage') return base - (base * _discountAmount / 100);
     if (_discountType == 'fixed') return base - _discountAmount;
     return base;
   }
-
-  // ── Promo code ────────────────────────────────────────────
-
   void _applyPromoCode() {
     final code = _promoCodeController.text.trim().toUpperCase();
     const promoCodes = {
@@ -246,7 +207,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       const SnackBar(content: Text('Invalid promo code'), backgroundColor: Colors.red),
     );
   }
-
   void _applyVoucherDirectly(RedeemedVoucher voucher) {
     final code = 'VOUCHER${voucher.voucherId}'.toUpperCase();
     setState(() {
@@ -257,9 +217,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       _promoCodeController.text = code;
     });
   }
-
-  // ── Date / time pickers ───────────────────────────────────
-
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -278,7 +235,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }
-
   Future<void> _selectTime() async {
     final picked = await showTimePicker(
       context: context,
@@ -295,9 +251,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     );
     if (picked != null) setState(() => _selectedTime = picked);
   }
-
-  // ── Validation ────────────────────────────────────────────
-
   bool _validateStep(int step) {
     switch (step) {
       case 0:
@@ -328,24 +281,18 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         return true;
     }
   }
-
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-
-  // ── Confirm booking ───────────────────────────────────────
-
   Future<void> _confirmBooking() async {
     if (!_validateStep(_currentStep)) return;
     if (_resolvedTechId == null) {
       _snack('No technician available for this shop right now');
       return;
     }
-
     setState(() => _isLoading = true);
     try {
       final user = ref.read(currentUserProvider).value;
       if (user == null) throw Exception('User not logged in');
-
       final finalPrice = _calculateFinalPrice();
       final scheduledDateTime = DateTime(
         _selectedDate!.year,
@@ -354,7 +301,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         _selectedTime.hour,
         _selectedTime.minute,
       );
-
       final bookingDetails = [
         'Booking Type: SHOP',
         'Shop: ${widget.shop.shopName}',
@@ -372,10 +318,7 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         if (_appliedPromoCode != null) 'Promo Code: $_appliedPromoCode',
         if (_appliedVoucher != null) 'Redeemed Voucher ID: ${_appliedVoucher!.id}',
       ].join('\n');
-
       final supabase = SupabaseConfig.client;
-
-      // Get or create a service ID
       String serviceId;
       var svcRes = await supabase
           .from('services')
@@ -386,7 +329,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       svcRes ??= await supabase.from('services').select('id').limit(1).maybeSingle();
       if (svcRes == null) throw Exception('No services available. Please contact support.');
       serviceId = svcRes['id'] as String;
-
       final bookingService = ref.read(bookingServiceProvider);
       final booking = await bookingService.createBooking(
         customerId: user.id,
@@ -396,19 +338,15 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         customerAddress: widget.shop.shopAddress,
         estimatedCost: finalPrice,
       );
-
       await bookingService.updateDiagnosticNotes(
         bookingId: booking.id,
         notes: bookingDetails,
         finalCost: finalPrice,
       );
-
       ref.invalidate(customerBookingsProvider);
       ref.invalidate(technicianBookingsProvider);
-
       if (!mounted) return;
       setState(() => _isLoading = false);
-
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -456,13 +394,9 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       );
     }
   }
-
-  // ── Build ─────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final steps = ['Device', 'Drop-off Schedule', 'Review'];
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -484,13 +418,8 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
       body: Column(
         children: [
-          // ── Shop banner ──────────────────────────────────
           _ShopBanner(shop: widget.shop),
-
-          // ── Step indicators ──────────────────────────────
           _StepIndicator(steps: steps, currentStep: _currentStep),
-
-          // ── Step content ─────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
@@ -504,8 +433,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
               ),
             ),
           ),
-
-          // ── Bottom navigation bar ────────────────────────
           _BottomNav(
             currentStep: _currentStep,
             totalSteps: steps.length,
@@ -525,7 +452,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   Widget _buildStep(int step) {
     switch (step) {
       case 0:
@@ -538,11 +464,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         return const SizedBox.shrink();
     }
   }
-
-  // ══════════════════════════════════════════
-  // STEP 1 — DEVICE INFO
-  // ══════════════════════════════════════════
-
   Widget _buildDeviceStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,8 +471,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         const Text('Device Information',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimaryColor)),
         const SizedBox(height: 20),
-
-        // Emergency toggle
         _buildSectionCard(
           title: 'Repair Type',
           child: Row(
@@ -564,8 +483,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Device type
         _buildSectionCard(
           title: 'Device Type',
           child: Row(
@@ -611,9 +528,7 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
         if (_selectedDeviceType != null) ...[
-          // Brand
           _buildSectionCard(
             title: 'Brand',
             child: Wrap(
@@ -646,18 +561,14 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
           const SizedBox(height: 16),
         ],
-
         if (_selectedBrand != null) ...[
-          // Model
           _buildSectionCard(
             title: 'Device Model',
             child: _buildModelField(),
           ),
           const SizedBox(height: 16),
         ],
-
         if (_selectedDeviceType != null) ...[
-          // Problems
           _buildSectionCard(
             title: 'Problem(s)',
             subtitle: 'Select all that apply',
@@ -686,8 +597,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
           const SizedBox(height: 16),
         ],
-
-        // Additional details
         _buildSectionCard(
           title: 'Additional Details',
           subtitle: 'Optional — describe the issue in more detail',
@@ -701,7 +610,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
             ),
           ),
         ),
-
         if (_selectedProblems.isNotEmpty) ...[
           const SizedBox(height: 16),
           _buildPricePreview(),
@@ -709,7 +617,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ],
     );
   }
-
   Widget _buildModelField() {
     final models = _brandDevices[_selectedDeviceType]?[_selectedBrand] ?? [];
     if (models.isEmpty) {
@@ -748,7 +655,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   void _showModelPicker(List<String> models) {
     showModalBottomSheet(
       context: context,
@@ -779,7 +685,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   Widget _buildPricePreview() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -809,7 +714,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   Widget _buildTypeButton(String label, bool selected, VoidCallback onTap,
       {Color color = AppTheme.deepBlue}) {
     return Expanded(
@@ -833,11 +737,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
-  // ══════════════════════════════════════════
-  // STEP 2 — DROP-OFF SCHEDULE
-  // ══════════════════════════════════════════
-
   Widget _buildScheduleStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,8 +747,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
         Text('Choose when to drop off your device at ${widget.shop.shopName}',
             style: const TextStyle(color: AppTheme.textSecondaryColor, fontSize: 14)),
         const SizedBox(height: 24),
-
-        // Shop info card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -896,8 +793,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 24),
-
-        // Date picker
         _buildSectionCard(
           title: 'Drop-off Date',
           child: GestureDetector(
@@ -928,8 +823,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Time picker
         _buildSectionCard(
           title: 'Drop-off Time',
           child: GestureDetector(
@@ -955,8 +848,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Additional notes
         _buildSectionCard(
           title: 'Notes for the Shop',
           subtitle: 'Optional — any special requests',
@@ -971,8 +862,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Assigned technician info
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1015,24 +904,16 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ],
     );
   }
-
-  // ══════════════════════════════════════════
-  // STEP 3 — REVIEW
-  // ══════════════════════════════════════════
-
   Widget _buildReviewStep() {
     final servicePrice = _getServicePrice();
     final finalPrice = _calculateFinalPrice();
     final discount = servicePrice - finalPrice;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Review Booking',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimaryColor)),
         const SizedBox(height: 20),
-
-        // Shop info
         _buildReviewSection('Shop Information', [
           _buildReviewItem('Shop Name', widget.shop.shopName),
           _buildReviewItem('Address', widget.shop.shopAddress),
@@ -1040,8 +921,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
           _buildReviewItem('Assigned Technician', _resolvedTechName ?? 'Shop Technician'),
         ]),
         const SizedBox(height: 16),
-
-        // Device
         _buildReviewSection('Device Information', [
           _buildReviewItem('Repair Type', _isEmergency ? 'Emergency (+10%)' : 'Regular'),
           _buildReviewItem('Device', _selectedDeviceType ?? ''),
@@ -1052,8 +931,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
             _buildReviewItem('Details', _detailsController.text),
         ]),
         const SizedBox(height: 16),
-
-        // Schedule
         _buildReviewSection('Drop-off Schedule', [
           _buildReviewItem(
             'Date & Time',
@@ -1065,8 +942,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
             _buildReviewItem('Notes', _notesController.text),
         ]),
         const SizedBox(height: 20),
-
-        // Promo code
         const Text('Promo Code (Optional)',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textPrimaryColor)),
         const SizedBox(height: 8),
@@ -1132,8 +1007,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
             ),
           ),
         ],
-
-        // Vouchers
         if (_appliedPromoCode == null && _availableVouchers.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Text('Or use a voucher',
@@ -1183,10 +1056,7 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
             ),
           ),
         ],
-
         const SizedBox(height: 20),
-
-        // Price summary
         _buildReviewSection('Price Summary', [
           _buildReviewItem('Service Fee', '₱${servicePrice.toStringAsFixed(2)}'),
           _buildReviewItem('Distance Fee', 'FREE (Shop Visit)'),
@@ -1222,9 +1092,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ],
     );
   }
-
-  // ── Reusable section helpers ──────────────────────────────
-
   Widget _buildSectionCard({
     required String title,
     String? subtitle,
@@ -1254,7 +1121,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   Widget _buildReviewSection(String title, List<Widget> items) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1275,7 +1141,6 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
       ),
     );
   }
-
   Widget _buildReviewItem(String label, String value,
       {bool bold = false, Color? valueColor}) {
     return Padding(
@@ -1301,15 +1166,9 @@ class _ShopBookingScreenState extends ConsumerState<ShopBookingScreen> {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// Shop banner shown at the top of every step
-// ─────────────────────────────────────────────
 class _ShopBanner extends StatelessWidget {
   final ShopInfo shop;
-
   const _ShopBanner({required this.shop});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1363,16 +1222,10 @@ class _ShopBanner extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// Step indicator
-// ─────────────────────────────────────────────
 class _StepIndicator extends StatelessWidget {
   final List<String> steps;
   final int currentStep;
-
   const _StepIndicator({required this.steps, required this.currentStep});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1381,7 +1234,6 @@ class _StepIndicator extends StatelessWidget {
       child: Row(
         children: List.generate(steps.length * 2 - 1, (i) {
           if (i.isOdd) {
-            // Connector line
             final stepIndex = i ~/ 2;
             return Expanded(
               child: Container(
@@ -1435,17 +1287,12 @@ class _StepIndicator extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────
-// Bottom navigation bar
-// ─────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
   final bool isLoading;
   final VoidCallback onBack;
   final VoidCallback onNext;
-
   const _BottomNav({
     required this.currentStep,
     required this.totalSteps,
@@ -1453,7 +1300,6 @@ class _BottomNav extends StatelessWidget {
     required this.onBack,
     required this.onNext,
   });
-
   @override
   Widget build(BuildContext context) {
     final isLast = currentStep == totalSteps - 1;

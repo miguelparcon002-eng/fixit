@@ -3,12 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../core/utils/app_logger.dart';
-
 class PaymentService {
   static final _supabase = SupabaseConfig.client;
   static const String _bucketName = 'payments';
-
-  /// Upload payment proof screenshot to Supabase Storage.
   static Future<String> uploadPaymentProof({
     required String bookingId,
     required String customerId,
@@ -22,15 +19,12 @@ class PaymentService {
         .replaceAll(RegExp(r'[^a-z0-9]'), '');
     final safeExt = ext.isEmpty ? 'jpg' : ext;
     final fileName = '$customerId/${bookingId}_$timestamp.$safeExt';
-
     final contentType = switch (safeExt) {
       'png' => 'image/png',
       'webp' => 'image/webp',
       _ => 'image/jpeg',
     };
-
     final Uint8List imageBytes = await imageFile.readAsBytes();
-
     await _supabase.storage.from(_bucketName).uploadBinary(
           fileName,
           imageBytes,
@@ -40,12 +34,8 @@ class PaymentService {
             cacheControl: '3600',
           ),
         );
-
     return _supabase.storage.from(_bucketName).getPublicUrl(fileName);
   }
-
-  /// Submit a payment record to the payments table.
-  /// [paymentType] is either 'booking' (regular job payment) or 'cancellation_fee'.
   static Future<void> submitPayment({
     required String bookingId,
     required String customerId,
@@ -67,8 +57,6 @@ class PaymentService {
       'payment_type': paymentType,
       'created_at': DateTime.now().toIso8601String(),
     });
-
-    // Only update booking payment_status for regular job payments.
     if (paymentType == 'booking') {
       await _supabase.from('bookings').update({
         'payment_status': 'submitted',
@@ -76,9 +64,6 @@ class PaymentService {
       }).eq('id', bookingId);
     }
   }
-
-  /// Get payment for a booking.
-  /// Pass [paymentType] to filter by type ('booking' or 'cancellation_fee').
   static Future<Map<String, dynamic>?> getPaymentForBooking(
     String bookingId, {
     String? paymentType,
@@ -101,8 +86,6 @@ class PaymentService {
       return null;
     }
   }
-
-  /// Get all payments (for admin).
   static Future<List<Map<String, dynamic>>> getAllPayments() async {
     final response = await _supabase
         .from('payments')
@@ -110,8 +93,6 @@ class PaymentService {
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
-
-  /// Admin: Verify or reject a payment.
   static Future<void> updatePaymentStatus({
     required String paymentId,
     required String status, // 'verified' or 'rejected'
@@ -122,27 +103,20 @@ class PaymentService {
       'verified_at': DateTime.now().toIso8601String(),
     };
     if (adminNote != null) updates['admin_note'] = adminNote;
-
     await _supabase.from('payments').update(updates).eq('id', paymentId);
-
-    // Update the booking's payment_status based on type and admin decision.
     final payment = await _supabase
         .from('payments')
         .select('booking_id, payment_type')
         .eq('id', paymentId)
         .single();
-
     final pType = payment['payment_type'] as String? ?? 'booking';
-
     if (pType == 'cancellation_fee') {
       if (status == 'verified') {
-        // Fee confirmed — fully cancel the booking now
         await _supabase.from('bookings').update({
           'payment_status': 'fee_paid',
           'status': 'cancelled',
         }).eq('id', payment['booking_id']);
       } else if (status == 'rejected') {
-        // Fee rejected — customer must resubmit; keep booking in cancellation_pending
         await _supabase.from('bookings').update({
           'payment_status': 'pending',
         }).eq('id', payment['booking_id']);
@@ -153,20 +127,15 @@ class PaymentService {
           'payment_status': 'completed',
         }).eq('id', payment['booking_id']);
       } else if (status == 'rejected') {
-        // Reset so the customer can resubmit
         await _supabase.from('bookings').update({
           'payment_status': 'pending',
         }).eq('id', payment['booking_id']);
       }
     }
   }
-
-  /// Delete a payment record (used when customer resubmits).
   static Future<void> deletePayment(String paymentId) async {
     await _supabase.from('payments').delete().eq('id', paymentId);
   }
-
-  /// Admin: Upload GCash QR code image.
   static Future<String> uploadAdminQrCode({
     required String adminId,
     required XFile imageFile,
@@ -179,15 +148,12 @@ class PaymentService {
         .replaceAll(RegExp(r'[^a-z0-9]'), '');
     final safeExt = ext.isEmpty ? 'jpg' : ext;
     final fileName = 'qr_codes/${adminId}_$timestamp.$safeExt';
-
     final contentType = switch (safeExt) {
       'png' => 'image/png',
       'webp' => 'image/webp',
       _ => 'image/jpeg',
     };
-
     final Uint8List imageBytes = await imageFile.readAsBytes();
-
     await _supabase.storage.from(_bucketName).uploadBinary(
           fileName,
           imageBytes,
@@ -197,17 +163,13 @@ class PaymentService {
             cacheControl: '3600',
           ),
         );
-
     return _supabase.storage.from(_bucketName).getPublicUrl(fileName);
   }
-
-  /// Admin: Save/update the GCash QR code settings.
   static Future<void> saveAdminQrSettings({
     required String qrImageUrl,
     required String gcashName,
     required String gcashNumber,
   }) async {
-    // Upsert into app_settings table
     await _supabase.from('app_settings').upsert({
       'setting_key': 'gcash_qr',
       'setting_value': {
@@ -218,8 +180,6 @@ class PaymentService {
       },
     }, onConflict: 'setting_key');
   }
-
-  /// Get admin's GCash QR code settings.
   static Future<Map<String, dynamic>?> getAdminQrSettings() async {
     try {
       final response = await _supabase

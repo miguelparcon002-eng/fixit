@@ -10,45 +10,32 @@ import 'widgets/verification_pending_dialog.dart';
 import '../../core/utils/app_logger.dart';
 import '../../models/job_request_model.dart';
 import '../../providers/job_request_provider.dart';
-
 class TechNavigation extends ConsumerStatefulWidget {
   final Widget child;
-
   const TechNavigation({super.key, required this.child});
-
   @override
   ConsumerState<TechNavigation> createState() => _TechNavigationState();
 }
-
 class _TechNavigationState extends ConsumerState<TechNavigation> {
   bool _dialogShown = false;
-
   int _getIndexFromRoute(String location) {
     if (location.startsWith('/tech-home')) return 0;
     if (location.startsWith('/tech-jobs')) return 1;
     if (location.startsWith('/tech-earnings')) return 2;
     if (location.startsWith('/tech-profile')) return 3;
     if (location.startsWith('/tech-notification-settings')) return 3;
-    // Ratings is a full page, but keep the Dashboard tab highlighted.
     if (location.startsWith('/tech-ratings')) return 0;
     return 0;
   }
-
   void _showVerificationDialog(UserModel user) {
-    // Prevent showing multiple dialogs
     if (_dialogShown) return;
     _dialogShown = true;
     AppLogger.p('=== Showing Verification Dialog for ${user.email} ===');
     AppLogger.p('User verified: ${user.verified}');
-    
-    // Check for verification request
     final verificationRequestAsync = ref.read(userVerificationRequestProvider);
-    
     verificationRequestAsync.when(
       data: (verificationRequest) {
         AppLogger.p('Verification request: ${verificationRequest?.status ?? "NO REQUEST"}');
-        
-        // If no verification request exists, show prompt to submit
         if (verificationRequest == null) {
           AppLogger.p('Showing VerificationNotSubmittedDialog');
           showDialog(
@@ -57,17 +44,11 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
             builder: (context) => const VerificationNotSubmittedDialog(),
           ).then((_) {
             AppLogger.p('Dialog closed by user');
-            // Don't reset flag - keep it true so dialog doesn't show again
-            // until user comes back from verification screen
           });
         } else if (verificationRequest.status == AppConstants.verificationPending) {
-          // After submission, do NOT keep interrupting the technician.
-          // They stay in read-only mode and can wait for admin approval.
           AppLogger.p('Verification is pending - no pop-up shown');
           _dialogShown = false;
         } else if (verificationRequest.status == AppConstants.verificationRejected) {
-          // Don't block the UI with a popup; technician can see status in the banner
-          // and resubmit if needed.
           AppLogger.p('Verification is rejected - no pop-up shown');
           _dialogShown = false;
         } else if (verificationRequest.status == AppConstants.verificationResubmit) {
@@ -79,22 +60,17 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
               verificationRequest: verificationRequest,
             ),
           );
-          // Do NOT reset _dialogShown so the dialog doesn't re-trigger on rebuild
         }
       },
       loading: () {
-        // Do not show any popups while loading.
         _dialogShown = false;
       },
       error: (error, stack) {
-        // Do not show popups on error; technician can still manually open
-        // verification submission from the banner.
         AppLogger.p('Error loading verification request: $error');
         _dialogShown = false;
       },
     );
   }
-
   void _showNewJobRequestPopup(BuildContext context, JobRequestModel req) {
     showDialog(
       context: context,
@@ -109,10 +85,8 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
-    // Show a popup banner whenever a new open job request arrives
     ref.listen<AsyncValue<List<JobRequestModel>>>(
       openJobRequestsProvider,
       (previous, next) {
@@ -127,9 +101,7 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
         }
       },
     );
-
     final userAsync = ref.watch(currentUserProvider);
-
     return userAsync.when(
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -138,30 +110,20 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
         body: Center(child: Text('Error: $e')),
       ),
       data: (user) {
-        // If the auth session exists but the profile is still loading/being created,
-        // don't immediately bounce back to login (this can cause "login twice").
-        // Instead show a loading state and let currentUserProvider retry.
         if (user == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
-        // Read-only mode for unverified technicians: they can browse UI,
-        // but write actions are blocked at the service layer.
         final isReadOnly = !user.verified;
         final verificationReqAsync = ref.watch(userVerificationRequestProvider);
-
         if (isReadOnly) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _showVerificationDialog(user);
           });
         }
-
-        // Normal tech navigation
         final currentLocation = GoRouterState.of(context).uri.toString();
         final currentIndex = _getIndexFromRoute(currentLocation);
-
         return Scaffold(
           body: Column(
             children: [
@@ -205,10 +167,8 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
                           );
                         }
                         if (req.status == AppConstants.verificationRejected) {
-                          // Rejected: no action available until admin allows resubmission
                           return const SizedBox.shrink();
                         }
-                        // Pending: allow viewing submission
                         return TextButton(
                           onPressed: () => context.push('/verification-submission'),
                           child: const Text('View submission'),
@@ -273,24 +233,17 @@ class _TechNavigationState extends ConsumerState<TechNavigation> {
     );
   }
 }
-
-// ── New-job-request popup banner ─────────────────────────────────────────────
-
 class _NewJobRequestPopup extends StatefulWidget {
   final JobRequestModel request;
   final VoidCallback onViewMap;
-
   const _NewJobRequestPopup({required this.request, required this.onViewMap});
-
   @override
   State<_NewJobRequestPopup> createState() => _NewJobRequestPopupState();
 }
-
 class _NewJobRequestPopupState extends State<_NewJobRequestPopup>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<Offset> _slide;
-
   @override
   void initState() {
     super.initState();
@@ -299,18 +252,15 @@ class _NewJobRequestPopupState extends State<_NewJobRequestPopup>
     _slide = Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     _ctrl.forward();
-    // Auto-dismiss after 6 seconds
     Future.delayed(const Duration(seconds: 6), () {
       if (mounted) Navigator.of(context).maybePop();
     });
   }
-
   @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Align(

@@ -9,41 +9,29 @@ import '../../../providers/address_provider.dart';
 import '../../../providers/rewards_provider.dart';
 import '../../../models/redeemed_voucher.dart';
 import '../../../core/utils/app_logger.dart';
-
 class BookingDialog extends ConsumerStatefulWidget {
   final bool isEmergency;
   final bool isWeekBooking;
-
   const BookingDialog({super.key, this.isEmergency = false, this.isWeekBooking = false});
-
   @override
   ConsumerState<BookingDialog> createState() => _BookingDialogState();
 }
-
 class _BookingDialogState extends ConsumerState<BookingDialog> {
   int _currentStep = 0;
   final ScrollController _scrollController = ScrollController();
-
-  // Step 1: Device selection
   String? _selectedDeviceType;
   final TextEditingController _modelController = TextEditingController();
   String? _selectedProblem;
   final TextEditingController _detailsController = TextEditingController();
-
-  // Step 2: Time and location
   TimeOfDay _selectedTime = TimeOfDay.now();
   DateTime? _selectedDate;
   final TextEditingController _addressController = TextEditingController();
   String? _selectedTechnician;
-
-  // Step 3: Promo code
   final TextEditingController _promoCodeController = TextEditingController();
   String? _appliedPromoCode;
   String? _appliedVoucherId; // ID of the redeemed voucher being used
   double _discountAmount = 0;
   String _discountType = 'none'; // 'percentage' or 'fixed'
-
-  // Pricing map based on device type and problem (realistic PH prices)
   final Map<String, Map<String, double>> _pricing = {
     'Mobile Phone': {
       'Screen Cracked': 1500.0,
@@ -62,7 +50,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       'Software Bug': 500.0,
     },
   };
-
   final List<String> _problems = [
     'Screen Cracked',
     'Battery Drains',
@@ -71,15 +58,12 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     'Water damage',
     'Software Bug',
   ];
-
   final List<Map<String, dynamic>> _technicians = [
     {'name': 'MetroFix', 'distance': '1.2km'},
     {'name': 'Estino', 'distance': '0.47km'},
     {'name': 'Sarsale', 'distance': '2.4km'},
     {'name': 'GizmoDoc', 'distance': '0.98km'},
   ];
-
-  // Brand and model data for device selection with images
   final Map<String, Map<String, List<Map<String, String>>>> _deviceBrands = {
     'Mobile Phone': {
       'Apple': [
@@ -224,20 +208,15 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       ],
     },
   };
-
   String? _selectedBrand;
-
   @override
   void initState() {
     super.initState();
-    // Ensure scroll starts at top
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0);
       }
     });
-
-    // Load default address from address provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final addressesAsync = ref.read(userAddressesProvider);
@@ -247,7 +226,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
               (address) => address.isDefault,
               orElse: () => addresses.first,
             );
-
             if (mounted) {
               setState(() {
                 _addressController.text = defaultAddress.address;
@@ -256,12 +234,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           }
         });
       } catch (e) {
-        // If there's an error or no addresses, just skip auto-fill
         debugPrint('Error loading default address: $e');
       }
     });
   }
-
   @override
   void dispose() {
     _modelController.dispose();
@@ -271,16 +247,12 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     try {
       _scrollController.dispose();
     } catch (e) {
-      // Ignore disposal errors on web
     }
     super.dispose();
   }
-
   void _applyPromoCode() {
     final code = _promoCodeController.text.trim().toUpperCase();
     final redeemedVouchersAsync = ref.read(redeemedVouchersProvider);
-
-    // Check if it's a redeemed voucher (only unused ones)
     RedeemedVoucher? foundRedeemedVoucher;
     redeemedVouchersAsync.whenData((redeemedVouchers) {
       try {
@@ -288,10 +260,8 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           (v) => !v.isUsed && code == 'VOUCHER${v.voucherId.toUpperCase()}',
         );
       } catch (e) {
-        // No matching voucher found
       }
     });
-
     if (foundRedeemedVoucher != null) {
       setState(() {
         _appliedPromoCode = code;
@@ -307,15 +277,12 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       );
       return;
     }
-
-    // Check standard promo codes
     final Map<String, Map<String, dynamic>> promoCodes = {
       'FIRST20': {'type': 'percentage', 'amount': 20},
       'SAVE100': {'type': 'fixed', 'amount': 100},
       'SAVE250': {'type': 'fixed', 'amount': 250},
       'DISCOUNT10': {'type': 'percentage', 'amount': 10},
     };
-
     if (promoCodes.containsKey(code)) {
       final promo = promoCodes[code]!;
       setState(() {
@@ -339,7 +306,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       );
     }
   }
-
   void _removePromoCode() {
     setState(() {
       _appliedPromoCode = null;
@@ -349,14 +315,12 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       _promoCodeController.clear();
     });
   }
-
   double _getServicePrice() {
     if (_selectedDeviceType == null || _selectedProblem == null) {
       return 500.0; // Default price
     }
     return _pricing[_selectedDeviceType]?[_selectedProblem] ?? 500.0;
   }
-
   double _getDistanceFee() {
     if (_selectedTechnician == null) return 0.0;
     final tech = _technicians.firstWhere(
@@ -364,20 +328,15 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       orElse: () => {'distance': '0km'},
     );
     final distanceStr = tech['distance'] as String;
-    // Parse distance (e.g., "1.2km" -> 1.2)
     final distance = double.tryParse(distanceStr.replaceAll('km', '')) ?? 0.0;
-    // Calculate fee: 0.1km = ₱5, so 1km = ₱50
     return (distance / 0.1) * 5;
   }
-
   double _getBasePrice() {
     return _getServicePrice() + _getDistanceFee();
   }
-
   double _calculateTotal() {
     final basePrice = _getBasePrice();
     if (_appliedPromoCode == null) return basePrice;
-
     if (_discountType == 'percentage') {
       return basePrice - (basePrice * _discountAmount / 100);
     } else if (_discountType == 'fixed') {
@@ -385,10 +344,8 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     }
     return basePrice;
   }
-
   void _nextStep() {
     if (_currentStep == 0) {
-      // Validate step 1
       if (_selectedDeviceType == null || _modelController.text.isEmpty || _selectedProblem == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please fill all required fields')),
@@ -396,7 +353,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         return;
       }
     } else if (_currentStep == 1) {
-      // Validate step 2
       if (_addressController.text.isEmpty || _selectedTechnician == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please fill all required fields')),
@@ -404,10 +360,8 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         return;
       }
     }
-
     if (_currentStep < 2) {
       setState(() => _currentStep++);
-      // Reset scroll position to top when moving to next step
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.jumpTo(0);
@@ -415,11 +369,9 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       });
     }
   }
-
   void _previousStep() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
-      // Reset scroll position to top when moving to previous step
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.jumpTo(0);
@@ -427,25 +379,17 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       });
     }
   }
-
   void _confirmAppointment() async {
     try {
-      // Get actual user details from profile
       final user = await ref.read(currentUserProvider.future);
       if (user == null) {
         throw Exception('User not logged in');
       }
-
-      // Calculate final total with any applied discount
       final finalTotal = _calculateTotal();
-
-      // Combine date and time into scheduledDate
       DateTime scheduledDateTime;
       if (widget.isEmergency) {
-        // Emergency: schedule for as soon as possible (now + 20 minutes)
         scheduledDateTime = DateTime.now().add(const Duration(minutes: 20));
       } else {
-        // Regular booking: use selected date and time
         scheduledDateTime = DateTime(
           (_selectedDate ?? DateTime.now()).year,
           (_selectedDate ?? DateTime.now()).month,
@@ -454,8 +398,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           _selectedTime.minute,
         );
       }
-
-      // Create booking details text
       final basePrice = _getBasePrice();
       final bookingDetails = [
         'Device: ${_selectedDeviceType ?? "N/A"}',
@@ -471,21 +413,14 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         if (widget.isEmergency) 'Priority: EMERGENCY',
         if (widget.isWeekBooking) 'Priority: Week booking',
       ].join('\n');
-
-      // Get all users to find a technician
       final supabase = SupabaseConfig.client;
-      
-      // Try to find a technician user
       String technicianId;
       try {
-        // First, try to find technician with email fixittechnician@gmail.com (Ethan)
         var techResponse = await supabase
             .from('users')
             .select('id, email, full_name, role')
             .eq('email', 'fixittechnician@gmail.com')
             .maybeSingle();
-        
-        // If Ethan not found, try any technician
         if (techResponse == null) {
           AppLogger.p('Ethan not found, looking for any technician...');
           techResponse = await supabase
@@ -495,7 +430,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
               .limit(1)
               .maybeSingle();
         }
-        
         if (techResponse != null) {
           technicianId = techResponse['id'] as String;
           AppLogger.p('✅ Found technician: ${techResponse['full_name']} (${techResponse['email']}) - ID: $technicianId');
@@ -510,19 +444,14 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         }
         throw Exception('Unable to find technicians. Please check database setup.');
       }
-
-      // Get or create a service ID
       String serviceId;
       try {
-        // First, try to find an existing service for this technician
         var serviceResponse = await supabase
             .from('services')
             .select('id, technician_id, service_name')
             .eq('technician_id', technicianId)
             .limit(1)
             .maybeSingle();
-        
-        // If no service for this technician, try to find any service
         if (serviceResponse == null) {
           AppLogger.p('No service found for technician $technicianId, checking for any service...');
           serviceResponse = await supabase
@@ -531,12 +460,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
               .limit(1)
               .maybeSingle();
         }
-        
         if (serviceResponse != null) {
           serviceId = serviceResponse['id'] as String;
           AppLogger.p('✅ Using existing service: ${serviceResponse['service_name']} (ID: $serviceId)');
         } else {
-          // No service exists at all - this needs manual creation due to RLS
           AppLogger.p('❌ No services found in database');
           throw Exception(
             'No services available. Please create a service for Ethan Estino first.\n\n'
@@ -552,10 +479,7 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         }
         throw Exception('Unable to access services. Please check database setup.');
       }
-
-      // Create booking in Supabase using BookingService
       final bookingService = ref.read(bookingServiceProvider);
-      
       final createdBooking = await bookingService.createBooking(
         customerId: user.id,
         technicianId: technicianId,
@@ -566,30 +490,21 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         customerLongitude: null,
         estimatedCost: finalTotal,
       );
-
-      // Update diagnostic notes with booking details
       await bookingService.updateDiagnosticNotes(
         bookingId: createdBooking.id,
         notes: bookingDetails,
         finalCost: finalTotal,
       );
-
-      // If a voucher was applied, mark it as used
       if (_appliedVoucherId != null) {
         final voucherService = ref.read(redeemedVoucherServiceProvider);
         await voucherService.markVoucherAsUsed(
           voucherId: _appliedVoucherId!,
           bookingId: createdBooking.id,
         );
-        // Refresh voucher providers
         ref.invalidate(redeemedVouchersProvider);
         ref.invalidate(unusedVouchersProvider);
       }
-
-      // Force refresh the customer bookings provider to show the new booking immediately
       ref.invalidate(customerBookingsProvider);
-
-      // Show success dialog
       if (!mounted) return;
       showDialog(
         context: context,
@@ -648,7 +563,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     } catch (e) {
       AppLogger.p('Error creating booking: $e');
       if (!mounted) return;
-      // Show user-friendly error message
       String errorMessage = 'Error creating booking';
       if (e.toString().contains('technician')) {
         errorMessage = 'No technicians available. Please contact support.';
@@ -659,7 +573,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       } else {
         errorMessage = e.toString().replaceAll('Exception: ', '');
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -674,7 +587,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -697,7 +609,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with progress indicator
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -747,7 +658,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Progress indicator
                   Row(
                     children: List.generate(3, (index) {
                       return Expanded(
@@ -769,8 +679,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                 ],
               ),
             ),
-
-            // Content
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
@@ -787,7 +695,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       ),
     );
   }
-
   Widget _buildDeviceSelectionStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,7 +745,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
         TextField(
           controller: _modelController,
           onChanged: (value) {
-            // Clear brand selection when typing manually
             if (_selectedBrand != null && value.isNotEmpty) {
               setState(() => _selectedBrand = null);
             }
@@ -875,7 +781,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
-        // Show brand/model selector when device type is selected
         if (_selectedDeviceType != null) ...[
           const SizedBox(height: 16),
           Container(
@@ -903,7 +808,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Brand selector - horizontal scroll
                 SizedBox(
                   height: 36,
                   child: ListView.separated(
@@ -947,7 +851,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                     },
                   ),
                 ),
-                // Model selector - show when brand is selected
                 if (_selectedBrand != null) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -994,7 +897,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Device image
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.network(
@@ -1130,7 +1032,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           ),
         ),
         const SizedBox(height: 24),
-        // Price Display
         if (_selectedDeviceType != null && _selectedProblem != null) ...[
           Container(
             padding: const EdgeInsets.all(16),
@@ -1200,12 +1101,10 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       ],
     );
   }
-
   Widget _buildTimeLocationStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Show date picker for week bookings
         if (widget.isWeekBooking) ...[
           const Text(
             'Select Date',
@@ -1259,7 +1158,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           ),
           const SizedBox(height: 24),
         ],
-        // Hide time slot for emergency repairs, show for week and regular bookings
         if (!widget.isEmergency) ...[
           const Text(
             'Time Slot',
@@ -1514,11 +1412,9 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
       ],
     );
   }
-
   Widget _buildConfirmationStep() {
     final basePrice = _getBasePrice();
     final total = _calculateTotal();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1575,8 +1471,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Promo Code Section
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1700,8 +1594,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Price Summary
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1714,7 +1606,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
           ),
           child: Column(
             children: [
-              // Service Fee
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1735,7 +1626,6 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              // Distance Fee
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1862,20 +1752,17 @@ class _BookingDialogState extends ConsumerState<BookingDialog> {
     );
   }
 }
-
 class _DeviceTypeButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _DeviceTypeButton({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -1914,18 +1801,15 @@ class _DeviceTypeButton extends StatelessWidget {
     );
   }
 }
-
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(

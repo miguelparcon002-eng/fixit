@@ -1,32 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/ratings_provider.dart';
 import '../../services/ratings_service.dart';
 import '../../core/widgets/app_logo.dart';
-
-// ── Filter state ────────────────────────────────────────────────────────────
-
 enum _SortOrder { newest, oldest, highestRating, lowestRating }
-
 class _FilterState {
   final String? technician;   // null = all
   final int? starFilter;      // null = all
   final _SortOrder sort;
   final String search;
-
   const _FilterState({
     this.technician,
     this.starFilter,
     this.sort = _SortOrder.newest,
     this.search = '',
   });
-
   bool get isActive =>
       technician != null || starFilter != null || search.isNotEmpty;
-
   _FilterState copyWith({
     Object? technician = _sentinel,
     Object? starFilter = _sentinel,
@@ -43,29 +35,21 @@ class _FilterState {
         sort: sort ?? this.sort,
         search: search ?? this.search,
       );
-
   static const _sentinel = Object();
 }
-
-// ── Screen ───────────────────────────────────────────────────────────────────
-
 class AdminReviewsScreen extends ConsumerStatefulWidget {
   const AdminReviewsScreen({super.key});
-
   @override
   ConsumerState<AdminReviewsScreen> createState() => _AdminReviewsScreenState();
 }
-
 class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
   _FilterState _filter = const _FilterState();
   final _searchCtrl = TextEditingController();
-
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
-
   List<Rating> _apply(List<Rating> all) {
     var list = all.where((r) {
       if (_filter.technician != null && r.technician != _filter.technician) {
@@ -84,7 +68,6 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
       }
       return true;
     }).toList();
-
     switch (_filter.sort) {
       case _SortOrder.newest:
         list.sort((a, b) => b.date.compareTo(a.date));
@@ -97,16 +80,13 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
     }
     return list;
   }
-
   void _clearFilters() {
     _searchCtrl.clear();
     setState(() => _filter = const _FilterState());
   }
-
   @override
   Widget build(BuildContext context) {
     final ratingsAsync = ref.watch(ratingsProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -153,28 +133,22 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
             const Center(child: CircularProgressIndicator(color: AppTheme.deepBlue)),
         error: (_, _) => const Center(child: Text('Error loading reviews')),
         data: (allRatings) {
-          // Unique technician names for filter
           final techNames = allRatings
               .map((r) => r.technician)
               .toSet()
               .toList()
             ..sort();
-
-          // Per-technician stats (for summary cards)
           final Map<String, List<Rating>> byTech = {};
           for (final r in allRatings) {
             byTech.putIfAbsent(r.technician, () => []).add(r);
           }
-
           final filtered = _apply(allRatings);
           final overallAvg = filtered.isEmpty
               ? 0.0
               : filtered.map((r) => r.rating).reduce((a, b) => a + b) /
                   filtered.length;
-
           return Column(
             children: [
-              // ── Stats header ───────────────────────────────────────
               _StatsHeader(
                 totalReviews: allRatings.length,
                 filteredCount: filtered.length,
@@ -182,8 +156,6 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
                 techCount: techNames.length,
                 isFiltered: _filter.isActive,
               ),
-
-              // ── Search bar ─────────────────────────────────────────
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -227,8 +199,6 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
                   ),
                 ),
               ),
-
-              // ── Filter chips ───────────────────────────────────────
               _FilterBar(
                 techNames: techNames,
                 filter: _filter,
@@ -236,8 +206,6 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
                 onChanged: (f) => setState(() => _filter = f),
                 onClear: _clearFilters,
               ),
-
-              // ── Active filter banner ───────────────────────────────
               if (_filter.isActive)
                 Padding(
                   padding:
@@ -267,8 +235,6 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
                     ],
                   ),
                 ),
-
-              // ── Review list ────────────────────────────────────────
               Expanded(
                 child: filtered.isEmpty
                     ? _EmptyState(isFiltered: _filter.isActive)
@@ -287,16 +253,12 @@ class _AdminReviewsScreenState extends ConsumerState<AdminReviewsScreen> {
     );
   }
 }
-
-// ── Stats header ─────────────────────────────────────────────────────────────
-
 class _StatsHeader extends StatelessWidget {
   final int totalReviews;
   final int filteredCount;
   final double avgRating;
   final int techCount;
   final bool isFiltered;
-
   const _StatsHeader({
     required this.totalReviews,
     required this.filteredCount,
@@ -304,7 +266,6 @@ class _StatsHeader extends StatelessWidget {
     required this.techCount,
     required this.isFiltered,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -352,7 +313,6 @@ class _StatsHeader extends StatelessWidget {
     );
   }
 }
-
 class _StatTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -363,7 +323,6 @@ class _StatTile extends StatelessWidget {
       required this.iconColor,
       required this.value,
       required this.label});
-
   @override
   Widget build(BuildContext context) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -386,22 +345,17 @@ class _StatTile extends StatelessWidget {
         ],
       );
 }
-
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
       width: 1, height: 36, color: Colors.white.withValues(alpha: 0.3));
 }
-
-// ── Filter bar ────────────────────────────────────────────────────────────────
-
 class _FilterBar extends StatelessWidget {
   final List<String> techNames;
   final Map<String, List<Rating>> byTech;
   final _FilterState filter;
   final ValueChanged<_FilterState> onChanged;
   final VoidCallback onClear;
-
   const _FilterBar({
     required this.techNames,
     required this.byTech,
@@ -409,18 +363,15 @@ class _FilterBar extends StatelessWidget {
     required this.onChanged,
     required this.onClear,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: Technician filter + Sort
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              // Technician dropdown
               Expanded(
                 child: Container(
                   padding:
@@ -497,7 +448,6 @@ class _FilterBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // Sort button
               _SortButton(
                 current: filter.sort,
                 onChanged: (s) => onChanged(filter.copyWith(sort: s)),
@@ -506,8 +456,6 @@ class _FilterBar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-
-        // Row 2: Star chips
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -543,7 +491,6 @@ class _FilterBar extends StatelessWidget {
       ],
     );
   }
-
   Color _starColor(int star) {
     switch (star) {
       case 5: return const Color(0xFF00C853);
@@ -554,14 +501,12 @@ class _FilterBar extends StatelessWidget {
     }
   }
 }
-
 class _StarChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final Color color;
   final int? count;
   final VoidCallback onTap;
-
   const _StarChip({
     required this.label,
     required this.isSelected,
@@ -569,7 +514,6 @@ class _StarChip extends StatelessWidget {
     required this.onTap,
     this.count,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -622,13 +566,10 @@ class _StarChip extends StatelessWidget {
     );
   }
 }
-
 class _SortButton extends StatelessWidget {
   final _SortOrder current;
   final ValueChanged<_SortOrder> onChanged;
-
   const _SortButton({required this.current, required this.onChanged});
-
   String get _label {
     switch (current) {
       case _SortOrder.newest: return 'Newest';
@@ -637,7 +578,6 @@ class _SortButton extends StatelessWidget {
       case _SortOrder.lowestRating: return 'Low Rated';
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<_SortOrder>(
@@ -673,7 +613,6 @@ class _SortButton extends StatelessWidget {
       ],
     );
   }
-
   PopupMenuItem<_SortOrder> _sortItem(
           _SortOrder v, String label, IconData icon) =>
       PopupMenuItem(
@@ -685,13 +624,9 @@ class _SortButton extends StatelessWidget {
         ]),
       );
 }
-
-// ── Review card ───────────────────────────────────────────────────────────────
-
 class _ReviewCard extends StatelessWidget {
   final Rating rating;
   const _ReviewCard({required this.rating});
-
   Color get _starColor {
     switch (rating.rating) {
       case 5: return const Color(0xFF00C853);
@@ -701,7 +636,6 @@ class _ReviewCard extends StatelessWidget {
       default: return const Color(0xFFDD2C00);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -717,7 +651,6 @@ class _ReviewCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Colored top strip
           Container(
             height: 4,
             decoration: BoxDecoration(
@@ -731,7 +664,6 @@ class _ReviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Customer row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -801,8 +733,6 @@ class _ReviewCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-
-                // Technician chip
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 6),
@@ -824,8 +754,6 @@ class _ReviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // Service/device chips
                 if (rating.service.isNotEmpty || rating.device.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
@@ -842,8 +770,6 @@ class _ReviewCard extends StatelessWidget {
                     ],
                   ),
                 ],
-
-                // Review text
                 if (rating.review.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Container(
@@ -881,12 +807,10 @@ class _ReviewCard extends StatelessWidget {
     );
   }
 }
-
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
   const _InfoChip({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) => Container(
         padding:
@@ -907,13 +831,9 @@ class _InfoChip extends StatelessWidget {
         ]),
       );
 }
-
-// ── Empty state ───────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final bool isFiltered;
   const _EmptyState({required this.isFiltered});
-
   @override
   Widget build(BuildContext context) => Center(
         child: Column(

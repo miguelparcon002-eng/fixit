@@ -20,31 +20,21 @@ class CreateBookingScreen extends ConsumerStatefulWidget {
   final String serviceId;
   final bool isEmergency;
   const CreateBookingScreen({super.key, required this.serviceId, this.isEmergency = false});
-
   @override
   ConsumerState<CreateBookingScreen> createState() => _CreateBookingScreenState();
 }
-
 class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-
-  // Repair type
   bool _isEmergency = false;
-
-  // Distance fee rate (₱ per 100m) — loaded from Supabase
   double _distanceFeeRate = 5.0;
-
-  // Step 1: Device selection
   String? _selectedDeviceType;
   String? _selectedBrand;
   String? _selectedModel;
   final TextEditingController _modelController = TextEditingController();
   final Set<String> _selectedProblems = {};
   final TextEditingController _detailsController = TextEditingController();
-
-  // Step 2: Time and location
   TimeOfDay _selectedTime = TimeOfDay.now();
   DateTime? _selectedDate;
   final TextEditingController _addressController = TextEditingController();
@@ -52,10 +42,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
   String? _selectedTechnicianId;
   List<Map<String, dynamic>> _techniciansFromDb = [];
   bool _isTechniciansLoading = false;
-
   final String _selectedPaymentMethod = 'gcash'; // App only accepts GCash
-
-  // Pricing map based on device type and problem (PH market rates)
   final Map<String, Map<String, double>> _pricing = {
     'Mobile Phone': {
       'Screen Cracked': 800.0,
@@ -74,8 +61,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       'Software Bug': 500.0,
     },
   };
-
-  // Brand → device models mapping
   final Map<String, Map<String, List<String>>> _brandDevices = {
     'Mobile Phone': {
       'Apple': ['iPhone 16 Pro Max', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro Max', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro Max', 'iPhone 14', 'iPhone 13', 'iPhone 12', 'iPhone SE'],
@@ -97,8 +82,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       'Other': [],
     },
   };
-
-  // Maps each problem to the technician specialties that cover it
   static const Map<String, List<String>> _problemToSpecialties = {
     'Screen Cracked':  ['Screen Repair', 'Display Replacement', 'iPhone Repair', 'Android Repair', 'Samsung Repair', 'Laptop Repair', 'MacBook Repair'],
     'Battery Drains':  ['Battery Replacement', 'iPhone Repair', 'Android Repair', 'Samsung Repair', 'Laptop Repair', 'MacBook Repair'],
@@ -107,8 +90,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     'Water damage':    ['Water Damage Repair', 'Data Recovery', 'Motherboard Repair', 'iPhone Repair', 'Android Repair', 'Laptop Repair', 'MacBook Repair'],
     'Software Bug':    ['Software Issues', 'Virus Removal', 'Data Recovery', 'SSD/HDD Upgrade'],
   };
-
-  /// Returns true if the technician has at least one specialty matching the selected problems.
   bool _isTechnicianRecommended(List<String> techSpecialties) {
     if (_selectedProblems.isEmpty || techSpecialties.isEmpty) return false;
     final relevant = _selectedProblems
@@ -116,7 +97,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         .toSet();
     return techSpecialties.any((s) => relevant.contains(s));
   }
-
   @override
   void initState() {
     super.initState();
@@ -124,7 +104,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     DistanceFeeService.getRate().then((rate) {
       if (mounted) setState(() => _distanceFeeRate = rate);
     });
-    // Load default address, vouchers, and technicians
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowGcashNotice();
       _loadTechnicians();
@@ -147,35 +126,23 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           }
         });
       } catch (e) {
-        // Address loading failed, user can enter manually
       }
     });
   }
-
-
   Future<void> _loadTechnicians() async {
     if (!mounted) return;
     setState(() => _isTechniciansLoading = true);
-
     try {
       final supabase = SupabaseConfig.client;
       final specialtyService = TechnicianSpecialtyService();
-
-      // Fetch available technician profiles.
-      // Also fetch schedule, busy status and accept-while-busy preference.
       final availableProfiles = await supabase
           .from('technician_profiles')
           .select('user_id, weekly_schedule, is_busy, accept_requests_while_busy')
           .eq('is_available', true);
-
-      // Build lookup: userId → profile data
       final profileMap = <String, Map<String, dynamic>>{
         for (final p in (availableProfiles as List))
           p['user_id'] as String: Map<String, dynamic>.from(p as Map),
       };
-
-      // Only keep technicians who pass the schedule check AND either
-      // are not busy, or are busy but accept new requests.
       final availableIds = profileMap.entries
           .where((e) {
             if (!_techIsOnlineNow(e.value['weekly_schedule'])) return false;
@@ -185,8 +152,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           })
           .map((e) => e.key)
           .toSet();
-
-      // Fetch all technician users then keep only available ones
       final allTechRows = await supabase
           .from('users')
           .select()
@@ -194,31 +159,21 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       final techRows = (allTechRows as List)
           .where((row) => availableIds.contains(row['id'] as String))
           .toList();
-
       final List<Map<String, dynamic>> results = [];
-
       for (final row in techRows) {
         final techId = row['id'] as String;
-
-        // Load specialties (safe - returns empty list on error)
         List<String> specialtyNames = [];
         try {
           final specialties = await specialtyService.getTechnicianSpecialties(techId);
           specialtyNames = specialties.map((s) => s.specialtyName).toList();
         } catch (_) {}
-
-        // Load stats (rating, completed jobs, experience)
         double avgRating = 0.0;
         int completedJobs = 0;
         String experience = 'New';
-
-        // Calculate live average — always combine UUID rows + legacy name-matched rows
         final techFullName = row['full_name'] as String? ?? '';
         try {
           final seenIds = <String>{};
           final vals = <int>[];
-
-          // UUID rows
           try {
             final byId = await supabase
                 .from('app_ratings')
@@ -229,8 +184,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               if (seenIds.add(id)) vals.add((r['rating'] as num).toInt());
             }
           } catch (_) {}
-
-          // Legacy rows (no technician_id) — always run
           final allRatings = await supabase
               .from('app_ratings')
               .select('id, rating, technician, technician_id');
@@ -247,13 +200,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                 (lastName != null && stored == lastName);
             if (matches && seenIds.add(id)) vals.add((r['rating'] as num).toInt());
           }
-
           if (vals.isNotEmpty) {
             avgRating = vals.reduce((a, b) => a + b) / vals.length;
           }
         } catch (_) {}
-
-        // Load completed jobs and experience from cached stats
         try {
           final statsRow = await supabase
               .from('app_technician_stats')
@@ -265,12 +215,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             experience = statsRow['experience'] as String? ?? 'New';
           }
         } catch (_) {}
-
-        // Use technician's saved lat/lng if available
         final techLat = (row['latitude'] as num?)?.toDouble();
         final techLng = (row['longitude'] as num?)?.toDouble();
-
-        // Calculate real distance if both have coordinates, else fallback to random
         double distanceKm;
         if (techLat != null && techLng != null && _pickedLatLng != null) {
           distanceKm = _haversineKm(
@@ -282,9 +228,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           distanceKm = (rawKm * 10).round() / 10.0;
         }
         distanceKm = double.parse(distanceKm.toStringAsFixed(1));
-        // fee rate loaded from admin settings (₱ per 100m)
         final distanceFee = (distanceKm * 10).round() * _distanceFeeRate;
-
         final techProfile = profileMap[techId];
         results.add({
           'id': techId,
@@ -303,7 +247,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           'isBusy': techProfile?['is_busy'] as bool? ?? false,
         });
       }
-
       if (mounted) {
         setState(() {
           _techniciansFromDb = results;
@@ -316,15 +259,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       }
     }
   }
-
-  /// Equirectangular approximation — returns distance in km.
   double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
     const toRad = pi / 180;
     final dlat = (lat2 - lat1) * 111.0;
     final dlng = (lng2 - lng1) * 111.0 * cos((lat1 + lat2) / 2 * toRad);
     return sqrt(dlat * dlat + dlng * dlng);
   }
-
   Map<String, dynamic>? get _selectedTechData {
     if (_selectedTechnicianId == null) return null;
     try {
@@ -333,7 +273,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       return null;
     }
   }
-
   @override
   void dispose() {
     _modelController.dispose();
@@ -342,7 +281,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-
   double _getServicePrice() {
     if (_selectedDeviceType == null || _selectedProblems.isEmpty) return 0.0;
     double base = 0.0;
@@ -351,25 +289,20 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     }
     return _isEmergency ? base * 1.10 : base;
   }
-
   double _getDistanceFee() {
     final tech = _selectedTechData;
     if (tech == null) return 0.0;
     return (tech['distanceFee'] as num?)?.toDouble() ?? 0.0;
   }
-
   double _getSelectedDistanceKm() {
     final tech = _selectedTechData;
     if (tech == null) return 0.0;
     return (tech['distanceKm'] as num?)?.toDouble() ?? 0.0;
   }
-
   double _calculatePrice() {
     return _getServicePrice() + _getDistanceFee();
   }
-
   double _calculateFinalPrice() => _calculatePrice();
-
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -395,7 +328,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       });
     }
   }
-
   Future<void> _selectTime() async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
@@ -419,7 +351,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       });
     }
   }
-
   bool _validateStep(int step) {
     switch (step) {
       case 0:
@@ -472,21 +403,15 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         return true;
     }
   }
-
   Future<void> _confirmBooking() async {
     if (!_validateStep(_currentStep)) return;
-
     setState(() {
       _isLoading = true;
     });
-
     try {
       final user = ref.read(currentUserProvider).value;
       if (user == null) throw Exception('User not logged in');
-
       final finalPrice = _calculateFinalPrice();
-
-      // Combine date and time into scheduledDate
       final scheduledDateTime = DateTime(
         _selectedDate!.year,
         _selectedDate!.month,
@@ -494,8 +419,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         _selectedTime.hour,
         _selectedTime.minute,
       );
-
-      // Create booking details text
       final serviceFee = _getServicePrice();
       final distanceFee = _getDistanceFee();
       final bookingDetails = [
@@ -510,12 +433,8 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         'Distance Fee: ₱${distanceFee.toStringAsFixed(2)}',
         'Convenience Fee Rate: 5',
       ].join('\n');
-
-      // Use the selected technician directly
       final technicianId = _selectedTechnicianId!;
       final supabase = SupabaseConfig.client;
-
-      // Get or create a service ID for this technician
       String serviceId;
       var serviceResponse = await supabase
           .from('services')
@@ -523,22 +442,17 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           .eq('technician_id', technicianId)
           .limit(1)
           .maybeSingle();
-
       serviceResponse ??= await supabase
           .from('services')
           .select('id')
           .limit(1)
           .maybeSingle();
-
       if (serviceResponse != null) {
         serviceId = serviceResponse['id'] as String;
       } else {
         throw Exception('No services available. Please contact support.');
       }
-
-      // Create booking in Supabase using BookingService
       final bookingService = ref.read(bookingServiceProvider);
-
       final createdBooking = await bookingService.createBooking(
         customerId: user.id,
         technicianId: technicianId,
@@ -550,15 +464,11 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         estimatedCost: finalPrice,
         paymentMethod: _selectedPaymentMethod,
       );
-
-      // Update diagnostic notes with booking details
       await bookingService.updateDiagnosticNotes(
         bookingId: createdBooking.id,
         notes: bookingDetails,
         finalCost: finalPrice,
       );
-
-      // Notify the technician of the new booking request
       final customerName = user.fullName;
       final problemList = _selectedProblems.join(', ');
       await NotificationService().sendNotification(
@@ -568,8 +478,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         message: '$customerName has requested a repair for: $problemList. Tap to view details.',
         data: {'booking_id': createdBooking.id, 'route': '/tech-jobs'},
       );
-
-      // Also notify the customer that their booking was submitted
       await NotificationService().sendNotification(
         userId: user.id,
         type: 'booking_request',
@@ -577,18 +485,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         message: 'Your booking has been submitted. Please wait for the technician to accept your request.',
         data: {'booking_id': createdBooking.id, 'route': '/booking/${createdBooking.id}'},
       );
-
-      // Force refresh bookings so the new booking appears immediately (no hot restart)
       ref.invalidate(customerBookingsProvider);
       ref.invalidate(technicianBookingsProvider);
-
       if (!mounted) return;
-
       setState(() {
         _isLoading = false;
       });
-
-      // Show success dialog
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -630,10 +532,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       setState(() {
         _isLoading = false;
       });
-
       if (!mounted) return;
-
-      // Show user-friendly error message
       String errorMessage = 'Error creating booking';
       if (e.toString().contains('technician')) {
         errorMessage = 'No technicians available. Please contact support.';
@@ -644,7 +543,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       } else {
         errorMessage = e.toString().replaceAll('Exception: ', '');
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),
@@ -659,7 +557,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -686,7 +583,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
       body: Column(
         children: [
-          // Progress indicator
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -701,7 +597,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // Step content
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
@@ -718,7 +613,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               ),
             ),
           ),
-          // Bottom navigation
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -759,7 +653,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     onPressed: _isLoading ? null : () async {
                       if (_currentStep < 2) {
                         if (_validateStep(_currentStep)) {
-                          // On step 0 (tech selection), warn if busy tech selected
                           if (_currentStep == 0) {
                             final tech = _selectedTechData;
                             final busy = tech?['isBusy'] as bool? ?? false;
@@ -804,7 +697,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   Widget _buildStepIndicator(int step, String label) {
     final isActive = step <= _currentStep;
     return Column(
@@ -839,7 +731,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   Widget _buildStepDivider(int step) {
     final isActive = step < _currentStep;
     return Container(
@@ -848,7 +739,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       color: isActive ? AppTheme.deepBlue : Colors.grey.shade300,
     );
   }
-
   Widget _buildStepContent() {
     switch (_currentStep) {
       case 0:
@@ -861,14 +751,10 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         return const SizedBox();
     }
   }
-
   void _showDeviceModelPicker() {
     if (_selectedDeviceType == null || _selectedBrand == null) return;
     final devices = _brandDevices[_selectedDeviceType]?[_selectedBrand] ?? [];
-
-    // If brand is "Other" or no devices, let user type manually
     if (_selectedBrand == 'Other' || devices.isEmpty) return;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -916,7 +802,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade200),
                     itemBuilder: (context, index) {
                       if (index == devices.length) {
-                        // "Other" option at the end
                         return ListTile(
                           leading: const Icon(Icons.edit, color: AppTheme.deepBlue),
                           title: const Text(
@@ -967,13 +852,11 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       },
     );
   }
-
   Widget _buildDeviceStep() {
     final servicePrice = _getServicePrice();
     final brands = _selectedDeviceType != null
         ? (_brandDevices[_selectedDeviceType]?.keys.toList() ?? [])
         : <String>[];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -986,8 +869,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Repair Type Toggle
         const Text(
           'Repair Type',
           style: TextStyle(
@@ -1087,8 +968,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ],
         const SizedBox(height: 20),
-
-        // Device Type
         const Text(
           'Device Type',
           style: TextStyle(
@@ -1146,8 +1025,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           }).toList(),
         ),
         const SizedBox(height: 20),
-
-        // Brand Selection
         if (_selectedDeviceType != null) ...[
           const Text(
             'Brand',
@@ -1170,7 +1047,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     _selectedModel = null;
                     _modelController.clear();
                   });
-                  // Show device picker popup for brands with devices
                   if (brand != 'Other') {
                     Future.delayed(const Duration(milliseconds: 150), () {
                       _showDeviceModelPicker();
@@ -1201,8 +1077,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
           const SizedBox(height: 20),
         ],
-
-        // Device Model (shows selected model or allows manual input)
         if (_selectedBrand != null) ...[
           const Text(
             'Device Model',
@@ -1269,8 +1143,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           const SizedBox(height: 20),
         ],
-
-        // What's the problem?
         const Text(
           'What\'s the Problem?',
           style: TextStyle(
@@ -1301,8 +1173,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
             ),
           ),
         ),
-
-        // Price Preview
         if (servicePrice > 0) ...[
           const SizedBox(height: 24),
           Container(
@@ -1347,7 +1217,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   void _showTechnicianMap() {
     showModalBottomSheet(
       context: context,
@@ -1362,7 +1231,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   Future<void> _checkAndShowGcashNotice() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null || !mounted) return;
@@ -1434,7 +1302,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   Future<bool?> _showBusyWarning(String techName) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -1509,7 +1376,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   void _showTechnicianDetails(Map<String, dynamic> tech) {
     final name = tech['name'] as String;
     final bio = tech['bio'] as String?;
@@ -1524,7 +1390,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
         .take(2)
         .map((s) => s[0].toUpperCase())
         .join();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1543,7 +1408,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Column(
                 children: [
-                  // Drag handle
                   Container(
                     width: 40,
                     height: 4,
@@ -1553,8 +1417,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-
-                  // Profile header
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: AppTheme.deepBlue,
@@ -1607,8 +1469,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Stats row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1618,8 +1478,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Bio
                   if (bio != null && bio.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
@@ -1652,8 +1510,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // Specialties
                   if (specialties.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
@@ -1692,8 +1548,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // Customer Reviews
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -1733,8 +1587,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-
-                  // Select button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -1765,7 +1617,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       },
     );
   }
-
   void _showTechnicianReviews(String technicianName, String technicianId) {
     showModalBottomSheet(
       context: context,
@@ -1832,7 +1683,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   Widget _buildReviewCard(Rating r) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1880,7 +1730,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   Widget _buildTechStat(IconData icon, Color color, String value, String label) {
     return Column(
       children: [
@@ -1910,7 +1759,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   Widget _buildScheduleStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1924,8 +1772,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Date Selection
         const Text(
           'Preferred Date',
           style: TextStyle(
@@ -1974,8 +1820,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Time Selection
         const Text(
           'Preferred Time',
           style: TextStyle(
@@ -2011,8 +1855,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Address
         const Text(
           'Service Address',
           style: TextStyle(
@@ -2045,7 +1887,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        // Pin exact location on map
         GestureDetector(
           onTap: () async {
             final result = await showModalBottomSheet<PickedLocation>(
@@ -2107,8 +1948,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Technician Selection
         Row(
           children: [
             const Expanded(
@@ -2201,7 +2040,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                 .take(2)
                 .map((s) => s[0].toUpperCase())
                 .join();
-
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: InkWell(
@@ -2226,7 +2064,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                     children: [
                       Row(
                         children: [
-                          // Avatar
                           CircleAvatar(
                             radius: 22,
                             backgroundColor: isSelected ? AppTheme.deepBlue : Colors.grey.shade300,
@@ -2393,7 +2230,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
                           ),
                         ],
                       ),
-                      // Specialties chips
                       if (specialties.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         SizedBox(
@@ -2441,14 +2277,12 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   Widget _buildReviewStep() {
     final servicePrice = _getServicePrice();
     final distanceFee = _getDistanceFee();
     final totalBeforeDiscount = _calculatePrice();
     final finalPrice = _calculateFinalPrice();
     final discount = totalBeforeDiscount - finalPrice;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2461,8 +2295,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Device Info
         _buildReviewSection(
           'Device Information',
           [
@@ -2474,8 +2306,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
-        // Schedule Info
         _buildReviewSection(
           'Schedule & Location',
           [
@@ -2488,8 +2318,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ],
         ),
         const SizedBox(height: 24),
-
-        // Price Summary
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -2588,8 +2416,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
           ),
         ),
         const SizedBox(height: 20),
-
-        // Terms
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -2617,7 +2443,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ],
     );
   }
-
   Widget _buildReviewSection(String title, List<Widget> items) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2643,7 +2468,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       ),
     );
   }
-
   Widget _buildReviewItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -2675,10 +2499,6 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
     );
   }
 }
-
-/// Returns true if the current day and time fall within the technician's
-/// weekly schedule. If no schedule is stored, returns true (rely on
-/// is_available flag which was already checked in the DB query).
 bool _techIsOnlineNow(dynamic weeklyScheduleJson) {
   if (weeklyScheduleJson == null) return true;
   const days = [
@@ -2699,4 +2519,3 @@ bool _techIsOnlineNow(dynamic weeklyScheduleJson) {
   final nowMin   = now.hour * 60 + now.minute;
   return nowMin >= startMin && nowMin < endMin;
 }
-

@@ -13,7 +13,6 @@ class RedeemedVoucher {
   final bool isUsed;
   final DateTime? expiresAt;
   final DateTime createdAt;
-
   RedeemedVoucher({
     required this.id,
     required this.userId,
@@ -30,7 +29,6 @@ class RedeemedVoucher {
     this.expiresAt,
     required this.createdAt,
   });
-
   factory RedeemedVoucher.fromJson(Map<String, dynamic> json) {
     return RedeemedVoucher(
       id: json['id'] as String,
@@ -49,7 +47,6 @@ class RedeemedVoucher {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -68,7 +65,6 @@ class RedeemedVoucher {
       'created_at': createdAt.toIso8601String(),
     };
   }
-
   RedeemedVoucher copyWith({
     String? id,
     String? userId,

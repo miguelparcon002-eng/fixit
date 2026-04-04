@@ -12,140 +12,71 @@ import '../providers/auth_provider.dart';
 import 'fcm_service.dart';
 import 'storage_service.dart';
 import '../core/utils/app_logger.dart';
-
-/// Service to manage user session and ensure data isolation between accounts.
-/// Call this when a user logs in, logs out, or signs up to reset all user-specific data.
 class UserSessionService {
   final Ref _ref;
-
   UserSessionService(this._ref);
-
-  /// Call this after a user successfully logs in.
-  /// This ensures all providers reload data for the new user.
   Future<void> onUserLogin(String userId) async {
     AppLogger.p('UserSessionService: User logged in - $userId');
-
-    // Set the current user for storage isolation
     StorageService.setCurrentUser(userId);
-
-    // Save FCM token so this device receives push notifications
     await FCMService.saveTokenForUser(userId);
-
-    // Reload all user-specific providers
     await _reloadAllUserData();
   }
-
-  /// Call this when a user logs out.
-  /// This clears all cached data and resets providers.
   Future<void> onUserLogout() async {
     AppLogger.p('UserSessionService: User logged out');
-
-    // Remove FCM token so this device stops receiving pushes
     final userId = StorageService.currentUserId;
     if (userId != null) await FCMService.clearTokenForUser(userId);
-
-    // Clear storage user context
     StorageService.setCurrentUser(null);
-
-    // Invalidate all user-specific providers to clear cached data
     _invalidateAllProviders();
   }
-
-  /// Call this after a new user signs up.
-  /// This ensures the new user starts with completely fresh data.
   Future<void> onUserSignup(String userId) async {
     AppLogger.p('UserSessionService: New user signed up - $userId');
-
-    // Set the current user for storage isolation
     StorageService.setCurrentUser(userId);
-
-    // Invalidate all providers to ensure fresh state
     _invalidateAllProviders();
-
-    // New users start with empty data - no need to load anything
     AppLogger.p('UserSessionService: New user initialized with fresh data');
   }
-
-  /// Reload all user-specific data from storage
   Future<void> _reloadAllUserData() async {
     try {
-      // Invalidate bookings (StreamProviders auto-reload)
       _ref.invalidate(customerBookingsProvider);
       _ref.invalidate(technicianBookingsProvider);
-
-      // Invalidate addresses (StreamProvider auto-reloads)
       _ref.invalidate(userAddressesProvider);
-
-      // Reload rewards (points are auto-calculated from Supabase bookings)
       _ref.invalidate(rewardPointsProvider);
       _ref.invalidate(redeemedVouchersProvider);
       _ref.invalidate(unusedVouchersProvider);
-
-      // Reload profile setup status
       _ref.invalidate(profileSetupCompleteProvider);
-
-      // Reload earnings (for technicians) - invalidate to recalculate from bookings
       _ref.invalidate(todayEarningsProvider);
       _ref.invalidate(totalEarningsProvider);
       _ref.invalidate(weekEarningsProvider);
       _ref.invalidate(monthEarningsProvider);
       _ref.invalidate(transactionsProvider);
-
-      // Refresh user profile
       _ref.invalidate(currentUserProvider);
       _ref.invalidate(profileProvider);
-
-      // Reload technician stats and ratings
       _ref.invalidate(technicianStatsProvider);
       _ref.invalidate(ratingsProvider);
-
-      // Reload support tickets
       _ref.invalidate(supportTicketsProvider);
-
       AppLogger.p('UserSessionService: All user data reloaded');
     } catch (e) {
       AppLogger.p('UserSessionService: Error reloading user data - $e');
     }
   }
-
-  /// Invalidate all user-specific providers (clears cached state)
   void _invalidateAllProviders() {
-    // Invalidate auth
     _ref.invalidate(currentUserProvider);
     _ref.invalidate(profileProvider);
-
-    // Invalidate bookings
     _ref.invalidate(customerBookingsProvider);
     _ref.invalidate(technicianBookingsProvider);
-
-    // Invalidate addresses
     _ref.invalidate(userAddressesProvider);
-
-    // Invalidate rewards
     _ref.invalidate(rewardPointsProvider);
     _ref.invalidate(redeemedVouchersProvider);
     _ref.invalidate(unusedVouchersProvider);
-
-    // Invalidate profile setup status
     _ref.invalidate(profileSetupCompleteProvider);
-
-    // Invalidate earnings
     _ref.invalidate(todayEarningsProvider);
     _ref.invalidate(totalEarningsProvider);
     _ref.invalidate(weekEarningsProvider);
     _ref.invalidate(monthEarningsProvider);
     _ref.invalidate(transactionsProvider);
-
-    // Invalidate technician stats and ratings
     _ref.invalidate(technicianStatsProvider);
     _ref.invalidate(ratingsProvider);
-
-    // Invalidate support tickets
     _ref.invalidate(supportTicketsProvider);
-
     AppLogger.p('UserSessionService: All providers invalidated');
   }
 }
-
-/// Provider for the UserSessionService
 final userSessionServiceProvider = Provider((ref) => UserSessionService(ref));

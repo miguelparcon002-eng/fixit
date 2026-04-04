@@ -4,16 +4,13 @@ import '../core/constants/db_constants.dart';
 import '../models/chat_model.dart';
 import '../core/utils/technician_verification_guard.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 class ChatService {
   final _supabase = SupabaseConfig.client;
   final _uuid = const Uuid();
-
   Ref? _ref;
   ChatService({Ref? ref}) {
     _ref = ref;
   }
-
   Future<ChatModel> createOrGetChat({
     required String customerId,
     required String technicianId,
@@ -28,11 +25,9 @@ class ChatService {
         .eq('customer_id', customerId)
         .eq('technician_id', technicianId)
         .maybeSingle();
-
     if (existingChat != null) {
       return ChatModel.fromJson(existingChat);
     }
-
     final chatId = _uuid.v4();
     final response = await _supabase.from(DBConstants.chats).insert({
       'id': chatId,
@@ -42,10 +37,8 @@ class ChatService {
       'unread_count_customer': 0,
       'unread_count_technician': 0,
     }).select().single();
-
     return ChatModel.fromJson(response);
   }
-
   Future<MessageModel> sendMessage({
     required String chatId,
     required String senderId,
@@ -56,7 +49,6 @@ class ChatService {
       await TechnicianVerificationGuard.requireVerifiedForWrite(_ref!);
     }
     final messageId = _uuid.v4();
-
     final response = await _supabase.from(DBConstants.messages).insert({
       'id': messageId,
       'chat_id': chatId,
@@ -65,15 +57,12 @@ class ChatService {
       'image_url': imageUrl,
       'is_read': false,
     }).select().single();
-
     await _supabase.from(DBConstants.chats).update({
       'last_message': message,
       'last_message_at': DateTime.now().toIso8601String(),
     }).eq('id', chatId);
-
     return MessageModel.fromJson(response);
   }
-
   Future<List<MessageModel>> getMessages({
     required String chatId,
     int limit = 50,
@@ -85,20 +74,16 @@ class ChatService {
         .eq('chat_id', chatId)
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
-
     return (response as List).map((e) => MessageModel.fromJson(e)).toList();
   }
-
   Future<List<ChatModel>> getUserChats(String userId) async {
     final response = await _supabase
         .from(DBConstants.chats)
         .select()
         .or('customer_id.eq.$userId,technician_id.eq.$userId')
         .order('last_message_at', ascending: false);
-
     return (response as List).map((e) => ChatModel.fromJson(e)).toList();
   }
-
   Future<void> markMessagesAsRead({
     required String chatId,
     required String userId,
@@ -108,15 +93,12 @@ class ChatService {
         .update({'is_read': true})
         .eq('chat_id', chatId)
         .neq('sender_id', userId);
-
     final chat = await _supabase
         .from(DBConstants.chats)
         .select()
         .eq('id', chatId)
         .single();
-
     final chatModel = ChatModel.fromJson(chat);
-
     if (chatModel.customerId == userId) {
       await _supabase
           .from(DBConstants.chats)
@@ -129,7 +111,6 @@ class ChatService {
           .eq('id', chatId);
     }
   }
-
   Stream<List<MessageModel>> watchMessages(String chatId) {
     return _supabase
         .from(DBConstants.messages)
@@ -138,7 +119,6 @@ class ChatService {
         .order('created_at', ascending: false)
         .map((data) => data.map((e) => MessageModel.fromJson(e)).toList());
   }
-
   Stream<List<ChatModel>> watchUserChats(String userId) {
     return _supabase
         .from(DBConstants.chats)

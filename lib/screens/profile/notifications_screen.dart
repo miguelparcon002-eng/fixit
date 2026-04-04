@@ -1,23 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/notification_icon_mapper.dart';
 import '../../core/utils/time_ago.dart';
 import '../../models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
-
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifications = ref.watch(filteredNotificationsProvider);
     final notificationsAsync = AsyncData<List<AppNotification>>(notifications);
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -80,7 +76,6 @@ class NotificationsScreen extends ConsumerWidget {
                     ),
                   );
                 }
-
                 return ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: items.length,
@@ -124,22 +119,18 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 }
-
 class _NotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
-
   const _NotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
   });
-
   @override
   Widget build(BuildContext context) {
     final mapped = mapNotificationIcon(notification.type);
-
     return GestureDetector(
       onTap: onTap,
       child: Container(

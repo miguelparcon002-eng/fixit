@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
-
 class AdminNavigation extends StatefulWidget {
   final Widget child;
-
   const AdminNavigation({super.key, required this.child});
-
   @override
   State<AdminNavigation> createState() => _AdminNavigationState();
 }
-
 class _AdminNavigationState extends State<AdminNavigation> {
   int _indexFromRoute(String location) {
     if (location.startsWith('/admin-home')) return 0;
@@ -21,12 +17,10 @@ class _AdminNavigationState extends State<AdminNavigation> {
     if (location.startsWith('/admin-reports')) return 3;
     return 0;
   }
-
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _indexFromRoute(location);
-
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
@@ -76,20 +70,17 @@ class _AdminNavigationState extends State<AdminNavigation> {
     );
   }
 }
-
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _NavItem({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

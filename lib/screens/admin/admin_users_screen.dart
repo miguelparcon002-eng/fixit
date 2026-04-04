@@ -9,37 +9,29 @@ import '../../providers/admin_technicians_provider.dart';
 import 'widgets/admin_customer_details_sheet.dart';
 import 'widgets/admin_notifications_dialog.dart';
 import 'widgets/admin_technician_details_sheet.dart';
-
 class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
-
   @override
   ConsumerState<AdminUsersScreen> createState() => _AdminUsersScreenState();
 }
-
 class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // — Customer state —
   final TextEditingController _customerSearchController =
       TextEditingController();
   String _customerSearchQuery = '';
   String _customerFilter = 'all';
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     _customerSearchController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,16 +114,12 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
     );
   }
 }
-
-// ─── Customers Tab ────────────────────────────────────────────────────────────
-
 class _CustomersTab extends ConsumerWidget {
   final TextEditingController searchController;
   final String searchQuery;
   final String selectedFilter;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String> onFilterChanged;
-
   const _CustomersTab({
     required this.searchController,
     required this.searchQuery,
@@ -139,14 +127,11 @@ class _CustomersTab extends ConsumerWidget {
     required this.onSearchChanged,
     required this.onFilterChanged,
   });
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customersAsync = ref.watch(adminCustomersProvider);
-
     return Column(
       children: [
-        // Search & Filter
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           padding: const EdgeInsets.all(14),
@@ -234,7 +219,6 @@ class _CustomersTab extends ConsumerWidget {
             ],
           ),
         ),
-        // Stats
         customersAsync.when(
           data: (customers) {
             final activeCount =
@@ -267,7 +251,6 @@ class _CustomersTab extends ConsumerWidget {
           error: (_, _) => const SizedBox.shrink(),
         ),
         const SizedBox(height: 8),
-        // List
         Expanded(
           child: customersAsync.when(
             data: (customers) {
@@ -292,7 +275,6 @@ class _CustomersTab extends ConsumerWidget {
               } else if (selectedFilter == 'suspended') {
                 filtered = filtered.where((c) => c.isSuspended).toList();
               }
-
               if (filtered.isEmpty) {
                 return Center(
                   child: Column(
@@ -314,7 +296,6 @@ class _CustomersTab extends ConsumerWidget {
                   ),
                 );
               }
-
               return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 itemCount: filtered.length,
@@ -358,24 +339,16 @@ class _CustomersTab extends ConsumerWidget {
     );
   }
 }
-
-// ─── Technicians Tab ──────────────────────────────────────────────────────────
-
 enum _TechSort { experience, createdAt, jobsDone }
-
 enum _TechVerifiedFilter { all, verified, unverified, suspended }
-
 class _TechniciansTab extends ConsumerStatefulWidget {
   const _TechniciansTab();
-
   @override
   ConsumerState<_TechniciansTab> createState() => _TechniciansTabState();
 }
-
 class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
   _TechSort _sort = _TechSort.jobsDone;
   _TechVerifiedFilter _verifiedFilter = _TechVerifiedFilter.all;
-
   String get _verifiedFilterLabel {
     switch (_verifiedFilter) {
       case _TechVerifiedFilter.all:
@@ -388,7 +361,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return 'Suspended';
     }
   }
-
   String get _sortLabel {
     switch (_sort) {
       case _TechSort.experience:
@@ -399,7 +371,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return 'Bookings done';
     }
   }
-
   List<AdminTechnicianListItem> _applyFilter(
       List<AdminTechnicianListItem> items) {
     switch (_verifiedFilter) {
@@ -413,7 +384,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return items.where((t) => t.isSuspended).toList();
     }
   }
-
   int _compare(AdminTechnicianListItem a, AdminTechnicianListItem b) {
     if (a.isSuspended != b.isSuspended) return a.isSuspended ? 1 : -1;
     int desc(num x, num y) => y.compareTo(x);
@@ -429,7 +399,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
         return desc(a.completedBookings, b.completedBookings);
     }
   }
-
   void _pickVerifiedFilter() {
     showDialog(
       context: context,
@@ -484,7 +453,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
       ),
     );
   }
-
   void _pickSort() {
     showDialog(
       context: context,
@@ -527,14 +495,11 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final techsAsync = ref.watch(adminTechniciansProvider);
-
     return Column(
       children: [
-        // Filter bar inside the tab
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -584,7 +549,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
             data: (items) {
               final filtered = _applyFilter(items);
               final sorted = [...filtered]..sort(_compare);
-
               if (sorted.isEmpty) {
                 return Center(
                   child: Column(
@@ -604,7 +568,6 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
                   ),
                 );
               }
-
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: sorted.length,
@@ -639,17 +602,12 @@ class _TechniciansTabState extends ConsumerState<_TechniciansTab> {
     );
   }
 }
-
-// ─── Shared small widgets ─────────────────────────────────────────────────────
-
 class _StatBadge extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-
   const _StatBadge(
       {required this.label, required this.value, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -681,20 +639,17 @@ class _StatBadge extends StatelessWidget {
     );
   }
 }
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onSelected;
   final Color? color;
-
   const _FilterChip({
     required this.label,
     required this.isSelected,
     required this.onSelected,
     this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -716,15 +671,12 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
 class _TechFilterOption extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _TechFilterOption(
       {required this.label, required this.isSelected, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -764,15 +716,10 @@ class _TechFilterOption extends StatelessWidget {
     );
   }
 }
-
-// ─── Customer Card ────────────────────────────────────────────────────────────
-
 class _CustomerCard extends StatelessWidget {
   final AdminCustomerUser customer;
   final VoidCallback onTap;
-
   const _CustomerCard({required this.customer, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -891,12 +838,10 @@ class _CustomerCard extends StatelessWidget {
     );
   }
 }
-
 class _StatusBadge extends StatelessWidget {
   final String label;
   final Color color;
   const _StatusBadge({required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -911,15 +856,10 @@ class _StatusBadge extends StatelessWidget {
     );
   }
 }
-
-// ─── Technician Card ──────────────────────────────────────────────────────────
-
 class _TechnicianCard extends StatelessWidget {
   final AdminTechnicianListItem technician;
   final VoidCallback onTap;
-
   const _TechnicianCard({required this.technician, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -928,7 +868,6 @@ class _TechnicianCard extends StatelessWidget {
     final rating = profile?.rating ?? 0.0;
     final jobs = technician.completedBookings;
     final exp = profile?.yearsExperience ?? 0;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -1063,15 +1002,12 @@ class _TechnicianCard extends StatelessWidget {
     );
   }
 }
-
 class _MiniStat extends StatelessWidget {
   final IconData icon;
   final String value;
   final Color color;
-
   const _MiniStat(
       {required this.icon, required this.value, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(

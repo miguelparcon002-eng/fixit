@@ -6,19 +6,15 @@ import '../../providers/rewards_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/reward.dart';
 import '../../models/redeemed_voucher.dart';
-
 class RewardsScreen extends ConsumerStatefulWidget {
   const RewardsScreen({super.key});
-
   @override
   ConsumerState<RewardsScreen> createState() => _RewardsScreenState();
 }
-
 class _RewardsScreenState extends ConsumerState<RewardsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _onAvailableTab = true;
-
   @override
   void initState() {
     super.initState();
@@ -29,20 +25,17 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
       }
     });
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final pointsAsync = ref.watch(rewardPointsProvider);
     final availableVouchers = ref.watch(availableVouchersProvider);
     final redeemedVouchersAsync = ref.watch(redeemedVouchersProvider);
     final points = pointsAsync.valueOrNull ?? 0;
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -71,7 +64,6 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
         ),
         child: Column(
           children: [
-            // Points Balance Card
             Container(
               margin: const EdgeInsets.all(20),
               padding: const EdgeInsets.all(24),
@@ -164,8 +156,6 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
                 ],
               ),
             ),
-
-            // Tabs
             Expanded(
               child: Column(
                   children: [
@@ -187,7 +177,6 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
                       child: TabBarView(
                         controller: _tabController,
                         children: [
-                          // Available Vouchers
                           ListView.builder(
                             padding: const EdgeInsets.all(20),
                             itemCount: availableVouchers.length,
@@ -203,15 +192,11 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
                               );
                             },
                           ),
-
-                          // Redeemed Vouchers (only show unused ones)
                           redeemedVouchersAsync.when(
                             loading: () => const Center(child: CircularProgressIndicator()),
                             error: (error, stack) => Center(child: Text('Error: $error')),
                             data: (redeemedVouchers) {
-                              // Filter to show only unused vouchers
                               final unusedVouchers = redeemedVouchers.where((v) => !v.isUsed).toList();
-
                               if (unusedVouchers.isEmpty) {
                                 return Center(
                                   child: Column(
@@ -264,7 +249,6 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
       ),
     );
   }
-
   void _showRedeemDialog(BuildContext context, WidgetRef ref, RewardVoucher voucher, int currentPoints) {
     showDialog(
       context: context,
@@ -357,7 +341,6 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        // Get current user
                         final user = ref.read(currentUserProvider).value;
                         if (user == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -368,21 +351,16 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
                           );
                           return;
                         }
-
-                        // Redeem voucher using service
                         final voucherService = ref.read(redeemedVoucherServiceProvider);
                         final redeemedVoucher = await voucherService.redeemVoucher(
                           userId: user.id,
                           voucher: voucher,
                         );
-
                         if (context.mounted) {
                           Navigator.pop(context);
                           if (redeemedVoucher != null) {
-                            // Refresh the redeemed vouchers list and reward points
                             ref.invalidate(redeemedVouchersProvider);
                             ref.invalidate(rewardPointsProvider);
-
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('${voucher.title} voucher redeemed!'),
@@ -423,18 +401,15 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen>
     );
   }
 }
-
 class _VoucherCard extends StatelessWidget {
   final RewardVoucher voucher;
   final bool canRedeem;
   final VoidCallback onRedeem;
-
   const _VoucherCard({
     required this.voucher,
     required this.canRedeem,
     required this.onRedeem,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -539,16 +514,12 @@ class _VoucherCard extends StatelessWidget {
     );
   }
 }
-
 class _RedeemedVoucherCard extends StatelessWidget {
   final RedeemedVoucher voucher;
-
   const _RedeemedVoucherCard({required this.voucher});
-
   @override
   Widget build(BuildContext context) {
     final promoCode = 'VOUCHER${voucher.voucherId.toUpperCase()}';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -652,7 +623,6 @@ class _RedeemedVoucherCard extends StatelessWidget {
                         icon: const Icon(Icons.copy, size: 20),
                         color: AppTheme.deepBlue,
                         onPressed: () {
-                          // Copy to clipboard functionality would go here
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Code $promoCode copied!'),

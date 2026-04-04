@@ -6,28 +6,22 @@ import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../providers/auth_provider.dart';
-
 class CustomerTicketDetailScreen extends ConsumerStatefulWidget {
   final String ticketId;
-
   const CustomerTicketDetailScreen({super.key, required this.ticketId});
-
   @override
   ConsumerState<CustomerTicketDetailScreen> createState() => _CustomerTicketDetailScreenState();
 }
-
 class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetailScreen> {
   final TextEditingController _replyController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
-
   @override
   void dispose() {
     _replyController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-
   Color _getStatusColor(String status) {
     switch (status) {
       case 'open':
@@ -42,7 +36,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         return Colors.grey;
     }
   }
-
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'urgent':
@@ -57,7 +50,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         return Colors.grey;
     }
   }
-
   String _getCategoryLabel(String category) {
     switch (category) {
       case 'booking_issue':
@@ -72,7 +64,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         return 'Other';
     }
   }
-
   IconData _getCategoryIcon(String category) {
     switch (category) {
       case 'booking_issue':
@@ -87,7 +78,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         return Icons.help_outline;
     }
   }
-
   String _getStatusMessage(String status) {
     switch (status) {
       case 'open':
@@ -102,15 +92,11 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         return '';
     }
   }
-
   Future<void> _sendReply(SupportTicket ticket) async {
     if (_replyController.text.trim().isEmpty) return;
-
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
-
     setState(() => _isLoading = true);
-
     try {
       final message = TicketMessage(
         id: 'msg_${const Uuid().v4().substring(0, 8)}',
@@ -121,11 +107,8 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         message: _replyController.text.trim(),
         createdAt: DateTime.now(),
       );
-
       await ref.read(supportTicketsProvider.notifier).addMessage(widget.ticketId, message);
       _replyController.clear();
-
-      // Scroll to bottom
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -135,7 +118,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
           );
         }
       });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -159,11 +141,9 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final ticket = ref.watch(ticketByIdProvider(widget.ticketId));
-
     if (ticket == null) {
       return Scaffold(
         backgroundColor: AppTheme.primaryCyan,
@@ -203,12 +183,10 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
         ),
       );
     }
-
     final messages = ticket.messages;
     final statusColor = _getStatusColor(ticket.status);
     final priorityColor = _getPriorityColor(ticket.priority);
     final isResolved = ticket.status == 'resolved' || ticket.status == 'closed';
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -229,7 +207,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
       ),
       body: Column(
         children: [
-          // Ticket Info Header
           Container(
             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             padding: const EdgeInsets.all(16),
@@ -240,7 +217,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Status and Priority Row
                 Row(
                   children: [
                     Container(
@@ -282,7 +258,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Status Badge Row
                 Row(
                   children: [
                     Container(
@@ -331,7 +306,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Status Message
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -363,7 +337,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
               ],
             ),
           ),
-          // Messages List
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
@@ -375,7 +348,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
               ),
               child: Column(
                 children: [
-                  // Conversation Label
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                     child: Row(
@@ -427,7 +399,6 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
                             },
                           ),
                   ),
-                  // Reply Input (disabled if closed)
                   if (ticket.status != 'closed')
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -520,16 +491,13 @@ class _CustomerTicketDetailScreenState extends ConsumerState<CustomerTicketDetai
     );
   }
 }
-
 class _MessageBubble extends StatelessWidget {
   final TicketMessage message;
   final bool isCustomer;
-
   const _MessageBubble({
     required this.message,
     required this.isCustomer,
   });
-
   String get timeString {
     final hour = message.createdAt.hour;
     final minute = message.createdAt.minute.toString().padLeft(2, '0');
@@ -537,12 +505,10 @@ class _MessageBubble extends StatelessWidget {
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     return '$displayHour:$minute $period';
   }
-
   String get dateString {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(message.createdAt.year, message.createdAt.month, message.createdAt.day);
-
     if (messageDate == today) {
       return 'Today';
     } else if (messageDate == today.subtract(const Duration(days: 1))) {
@@ -551,7 +517,6 @@ class _MessageBubble extends StatelessWidget {
       return '${message.createdAt.day}/${message.createdAt.month}/${message.createdAt.year}';
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Padding(

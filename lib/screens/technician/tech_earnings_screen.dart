@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/earnings_provider.dart';
-
 class TechEarningsScreen extends ConsumerWidget {
   const TechEarningsScreen({super.key});
-
   String _formatTransactionDate(DateTime date) {
     const months = [
       'Jan',
@@ -30,12 +27,9 @@ class TechEarningsScreen extends ConsumerWidget {
     final minute = date.minute.toString().padLeft(2, '0');
     return '${months[date.month - 1]} ${date.day}, ${date.year} - $hour:$minute $amPm';
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // The card is labeled "This Month", so use month earnings to match bookings.
     final totalEarningsAsync = ref.watch(monthEarningsProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -74,8 +68,6 @@ class TechEarningsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Main earnings card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -225,10 +217,7 @@ class TechEarningsScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // Transaction History
               Consumer(
                 builder: (context, ref, _) {
                   final filter = ref.watch(earningsFilterProvider);
@@ -286,8 +275,6 @@ class TechEarningsScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Transaction History Range
               Consumer(
                 builder: (context, ref, child) {
                   final range = ref.watch(selectedEarningsRangeProvider);
@@ -321,11 +308,9 @@ class TechEarningsScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 16),
-
               Consumer(
                 builder: (context, ref, child) {
                   final transactionsAsync = ref.watch(filteredTransactionsProvider);
-
                   return transactionsAsync.when(
                     data: (transactions) {
                       if (transactions.isEmpty) {
@@ -364,18 +349,12 @@ class TechEarningsScreen extends ConsumerWidget {
                           ),
                         );
                       }
-
                       return Column(
                         children: transactions.map((booking) {
                           final txDate = booking.completedAt ?? booking.scheduledDate ?? booking.createdAt;
                           final dateStr = _formatTransactionDate(txDate);
-
-                          // Use booking id as job id fallback.
                           final jobId = booking.id;
-
-                          // Prefer final cost; fallback to estimated.
                           final amountValue = booking.finalCost ?? booking.estimatedCost ?? 0.0;
-
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _TransactionItem(
@@ -433,13 +412,10 @@ class TechEarningsScreen extends ConsumerWidget {
     );
   }
 }
-
 class _SmallMetric extends StatelessWidget {
   final String label;
   final String value;
-
   const _SmallMetric({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -466,18 +442,15 @@ class _SmallMetric extends StatelessWidget {
     );
   }
 }
-
 class _TabButton extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _TabButton({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -505,7 +478,6 @@ class _TabButton extends StatelessWidget {
     );
   }
 }
-
 class _TransactionItem extends ConsumerWidget {
   final String bookingId;
   final String customerId;
@@ -514,7 +486,6 @@ class _TransactionItem extends ConsumerWidget {
   final String date;
   final bool isEmergency;
   final String amount;
-
   const _TransactionItem({
     required this.bookingId,
     required this.customerId,
@@ -524,7 +495,6 @@ class _TransactionItem extends ConsumerWidget {
     required this.isEmergency,
     required this.amount,
   });
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customerAsync = ref.watch(userByIdProvider(customerId));
@@ -640,22 +610,15 @@ class _TransactionItem extends ConsumerWidget {
     );
   }
 }
-
-// ─── Earnings Filter Sheet ─────────────────────────────────────────────────
-
 class _EarningsFilterSheet extends ConsumerStatefulWidget {
   const _EarningsFilterSheet();
-
   @override
   ConsumerState<_EarningsFilterSheet> createState() => _EarningsFilterSheetState();
 }
-
 class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
   late EarningsFilter _local;
-
   final _minController = TextEditingController();
   final _maxController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -663,14 +626,12 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
     if (_local.minAmount != null) _minController.text = _local.minAmount!.toStringAsFixed(0);
     if (_local.maxAmount != null) _maxController.text = _local.maxAmount!.toStringAsFixed(0);
   }
-
   @override
   void dispose() {
     _minController.dispose();
     _maxController.dispose();
     super.dispose();
   }
-
   Future<void> _pickDate(bool isFrom) async {
     final initial = isFrom ? (_local.fromDate ?? DateTime.now()) : (_local.toDate ?? DateTime.now());
     final picked = await showDatePicker(
@@ -686,7 +647,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
           : _local.copyWith(toDate: picked);
     });
   }
-
   void _apply() {
     final min = double.tryParse(_minController.text.trim());
     final max = double.tryParse(_maxController.text.trim());
@@ -698,12 +658,10 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
     );
     Navigator.pop(context);
   }
-
   void _reset() {
     ref.read(earningsFilterProvider.notifier).state = const EarningsFilter();
     Navigator.pop(context);
   }
-
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('MMM d, yyyy');
@@ -738,8 +696,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Date range
             const Text('Date Range', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
             const SizedBox(height: 10),
             Row(
@@ -768,8 +724,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Amount range
             const Text('Amount Range (₱)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
             const SizedBox(height: 10),
             Row(
@@ -802,8 +756,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Job type
             const Text('Job Type', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
             const SizedBox(height: 10),
             Row(
@@ -829,8 +781,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Sort order
             const Text('Sort By', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimaryColor)),
             const SizedBox(height: 10),
             Wrap(
@@ -860,7 +810,6 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
               ],
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -880,15 +829,12 @@ class _EarningsFilterSheetState extends ConsumerState<_EarningsFilterSheet> {
     );
   }
 }
-
 class _DatePickerTile extends StatelessWidget {
   final String label;
   final String? value;
   final VoidCallback onTap;
   final VoidCallback? onClear;
-
   const _DatePickerTile({required this.label, required this.value, required this.onTap, this.onClear});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -926,15 +872,12 @@ class _DatePickerTile extends StatelessWidget {
     );
   }
 }
-
 class _ChipOption extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
   final Color? color;
-
   const _ChipOption({required this.label, required this.selected, required this.onTap, this.color});
-
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppTheme.deepBlue;

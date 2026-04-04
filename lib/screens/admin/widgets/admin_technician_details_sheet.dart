@@ -1,29 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../models/admin_technician_list_item.dart';
 import '../../../providers/admin_booking_provider.dart';
 import '../../../providers/admin_technicians_provider.dart';
 import '../../../providers/admin_technician_actions_provider.dart';
-
 class AdminTechnicianDetailsSheet extends ConsumerWidget {
   final AdminTechnicianListItem technician;
-
   const AdminTechnicianDetailsSheet({
     super.key,
     required this.technician,
   });
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingsAsync =
         ref.watch(adminBookingsByTechnicianProvider(technician.userId));
-
     final profile = technician.profile;
     final specialties = profile?.specialties ?? const <String>[];
-
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -82,7 +76,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 14),
-
               _Section(
                 title: 'Technician details',
                 child: Column(
@@ -118,7 +111,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
-
               if (specialties.isNotEmpty)
                 _Section(
                   title: 'Specialties',
@@ -151,7 +143,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                   ),
                 ),
               if (specialties.isNotEmpty) const SizedBox(height: 12),
-
               _Section(
                 title: 'Recent bookings',
                 child: bookingsAsync.when(
@@ -162,7 +153,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                         style: TextStyle(color: AppTheme.textSecondaryColor),
                       );
                     }
-
                     return Column(
                       children: items.take(6).map((b) {
                         final booking = b.booking;
@@ -201,7 +191,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -215,7 +204,6 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
                           suspended: !technician.isSuspended,
                         );
                         ref.invalidate(adminTechniciansProvider);
-
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -276,12 +264,10 @@ class AdminTechnicianDetailsSheet extends ConsumerWidget {
     );
   }
 }
-
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
   const _Section({required this.title, required this.child});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -310,12 +296,10 @@ class _Section extends StatelessWidget {
     );
   }
 }
-
 class _Row extends StatelessWidget {
   final String label;
   final String value;
   const _Row({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Padding(

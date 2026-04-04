@@ -3,33 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/admin_earnings_provider.dart';
-
 class AdminEarningsScreen extends ConsumerStatefulWidget {
   const AdminEarningsScreen({super.key});
-
   @override
   ConsumerState<AdminEarningsScreen> createState() => _AdminEarningsScreenState();
 }
-
 class _AdminEarningsScreenState extends ConsumerState<AdminEarningsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final overviewAsync = ref.watch(adminEarningsOverviewProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -92,18 +85,15 @@ class _AdminEarningsScreenState extends ConsumerState<AdminEarningsScreen> with 
     );
   }
 }
-
 class _PlatformMetric extends StatelessWidget {
   final String label;
   final String value;
   final String subtitle;
-
   const _PlatformMetric({
     required this.label,
     required this.value,
     required this.subtitle,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -138,16 +128,12 @@ class _PlatformMetric extends StatelessWidget {
     );
   }
 }
-
 class _TechniciansEarningsTab extends ConsumerWidget {
   final AsyncValue<dynamic> overviewAsync;
-
   const _TechniciansEarningsTab({required this.overviewAsync});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final techniciansAsync = ref.watch(allTechniciansEarningsProvider);
-
     return techniciansAsync.when(
       data: (technicians) {
         if (technicians.isEmpty) {
@@ -176,7 +162,6 @@ class _TechniciansEarningsTab extends ConsumerWidget {
             ],
           );
         }
-
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(allTechniciansEarningsProvider);
@@ -241,12 +226,9 @@ class _TechniciansEarningsTab extends ConsumerWidget {
     );
   }
 }
-
 class _TechnicianEarningsCard extends StatelessWidget {
   final dynamic technician;
-
   const _TechnicianEarningsCard({required this.technician});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -402,7 +384,6 @@ class _TechnicianEarningsCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Weekly payout preview (net after 3% fee)
                 Builder(builder: (_) {
                   final weekEarnings = technician.weekEarnings as double;
                   final netPayout = weekEarnings * 0.97;
@@ -446,18 +427,15 @@ class _TechnicianEarningsCard extends StatelessWidget {
     );
   }
 }
-
 class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
   final int jobs;
-
   const _MiniStat({
     required this.label,
     required this.value,
     required this.jobs,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -499,16 +477,12 @@ class _MiniStat extends StatelessWidget {
     );
   }
 }
-
 class _CustomersSpendingTab extends ConsumerWidget {
   final AsyncValue<dynamic> overviewAsync;
-
   const _CustomersSpendingTab({required this.overviewAsync});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customersAsync = ref.watch(allCustomersSpendingProvider);
-
     return customersAsync.when(
       data: (customers) {
         if (customers.isEmpty) {
@@ -537,7 +511,6 @@ class _CustomersSpendingTab extends ConsumerWidget {
             ],
           );
         }
-
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(allCustomersSpendingProvider);
@@ -602,12 +575,9 @@ class _CustomersSpendingTab extends ConsumerWidget {
     );
   }
 }
-
 class _CustomerSpendingCard extends StatelessWidget {
   final dynamic customer;
-
   const _CustomerSpendingCard({required this.customer});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -736,16 +706,13 @@ class _CustomerSpendingCard extends StatelessWidget {
     );
   }
 }
-
 class _CustomerMiniStat extends StatelessWidget {
   final String label;
   final String value;
-
   const _CustomerMiniStat({
     required this.label,
     required this.value,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -779,12 +746,9 @@ class _CustomerMiniStat extends StatelessWidget {
     );
   }
 }
-
 class _PlatformOverviewCard extends StatelessWidget {
   final AsyncValue<dynamic> overviewAsync;
-
   const _PlatformOverviewCard({required this.overviewAsync});
-
   @override
   Widget build(BuildContext context) {
     return overviewAsync.when(

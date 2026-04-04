@@ -2,25 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/ratings_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/ratings_service.dart';
-
-// ─── Filter state ──────────────────────────────────────────────────────────────
-
 enum RatingsSortOrder { newest, oldest }
-
-// null = show all stars; 1-5 = filter to that star count
 final ratingsStarFilterProvider = StateProvider<int?>((ref) => null);
 final ratingsSortOrderProvider = StateProvider<RatingsSortOrder>((ref) => RatingsSortOrder.newest);
-
-// ─── Screen ────────────────────────────────────────────────────────────────────
-
 class TechRatingsScreen extends ConsumerWidget {
   const TechRatingsScreen({super.key});
-
   bool _isRatingForTechnician(String ratingTechnician, String userName) {
     final userNameLower = userName.toLowerCase();
     final ratingTechLower = ratingTechnician.toLowerCase();
@@ -33,7 +23,6 @@ class TechRatingsScreen extends ConsumerWidget {
     }
     return false;
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ratingsAsync = ref.watch(ratingsProvider);
@@ -41,7 +30,6 @@ class TechRatingsScreen extends ConsumerWidget {
     final userName = userAsync.whenOrNull(data: (u) => u?.fullName) ?? 'Technician';
     final starFilter = ref.watch(ratingsStarFilterProvider);
     final sortOrder = ref.watch(ratingsSortOrderProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -67,7 +55,6 @@ class TechRatingsScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          // Sort button
           IconButton(
             tooltip: sortOrder == RatingsSortOrder.newest ? 'Sort: Newest first' : 'Sort: Oldest first',
             icon: Icon(
@@ -94,23 +81,16 @@ class TechRatingsScreen extends ConsumerWidget {
           final myRatings = allRatings
               .where((r) => _isRatingForTechnician(r.technician, userName))
               .toList();
-
-          // Stats
           final avg = myRatings.isEmpty
               ? 0.0
               : myRatings.map((r) => r.rating).reduce((a, b) => a + b) / myRatings.length;
-
           final starCounts = List.generate(5, (i) {
             final star = 5 - i;
             return myRatings.where((r) => r.rating == star).length;
           });
-
-          // Apply filters
           var filtered = starFilter != null
               ? myRatings.where((r) => r.rating == starFilter).toList()
               : List<Rating>.from(myRatings);
-
-          // Sort by date string (format: "Month DD, YYYY" or ISO)
           filtered.sort((a, b) {
             DateTime? da = _parseDate(a.date);
             DateTime? db = _parseDate(b.date);
@@ -121,10 +101,8 @@ class TechRatingsScreen extends ConsumerWidget {
                 ? db.compareTo(da)
                 : da.compareTo(db);
           });
-
           return CustomScrollView(
             slivers: [
-              // ── Summary header ──────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -135,8 +113,6 @@ class TechRatingsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-
-              // ── Star filter chips ────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
@@ -164,8 +140,6 @@ class TechRatingsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-
-              // ── Result count ─────────────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -179,8 +153,6 @@ class TechRatingsScreen extends ConsumerWidget {
                   ),
                 ),
               ),
-
-              // ── Review cards ─────────────────────────────────────────────────
               if (filtered.isEmpty)
                 SliverFillRemaining(
                   child: Center(
@@ -229,7 +201,6 @@ class TechRatingsScreen extends ConsumerWidget {
       ),
     );
   }
-
   Color _starColor(int star) {
     switch (star) {
       case 5: return const Color(0xFF00C853);
@@ -239,41 +210,30 @@ class TechRatingsScreen extends ConsumerWidget {
       default: return const Color(0xFFDD2C00);
     }
   }
-
   DateTime? _parseDate(String date) {
-    // Try ISO 8601 (e.g. "2026-03-04" or "2026-03-04T...")
     try {
       return DateTime.parse(date);
     } catch (_) {}
-    // Try MM/dd/yyyy — the format used when saving ratings (DateFormat('MM/dd/yyyy'))
     try {
       return DateFormat('MM/dd/yyyy').parse(date);
     } catch (_) {}
-    // Try M/d/yyyy
     try {
       return DateFormat('M/d/yyyy').parse(date);
     } catch (_) {}
-    // Try "MMMM dd, yyyy" e.g. "March 04, 2026"
     try {
       return DateFormat('MMMM dd, yyyy').parse(date);
     } catch (_) {}
-    // Try "MMM dd, yyyy" e.g. "Mar 04, 2026"
     try {
       return DateFormat('MMM dd, yyyy').parse(date);
     } catch (_) {}
     return null;
   }
 }
-
-// ─── Summary Card ──────────────────────────────────────────────────────────────
-
 class _SummaryCard extends StatelessWidget {
   final double avg;
   final int total;
   final List<int> starCounts; // index 0 = 5★, index 4 = 1★
-
   const _SummaryCard({required this.avg, required this.total, required this.starCounts});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -296,7 +256,6 @@ class _SummaryCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left: big number + stars
           Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -331,7 +290,6 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 24),
-          // Right: bar breakdown
           Expanded(
             child: Column(
               children: List.generate(5, (i) {
@@ -388,22 +346,17 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-
-// ─── Star filter chip ──────────────────────────────────────────────────────────
-
 class _StarChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
   final Color? color;
-
   const _StarChip({
     required this.label,
     required this.isSelected,
     required this.onTap,
     this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     final activeColor = color ?? AppTheme.deepBlue;
@@ -435,14 +388,9 @@ class _StarChip extends StatelessWidget {
     );
   }
 }
-
-// ─── Review card ───────────────────────────────────────────────────────────────
-
 class _ReviewCard extends StatelessWidget {
   final Rating rating;
-
   const _ReviewCard({required this.rating});
-
   Color get _starBgColor {
     switch (rating.rating) {
       case 5: return const Color(0xFF00C853);
@@ -452,7 +400,6 @@ class _ReviewCard extends StatelessWidget {
       default: return const Color(0xFFDD2C00);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -469,7 +416,6 @@ class _ReviewCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Colored top accent strip
           Container(
             height: 4,
             decoration: BoxDecoration(
@@ -482,11 +428,9 @@ class _ReviewCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header row
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar
                     Container(
                       width: 44,
                       height: 44,
@@ -531,7 +475,6 @@ class _ReviewCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    // Star badge + date stacked
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -563,7 +506,6 @@ class _ReviewCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Service info chip row
                 Wrap(
                   spacing: 8,
                   runSpacing: 6,
@@ -610,13 +552,10 @@ class _ReviewCard extends StatelessWidget {
     );
   }
 }
-
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
-
   const _InfoChip({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(

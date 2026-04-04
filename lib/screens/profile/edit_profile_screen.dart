@@ -6,14 +6,11 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/image_upload_service.dart';
-
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
-
   @override
   ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
-
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _fullNameController;
@@ -22,18 +19,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _isLoading = false;
   String? _webImagePath;
   final ImagePicker _picker = ImagePicker();
-
   @override
   void initState() {
     super.initState();
     _fullNameController = TextEditingController();
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userAsync = ref.read(currentUserProvider);
       final profileAsync = ref.read(profileProvider);
-
       userAsync.whenData((user) {
         if (user != null) {
           setState(() {
@@ -43,7 +37,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           });
         }
       });
-
       profileAsync.whenData((profile) {
         setState(() {
           if (_emailController.text.isEmpty) _emailController.text = profile.email;
@@ -55,7 +48,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       });
     });
   }
-
   @override
   void dispose() {
     _fullNameController.dispose();
@@ -63,7 +55,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _phoneController.dispose();
     super.dispose();
   }
-
   Future<void> _pickImage() async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -72,22 +63,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-
       if (pickedFile != null) {
         setState(() => _isLoading = true);
         final user = (await ref.read(currentUserProvider.future))!;
-
         final oldImageUrl = user.profilePicture;
         final newImageUrl = await ImageUploadService.uploadAndSaveProfileImage(
           userId: user.id,
           imageFile: pickedFile,
           oldImageUrl: oldImageUrl,
         );
-
         setState(() => _webImagePath = newImageUrl);
         await ref.read(profileProvider.notifier).updateProfileImage(newImageUrl);
         ref.invalidate(currentUserProvider);
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -108,15 +95,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-
     try {
       final authService = ref.read(authServiceProvider);
       final user = (await ref.read(currentUserProvider.future))!;
-
       await authService.updateProfile(
         userId: user.id,
         fullName: _fullNameController.text.trim(),
@@ -125,13 +109,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         latitude: null,
         longitude: null,
       );
-
       await ref.read(profileProvider.notifier).updateEmail(_emailController.text.trim());
       await ref.read(profileProvider.notifier).updatePhone(_phoneController.text.trim());
-
       ref.invalidate(currentUserProvider);
       ref.invalidate(profileProvider);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
@@ -152,11 +133,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: userAsync.when(
@@ -164,12 +143,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (user) {
           if (user == null) return const Center(child: Text('No user data'));
-
           return Form(
             key: _formKey,
             child: CustomScrollView(
               slivers: [
-                // Gradient header with avatar
                 SliverToBoxAdapter(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -189,7 +166,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       bottom: false,
                       child: Column(
                         children: [
-                          // AppBar row
                           Padding(
                             padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
                             child: Row(
@@ -218,7 +194,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          // Avatar
                           Stack(
                             alignment: Alignment.bottomRight,
                             children: [
@@ -262,7 +237,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // Name preview
                           Text(
                             _fullNameController.text.isEmpty ? 'Your Name' : _fullNameController.text,
                             style: const TextStyle(
@@ -285,13 +259,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   ),
                 ),
-
-                // Form content
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      // Personal Details card
                       _SectionCard(
                         title: 'Personal Details',
                         icon: Icons.person_rounded,
@@ -319,8 +290,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Email card (read-only)
                       _SectionCard(
                         title: 'Account Email',
                         icon: Icons.email_rounded,
@@ -346,8 +315,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Account Info card
                       _SectionCard(
                         title: 'Account Information',
                         icon: Icons.info_outline_rounded,
@@ -375,8 +342,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 28),
-
-                      // Save button
                       SizedBox(
                         width: double.infinity,
                         height: 54,
@@ -420,7 +385,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
   }
-
   Widget _buildProfileImage(dynamic user) {
     final imageUrl = _webImagePath ?? user.profilePicture;
     if (imageUrl != null && imageUrl.isNotEmpty) {
@@ -440,7 +404,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
     return _buildInitials(user.fullName);
   }
-
   Widget _buildInitials(String fullName) {
     final initials = fullName
         .split(' ')
@@ -458,16 +421,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 }
-
-// ── Reusable widgets ────────────────────────────────────────────
-
 class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget> children;
-
   const _SectionCard({required this.title, required this.icon, required this.children});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -516,7 +474,6 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
 class _ModernTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -526,7 +483,6 @@ class _ModernTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
-
   const _ModernTextField({
     required this.controller,
     required this.label,
@@ -537,7 +493,6 @@ class _ModernTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
   });
-
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -605,20 +560,17 @@ class _ModernTextField extends StatelessWidget {
     );
   }
 }
-
 class _InfoTile extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color valueColor;
-
   const _InfoTile({
     required this.label,
     required this.value,
     required this.icon,
     required this.valueColor,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(

@@ -3,7 +3,6 @@ enum CustomerStatus {
   inactive,
   suspended,
 }
-
 class CustomerModel {
   final String id;
   final String name;
@@ -18,7 +17,6 @@ class CustomerModel {
   final int cancelledBookings;
   final double totalSpent;
   final List<String> addresses;
-
   CustomerModel({
     required this.id,
     required this.name,
@@ -34,16 +32,12 @@ class CustomerModel {
     this.totalSpent = 0.0,
     this.addresses = const [],
   });
-
-  // Check if customer is currently active (active within last 7 days)
   bool get isCurrentlyActive {
     if (lastActiveAt == null) return false;
     final now = DateTime.now();
     final difference = now.difference(lastActiveAt!);
     return difference.inDays <= 7;
   }
-
-  // Get activity status string
   String get activityStatus {
     if (lastActiveAt == null) return 'Never active';
     if (isCurrentlyActive) return 'Active';
@@ -53,7 +47,6 @@ class CustomerModel {
     if (difference.inDays <= 90) return 'Inactive (${(difference.inDays / 30).floor()} months ago)';
     return 'Inactive';
   }
-
   factory CustomerModel.fromJson(Map<String, dynamic> json) {
     return CustomerModel(
       id: json['id'] as String,
@@ -78,7 +71,6 @@ class CustomerModel {
           : [],
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -96,7 +88,6 @@ class CustomerModel {
       'addresses': addresses,
     };
   }
-
   CustomerModel copyWith({
     String? id,
     String? name,
@@ -129,7 +120,6 @@ class CustomerModel {
     );
   }
 }
-
 class CustomerBookingHistory {
   final String bookingId;
   final String serviceName;
@@ -137,7 +127,6 @@ class CustomerBookingHistory {
   final DateTime bookingDate;
   final String status;
   final double amount;
-
   CustomerBookingHistory({
     required this.bookingId,
     required this.serviceName,
@@ -146,7 +135,6 @@ class CustomerBookingHistory {
     required this.status,
     required this.amount,
   });
-
   factory CustomerBookingHistory.fromJson(Map<String, dynamic> json) {
     return CustomerBookingHistory(
       bookingId: json['booking_id'] as String,
@@ -157,7 +145,6 @@ class CustomerBookingHistory {
       amount: (json['amount'] as num).toDouble(),
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'booking_id': bookingId,

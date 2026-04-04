@@ -7,7 +7,6 @@ class AppNotification {
   final Map<String, dynamic>? data;
   final bool isRead;
   final DateTime createdAt;
-
   const AppNotification({
     required this.id,
     required this.userId,
@@ -18,7 +17,6 @@ class AppNotification {
     required this.isRead,
     required this.createdAt,
   });
-
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
       id: json['id'] as String,
@@ -31,6 +29,5 @@ class AppNotification {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
-
   String? get route => data?['route'] as String?;
 }

@@ -1,8 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/constants/app_constants.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
@@ -13,26 +12,16 @@ import '../../services/booking_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/job_status_tracker.dart';
 import 'widgets/customer_location_sheet.dart';
-
-// Provider for the initial tab to show in jobs screen
-// 0 = Request, 1 = Active, 2 = Complete, 3 = All
 final techJobsInitialTabProvider = StateProvider<int>((ref) => 0);
-
 enum _TechJobsTab { request, active, complete, all }
-
-// ─── Filter model ─────────────────────────────────────────────────────────────
-
 enum _TechSortOrder { newest, oldest }
-
 class _TechJobFilter {
   final Set<String> statuses; // empty = all
   final DateTime? fromDate;
   final DateTime? toDate;
   final _TechSortOrder sort;
   final bool? emergencyOnly; // null = both, true = only emergency, false = only regular
-  // null = all, 'post_problem' = job-map accepted, 'booking' = regular bookings
   final String? bookingSource;
-
   const _TechJobFilter({
     this.statuses = const {},
     this.fromDate,
@@ -41,13 +30,11 @@ class _TechJobFilter {
     this.emergencyOnly,
     this.bookingSource,
   });
-
   bool get isActive =>
       statuses.isNotEmpty ||
       fromDate != null ||
       toDate != null ||
       emergencyOnly != null;
-
   _TechJobFilter copyWith({
     Set<String>? statuses,
     DateTime? fromDate,
@@ -69,23 +56,16 @@ class _TechJobFilter {
           identical(bookingSource, _sentinel) ? this.bookingSource : bookingSource as String?,
     );
   }
-
   static const _sentinel = Object();
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 class TechJobsScreenNew extends ConsumerStatefulWidget {
   const TechJobsScreenNew({super.key});
-
   @override
   ConsumerState<TechJobsScreenNew> createState() => _TechJobsScreenNewState();
 }
-
 class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
   _TechJobsTab _selectedTab = _TechJobsTab.request;
   _TechJobFilter _filter = const _TechJobFilter();
-
   @override
   Widget build(BuildContext context) {
     final providerTab = ref.watch(techJobsInitialTabProvider);
@@ -97,7 +77,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         ref.read(techJobsInitialTabProvider.notifier).state = 0;
       });
     }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -160,9 +139,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       ),
     );
   }
-
-  // ─── Filter helpers ──────────────────────────────────────────────────────
-
   Widget _buildSourceFilterChips() {
     final options = [
       (null, 'All'),
@@ -206,7 +182,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       ),
     );
   }
-
   Widget _buildActiveFilterBanner() {
     final parts = <String>[];
     if (_filter.statuses.isNotEmpty) {
@@ -220,7 +195,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
     if (_filter.toDate != null) {
       parts.add('To ${DateFormat('MMM d').format(_filter.toDate!)}');
     }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
@@ -254,7 +228,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       ),
     );
   }
-
   String _displayStatus(String s) => switch (s) {
         'requested' => 'Requested',
         'accepted' => 'Accepted',
@@ -263,7 +236,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         'cancelled' => 'Cancelled',
         _ => s,
       };
-
   Future<void> _openFilterSheet() async {
     final result = await showModalBottomSheet<_TechJobFilter>(
       context: context,
@@ -275,9 +247,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       setState(() => _filter = result);
     }
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-
   _TechJobsTab _tabFromInt(int value) {
     return switch (value) {
       0 => _TechJobsTab.request,
@@ -287,7 +256,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       _ => _TechJobsTab.request,
     };
   }
-
   Widget _buildTabs() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -325,7 +293,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         onSelectionChanged: (value) {
           setState(() {
             _selectedTab = value.first;
-            // Clear source filter when leaving Active tab
             if (_selectedTab != _TechJobsTab.active) {
               _filter = _filter.copyWith(bookingSource: null);
             }
@@ -334,10 +301,8 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       ),
     );
   }
-
   Widget _buildJobsList() {
     final bookingsAsync = ref.watch(technicianBookingsProvider);
-
     return RefreshIndicator(
       color: AppTheme.deepBlue,
       onRefresh: () async {
@@ -359,12 +324,8 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       ),
     );
   }
-
   Widget _buildJobsContent(List<BookingModel> allBookings) {
-    // 1. Tab filter
     List<BookingModel> filtered = _filterBookings(allBookings);
-
-    // 2. Advanced filters
     if (_filter.statuses.isNotEmpty) {
       filtered = filtered.where((b) => _filter.statuses.contains(b.status)).toList();
     }
@@ -392,7 +353,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         return !d.isAfter(to);
       }).toList();
     }
-
     if (filtered.isEmpty) {
       final (icon, title, subtitle) = _emptyStateForTab();
       return ListView(
@@ -406,26 +366,21 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
         ],
       );
     }
-
-    // 3. Sort
     final sorted = [...filtered]..sort((a, b) {
         if (_filter.sort == _TechSortOrder.oldest) {
           final aDate = a.scheduledDate ?? a.createdAt;
           final bDate = b.scheduledDate ?? b.createdAt;
           return aDate.compareTo(bDate);
         }
-        // Default: emergency first, then by date
         final prio = (b.isEmergency ? 1 : 0).compareTo(a.isEmergency ? 1 : 0);
         if (prio != 0) return prio;
         final aDate = a.scheduledDate ?? a.createdAt;
         final bDate = b.scheduledDate ?? b.createdAt;
-        // Active tab: soonest first so today's jobs appear at top
         if (_selectedTab == _TechJobsTab.active) {
           return aDate.compareTo(bDate);
         }
         return bDate.compareTo(aDate); // other tabs: newest first
       });
-
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: sorted.length,
@@ -438,7 +393,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       },
     );
   }
-
   List<BookingModel> _filterBookings(List<BookingModel> allBookings) {
     return switch (_selectedTab) {
       _TechJobsTab.request =>
@@ -457,34 +411,11 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
       _TechJobsTab.all => allBookings,
     };
   }
-
-  /// Returns true if [b] originated from the "Post a Problem / Job Map" flow.
-  ///
-  /// Layer 1 — DB field (new bookings, most reliable):
-  ///   booking_source = 'post_problem'
-  ///
-  /// Layer 2 — Explicit marker in notes (pre-DB-column, still in notes):
-  ///   diagnostic_notes starts with '[POST_PROBLEM]'
-  ///
-  /// Layer 3 — accepted_at heuristic (legacy data):
-  ///   Regular bookings go through requested→accepted via the set_booking_status
-  ///   RPC, which writes accepted_at. Post-problem bookings are created directly
-  ///   as 'accepted' via INSERT, so accepted_at is never set by the RPC.
-  ///   accepted_at != null  →  went through normal flow  →  regular booking.
-  ///
-  /// Layer 4 — Notes format fallback (last resort):
-  ///   All regular booking flows write notes starting with 'Repair Type:' or
-  ///   'Device:'. Check the customer portion (before any '---TECHNICIAN NOTES---'
-  ///   separator) so technician-appended text doesn't affect classification.
   bool _isPostProblem(BookingModel b) {
-    // Layer 1
     if (b.bookingSource == 'post_problem') return true;
-    // Layer 2
     final notes = b.diagnosticNotes;
     if (notes != null && notes.startsWith('[POST_PROBLEM]')) return true;
-    // Layer 3 — has accepted_at → normal booking flow → NOT post-problem
     if (b.acceptedAt != null) return false;
-    // Layer 4 — check notes format on the customer portion only
     if (notes == null || notes.isEmpty) return false;
     final customerPart = notes.split('---TECHNICIAN NOTES---').first.trim();
     if (customerPart.startsWith('Repair Type:') || customerPart.startsWith('Device:')) {
@@ -492,7 +423,6 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
     }
     return true;
   }
-
   (IconData, String, String) _emptyStateForTab() {
     return switch (_selectedTab) {
       _TechJobsTab.request => (
@@ -518,25 +448,18 @@ class _TechJobsScreenNewState extends ConsumerState<TechJobsScreenNew> {
     };
   }
 }
-
 class _TechJobCard extends ConsumerWidget {
   final BookingModel booking;
   final _TechJobsTab selectedTab;
-
   const _TechJobCard({required this.booking, required this.selectedTab});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingService = ref.read(bookingServiceProvider);
-
     final (statusColor, statusLabel, statusIcon) = _status(booking.status);
     final scheduled = booking.scheduledDate;
-
     final dateLabel = scheduled == null ? 'TBD' : DateFormat('MMM d').format(scheduled);
     final timeLabel = scheduled == null ? 'TBD' : DateFormat('h:mm a').format(scheduled);
-
     final total = booking.finalCost ?? booking.estimatedCost ?? 0.0;
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -641,7 +564,6 @@ class _TechJobCard extends ConsumerWidget {
       ),
     );
   }
-
   (Color, String, IconData) _status(String status) {
     return switch (status) {
       'requested'   => (AppTheme.warningColor,       'New Request',       Icons.inbox_outlined),
@@ -656,7 +578,6 @@ class _TechJobCard extends ConsumerWidget {
       _             => (Colors.grey, status, Icons.info_outline),
     };
   }
-
   Widget _progressHeader() => const Row(
     children: [
       Icon(Icons.route_outlined, size: 14, color: AppTheme.deepBlue),
@@ -671,13 +592,11 @@ class _TechJobCard extends ConsumerWidget {
       ),
     ],
   );
-
   Widget _buildActionButtons(
     BuildContext context,
     WidgetRef ref,
     BookingService bookingService,
   ) {
-    // Request tab - show accept/decline for requested
     if (selectedTab == _TechJobsTab.request && booking.status == 'requested') {
       return Row(
         children: [
@@ -712,8 +631,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── Pre-work active statuses (accepted / en_route): advance button ────────
     if (selectedTab == _TechJobsTab.active &&
         (booking.status == AppConstants.bookingAccepted ||
          booking.status == AppConstants.bookingEnRoute)) {
@@ -734,11 +651,9 @@ class _TechJobCard extends ConsumerWidget {
             'Your technician has arrived at your location!',
           ),
       };
-
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Primary action: always visible at the top ─────────────────────
           ElevatedButton.icon(
             onPressed: () => _advanceJobStatus(
               context, ref, bookingService,
@@ -755,7 +670,6 @@ class _TechJobCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 14),
-          // ── Progress tracker (next step is also tappable) ─────────────────
           _progressHeader(),
           const SizedBox(height: 10),
           JobStatusTracker(
@@ -792,8 +706,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── Arrived: assess & price + start work ─────────────────────────────────
     if (selectedTab == _TechJobsTab.active &&
         booking.status == AppConstants.bookingArrived) {
       return Column(
@@ -877,8 +789,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── In-progress: tracker + adjust price + mark done ───────────────────────
     if (selectedTab == _TechJobsTab.active &&
         booking.status == AppConstants.bookingInProgress) {
       return Column(
@@ -915,8 +825,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── Completed in active tab: tracker + confirm paid ──────────────────
     if ((selectedTab == _TechJobsTab.active || selectedTab == _TechJobsTab.all) &&
         booking.status == AppConstants.bookingCompleted) {
       final payStatus = booking.paymentStatus ?? 'pending';
@@ -945,8 +853,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── Paid in active tab: tracker at "Paid" + Mark Complete button ──────
     if ((selectedTab == _TechJobsTab.active || selectedTab == _TechJobsTab.all) &&
         booking.status == AppConstants.bookingPaid) {
       return Column(
@@ -971,8 +877,6 @@ class _TechJobCard extends ConsumerWidget {
         ],
       );
     }
-
-    // ── Closed: clean success card ─────────────────────────────────────────
     if ((selectedTab == _TechJobsTab.complete || selectedTab == _TechJobsTab.all) &&
         booking.status == AppConstants.bookingClosed) {
       return Container(
@@ -1022,10 +926,8 @@ class _TechJobCard extends ConsumerWidget {
         ),
       );
     }
-
     return const SizedBox.shrink();
   }
-
   Future<void> _acceptJob(
     BuildContext context,
     WidgetRef ref,
@@ -1036,7 +938,6 @@ class _TechJobCard extends ConsumerWidget {
         bookingId: booking.id,
         status: AppConstants.bookingAccepted,
       );
-
       await NotificationService().sendNotification(
         userId: booking.customerId,
         type: 'booking_accepted',
@@ -1044,8 +945,6 @@ class _TechJobCard extends ConsumerWidget {
         message: 'Your booking has been accepted! The technician will be on their way soon.',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
-
-      // Mark the redeemed voucher as used now that the job is accepted
       final voucherId = booking.redeemedVoucherId;
       if (voucherId != null) {
         final voucherService = ref.read(redeemedVoucherServiceProvider);
@@ -1054,7 +953,6 @@ class _TechJobCard extends ConsumerWidget {
           bookingId: booking.id,
         );
       }
-
       ref.invalidate(technicianBookingsProvider);
       ref.invalidate(bookingByIdProvider(booking.id));
       ref.read(techJobsInitialTabProvider.notifier).state = 1;
@@ -1072,7 +970,6 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
   }
-
   Future<void> _advanceJobStatus(
     BuildContext context,
     WidgetRef ref,
@@ -1106,7 +1003,6 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
   }
-
   Future<void> _markPaid(
     BuildContext context,
     WidgetRef ref,
@@ -1124,7 +1020,6 @@ class _TechJobCard extends ConsumerWidget {
         message: 'Your payment has been confirmed. Thank you for using FixIT!',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
-      // Notify admins
       try {
         final adminRows = await SupabaseConfig.client
             .from('users')
@@ -1153,7 +1048,6 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
   }
-
   Future<void> _closeJob(
     BuildContext context,
     WidgetRef ref,
@@ -1187,7 +1081,6 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
   }
-
   Future<void> _declineJob(
     BuildContext context,
     WidgetRef ref,
@@ -1211,15 +1104,12 @@ class _TechJobCard extends ConsumerWidget {
         ],
       ),
     );
-
     if (confirm != true) return;
-
     try {
       await bookingService.updateBookingStatus(
         bookingId: booking.id,
         status: 'cancelled',
       );
-
       await NotificationService().sendNotification(
         userId: booking.customerId,
         type: 'booking_declined',
@@ -1227,7 +1117,6 @@ class _TechJobCard extends ConsumerWidget {
         message: 'Unfortunately, the technician was unable to accept your booking. Please try booking another technician.',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
-
       ref.invalidate(technicianBookingsProvider);
       ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
@@ -1244,7 +1133,6 @@ class _TechJobCard extends ConsumerWidget {
       );
     }
   }
-
   Future<void> _adjustPrice(
     BuildContext context,
     WidgetRef ref,
@@ -1254,7 +1142,6 @@ class _TechJobCard extends ConsumerWidget {
     final amountController = TextEditingController();
     final reasonController = TextEditingController();
     bool saving = false;
-
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1262,7 +1149,6 @@ class _TechJobCard extends ConsumerWidget {
       builder: (sheetCtx) => StatefulBuilder(
         builder: (ctx, setState) {
           final enteredAmt = double.tryParse(amountController.text.trim()) ?? 0.0;
-
           Future<void> apply(double sign) async {
             final amt = double.tryParse(amountController.text.trim());
             if (amt == null || amt <= 0) {
@@ -1307,12 +1193,10 @@ class _TechJobCard extends ConsumerWidget {
               }
             }
           }
-
           void setQuickAmount(double amt) {
             amountController.text = amt.toStringAsFixed(0);
             setState(() {});
           }
-
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
             child: Container(
@@ -1324,7 +1208,6 @@ class _TechJobCard extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Gradient header ────────────────────────────────────────
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -1381,7 +1264,6 @@ class _TechJobCard extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 18),
-                        // Price preview row
                         Row(
                           children: [
                             Expanded(
@@ -1470,14 +1352,11 @@ class _TechJobCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-
-                  // ── Body ──────────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Quick presets
                         const Text(
                           'QUICK AMOUNTS',
                           style: TextStyle(
@@ -1518,8 +1397,6 @@ class _TechJobCard extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
-
-                        // Amount field
                         TextField(
                           controller: amountController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1536,8 +1413,6 @@ class _TechJobCard extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-
-                        // Reason field
                         TextField(
                           controller: reasonController,
                           maxLines: 2,
@@ -1557,8 +1432,6 @@ class _TechJobCard extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 20),
-
-                        // Action buttons
                         if (saving)
                           const Center(child: CircularProgressIndicator())
                         else
@@ -1607,13 +1480,11 @@ class _TechJobCard extends ConsumerWidget {
       ),
     );
   }
-
   Future<void> _assessAndPrice(
     BuildContext context,
     WidgetRef ref,
     BookingService bookingService,
   ) async {
-    // ── Pricing catalogue per device type ─────────────────────────────────
     final Map<String, List<Map<String, dynamic>>> catalogue = {
       'Mobile Phone': [
         {'label': 'Screen Cracked / Broken', 'price': 800.0},
@@ -1668,8 +1539,6 @@ class _TechJobCard extends ConsumerWidget {
         {'label': 'Performance Issue', 'price': 350.0},
       ],
     };
-
-    // ── Parse device info from booking notes ───────────────────────────────
     final notes = booking.diagnosticNotes ?? '';
     final rawDevice = RegExp(r'Device:\s*(.+)', caseSensitive: false)
             .firstMatch(notes)?.group(1)?.trim() ?? '';
@@ -1679,8 +1548,6 @@ class _TechJobCard extends ConsumerWidget {
             .firstMatch(notes)?.group(1)?.trim() ?? '';
     final deviceProblem = RegExp(r'Problem:\s*(.+)', caseSensitive: false)
             .firstMatch(notes)?.group(1)?.trim() ?? '';
-
-    // Match device to catalogue key
     String deviceKey = 'Other';
     for (final key in catalogue.keys) {
       if (rawDevice.toLowerCase().contains(key.toLowerCase().split(' ').first)) {
@@ -1689,8 +1556,6 @@ class _TechJobCard extends ConsumerWidget {
       }
     }
     final items = catalogue[deviceKey]!;
-
-    // ── Mutable state (captured by StatefulBuilder closure) ───────────────
     final diagNotesController = TextEditingController();
     final serviceFeeController = TextEditingController();
     final newPartController        = TextEditingController();
@@ -1703,7 +1568,6 @@ class _TechJobCard extends ConsumerWidget {
         {'name': p, 'price': 0.0},
     ];
     bool saving = false;
-
     try {
       final confirmed = await showModalBottomSheet<bool>(
         context: context,
@@ -1716,7 +1580,6 @@ class _TechJobCard extends ConsumerWidget {
             final distanceFee = booking.parsedDistanceFee ?? 0.0;
             final total = serviceFee + partsTotal + distanceFee;
             final canSave = !saving && (selectedIssues.isNotEmpty || serviceFee > 0 || partsTotal > 0);
-
             Future<void> save() async {
               setState(() => saving = true);
               try {
@@ -1736,7 +1599,6 @@ class _TechJobCard extends ConsumerWidget {
                 }
                 final diagNote = diagNotesController.text.trim();
                 if (diagNote.isNotEmpty) buf.writeln('Technician Notes: $diagNote');
-
                 final customerPart = booking.moreDetails ?? notes;
                 final combined = '$customerPart\n---TECHNICIAN NOTES---\n${buf.toString().trim()}';
                 await bookingService.updateDiagnosticNotes(
@@ -1757,7 +1619,6 @@ class _TechJobCard extends ConsumerWidget {
                 );
               }
             }
-
             return DraggableScrollableSheet(
               expand: false,
               initialChildSize: 0.85,
@@ -1779,7 +1640,6 @@ class _TechJobCard extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    // Header
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 14, 12, 0),
                       child: Row(
@@ -1814,13 +1674,11 @@ class _TechJobCard extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     Divider(color: Colors.grey.shade100, height: 1),
-                    // Scrollable body
                     Expanded(
                       child: ListView(
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                         children: [
-                          // Device info banner
                           if (rawDevice.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.all(14),
@@ -1852,8 +1710,6 @@ class _TechJobCard extends ConsumerWidget {
                                 ],
                               ),
                             ),
-
-                          // ── Identified Issues ────────────────────────
                           Row(children: [
                             const Icon(Icons.build_circle_rounded, size: 15, color: AppTheme.deepBlue),
                             const SizedBox(width: 6),
@@ -1867,7 +1723,6 @@ class _TechJobCard extends ConsumerWidget {
                           Text('Select all damage found on the device',
                               style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                           const SizedBox(height: 10),
-                          // Catalogue issues
                           ...items.map((item) {
                             final label = item['label'] as String;
                             final isSelected = selectedIssues.contains(label);
@@ -1917,7 +1772,6 @@ class _TechJobCard extends ConsumerWidget {
                               ),
                             );
                           }),
-                          // Custom issues added by technician
                           ...customIssueOrder.map((label) {
                             final isSelected = selectedIssues.contains(label);
                             return GestureDetector(
@@ -1961,7 +1815,6 @@ class _TechJobCard extends ConsumerWidget {
                                             color: isSelected ? AppTheme.deepBlue : AppTheme.textPrimaryColor,
                                           )),
                                     ),
-                                    // Remove custom issue
                                     if (!saving)
                                       GestureDetector(
                                         onTap: () => setState(() {
@@ -1975,7 +1828,6 @@ class _TechJobCard extends ConsumerWidget {
                               ),
                             );
                           }),
-                          // Add custom issue input
                           const SizedBox(height: 4),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2032,8 +1884,6 @@ class _TechJobCard extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 20),
-
-                          // ── Service Fee ──────────────────────────────
                           const Text('Service Fee (₱)',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
                           const SizedBox(height: 4),
@@ -2061,8 +1911,6 @@ class _TechJobCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 20),
-
-                          // ── Parts Used ───────────────────────────────
                           const Text('Parts Used',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
                           const SizedBox(height: 4),
@@ -2356,8 +2204,6 @@ class _TechJobCard extends ConsumerWidget {
                               ),
                             ),
                           const SizedBox(height: 20),
-
-                          // ── Diagnosis Notes ──────────────────────────
                           const Text('Diagnosis Notes',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimaryColor)),
                           const SizedBox(height: 4),
@@ -2384,8 +2230,6 @@ class _TechJobCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // ── Price Summary card ───────────────────────
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -2491,8 +2335,6 @@ class _TechJobCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // ── Save button ──────────────────────────────
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
@@ -2524,7 +2366,6 @@ class _TechJobCard extends ConsumerWidget {
           },
         ),
       );
-
       if (confirmed != true) return;
       ref.invalidate(technicianBookingsProvider);
       ref.invalidate(bookingByIdProvider(booking.id));
@@ -2543,8 +2384,6 @@ class _TechJobCard extends ConsumerWidget {
       customIssueController.dispose();
     }
   }
-
-
   Future<void> _completeJob(
     BuildContext context,
     WidgetRef ref,
@@ -2555,7 +2394,6 @@ class _TechJobCard extends ConsumerWidget {
         bookingId: booking.id,
         status: 'completed',
       );
-
       await NotificationService().sendNotification(
         userId: booking.customerId,
         type: 'booking_completed',
@@ -2563,7 +2401,6 @@ class _TechJobCard extends ConsumerWidget {
         message: 'Your repair has been completed! Please proceed with payment.',
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
-
       ref.invalidate(technicianBookingsProvider);
       ref.invalidate(bookingByIdProvider(booking.id));
       if (!context.mounted) return;
@@ -2581,13 +2418,10 @@ class _TechJobCard extends ConsumerWidget {
     }
   }
 }
-
 class _StatusChip extends StatelessWidget {
   final String label;
   final Color color;
-
   const _StatusChip({required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2608,17 +2442,13 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
-
 class _TypeChip extends StatelessWidget {
   final bool isEmergency;
-
   const _TypeChip({required this.isEmergency});
-
   @override
   Widget build(BuildContext context) {
     final color = isEmergency ? Colors.red : AppTheme.lightBlue;
     final label = isEmergency ? 'Emergency' : 'Regular';
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -2637,13 +2467,10 @@ class _TypeChip extends StatelessWidget {
     );
   }
 }
-
 class _MetaPill extends StatelessWidget {
   final IconData icon;
   final String label;
-
   const _MetaPill({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2671,13 +2498,10 @@ class _MetaPill extends StatelessWidget {
     );
   }
 }
-
 class _MetaLine extends StatelessWidget {
   final IconData icon;
   final String text;
-
   const _MetaLine({required this.icon, required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -2700,12 +2524,9 @@ class _MetaLine extends StatelessWidget {
     );
   }
 }
-
 class _NotesBox extends StatelessWidget {
   final String text;
-
   const _NotesBox({required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2739,18 +2560,15 @@ class _NotesBox extends StatelessWidget {
     );
   }
 }
-
 class _EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-
   const _EmptyState({
     required this.icon,
     required this.title,
     required this.subtitle,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2797,18 +2615,15 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
 class _ErrorState extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback onRetry;
-
   const _ErrorState({
     required this.title,
     required this.message,
     required this.onRetry,
   });
-
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -2882,45 +2697,36 @@ class _ErrorState extends StatelessWidget {
     );
   }
 }
-
-// ─── Tech filter bottom sheet ─────────────────────────────────────────────────
-
 class _TechFilterSheet extends StatefulWidget {
   final _TechJobFilter current;
   const _TechFilterSheet({required this.current});
-
   @override
   State<_TechFilterSheet> createState() => _TechFilterSheetState();
 }
-
 class _TechFilterSheetState extends State<_TechFilterSheet> {
   late Set<String> _statuses;
   late DateTime? _from;
   late DateTime? _to;
   late _TechSortOrder _sort;
   late bool? _emergencyOnly;
-
   static const _allStatuses = [
     'requested',
     'in_progress',
     'completed',
     'cancelled',
   ];
-
   static const _statusLabels = {
     'requested': 'Requested',
     'in_progress': 'Active',
     'completed': 'Completed',
     'cancelled': 'Cancelled',
   };
-
   static const _statusColors = {
     'requested': AppTheme.warningColor,
     'in_progress': AppTheme.accentPurple,
     'completed': AppTheme.successColor,
     'cancelled': AppTheme.errorColor,
   };
-
   @override
   void initState() {
     super.initState();
@@ -2930,7 +2736,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
     _sort = widget.current.sort;
     _emergencyOnly = widget.current.emergencyOnly;
   }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -2949,7 +2754,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
                       width: 40, height: 4,
@@ -2957,8 +2761,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Header
                   Row(
                     children: [
                       const Expanded(
@@ -2978,8 +2780,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Status chips
                   _SheetSection(label: 'Status', icon: Icons.label_outline),
                   const SizedBox(height: 10),
                   Wrap(
@@ -3020,8 +2820,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-
-                  // Job type
                   _SheetSection(label: 'Job Type', icon: Icons.bolt_outlined),
                   const SizedBox(height: 10),
                   Row(
@@ -3049,8 +2847,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Date range
                   _SheetSection(label: 'Date Range', icon: Icons.calendar_today_outlined),
                   const SizedBox(height: 10),
                   Row(
@@ -3091,8 +2887,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Sort
                   _SheetSection(label: 'Sort Order', icon: Icons.sort),
                   const SizedBox(height: 10),
                   Row(
@@ -3117,8 +2911,6 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
-                  // Apply
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -3151,12 +2943,10 @@ class _TechFilterSheetState extends State<_TechFilterSheet> {
     );
   }
 }
-
 class _SheetSection extends StatelessWidget {
   final String label;
   final IconData icon;
   const _SheetSection({required this.label, required this.icon});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -3173,20 +2963,17 @@ class _SheetSection extends StatelessWidget {
     );
   }
 }
-
 class _TypeToggle extends StatelessWidget {
   final String label;
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-
   const _TypeToggle({
     required this.label,
     required this.selected,
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -3217,20 +3004,17 @@ class _TypeToggle extends StatelessWidget {
     );
   }
 }
-
 class _TechDateButton extends StatelessWidget {
   final String label;
   final bool hasValue;
   final VoidCallback onTap;
   final VoidCallback? onClear;
-
   const _TechDateButton({
     required this.label,
     required this.hasValue,
     required this.onTap,
     this.onClear,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -3272,20 +3056,17 @@ class _TechDateButton extends StatelessWidget {
     );
   }
 }
-
 class _TechSortChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-
   const _TechSortChip({
     required this.label,
     required this.icon,
     required this.selected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -3320,4 +3101,3 @@ class _TechSortChip extends StatelessWidget {
     );
   }
 }
-

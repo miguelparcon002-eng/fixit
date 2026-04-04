@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
-
 class PaymentMethodScreen extends ConsumerStatefulWidget {
   const PaymentMethodScreen({super.key});
-
   @override
   ConsumerState<PaymentMethodScreen> createState() =>
       _PaymentMethodScreenState();
 }
-
 class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
   final List<Map<String, String>> _cards = [
     {
@@ -26,7 +23,6 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
       'isDefault': 'false',
     },
   ];
-
   void _addCard() {
     showDialog(
       context: context,
@@ -46,13 +42,11 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
       ),
     );
   }
-
   void _deleteCard(int index) {
     setState(() {
       _cards.removeAt(index);
     });
   }
-
   void _setDefault(int index) {
     setState(() {
       for (var i = 0; i < _cards.length; i++) {
@@ -60,7 +54,6 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
       }
     });
   }
-
   IconData _getCardIcon(String type) {
     switch (type) {
       case 'Visa':
@@ -71,7 +64,6 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
         return Icons.credit_card;
     }
   }
-
   Color _getCardColor(String type) {
     switch (type) {
       case 'Visa':
@@ -82,7 +74,6 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
         return Colors.grey;
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -260,23 +251,18 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
     );
   }
 }
-
 class _AddCardDialog extends StatefulWidget {
   final Function(String cardNumber, String expiry, String cvv, String name)
       onSave;
-
   const _AddCardDialog({required this.onSave});
-
   @override
   State<_AddCardDialog> createState() => _AddCardDialogState();
 }
-
 class _AddCardDialogState extends State<_AddCardDialog> {
   final TextEditingController _cardNumberController = TextEditingController();
   final TextEditingController _expiryController = TextEditingController();
   final TextEditingController _cvvController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-
   @override
   void dispose() {
     _cardNumberController.dispose();
@@ -285,7 +271,6 @@ class _AddCardDialogState extends State<_AddCardDialog> {
     _nameController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(

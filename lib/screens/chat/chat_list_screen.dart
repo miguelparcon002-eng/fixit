@@ -4,30 +4,24 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
-
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
-
   @override
   ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
 }
-
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   int? _expandedIndex;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
   bool _matchesSearch(String text) {
     if (_searchQuery.isEmpty) return true;
     return text.toLowerCase().contains(_searchQuery);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,7 +31,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -67,7 +60,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   ],
                 ),
               ),
-              // Subtitle
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
@@ -83,7 +75,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Search Bar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
@@ -122,7 +113,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Contact Us Section
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
@@ -138,7 +128,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Contact Options
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -220,7 +209,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              // FAQ Section
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Align(
@@ -236,7 +224,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // FAQ List
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
@@ -290,12 +277,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     );
   }
 }
-
 class _LiveChatOption extends StatelessWidget {
   final VoidCallback onTap;
-
   const _LiveChatOption({required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -393,7 +377,6 @@ class _LiveChatOption extends StatelessWidget {
     );
   }
 }
-
 class _ContactOption extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -403,7 +386,6 @@ class _ContactOption extends StatelessWidget {
   final String statusText;
   final Color statusColor;
   final VoidCallback onTap;
-
   const _ContactOption({
     required this.icon,
     required this.iconColor,
@@ -414,7 +396,6 @@ class _ContactOption extends StatelessWidget {
     required this.statusColor,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -479,20 +460,17 @@ class _ContactOption extends StatelessWidget {
     );
   }
 }
-
 class _FAQItem extends StatelessWidget {
   final String question;
   final String answer;
   final bool isExpanded;
   final VoidCallback onTap;
-
   const _FAQItem({
     required this.question,
     required this.answer,
     required this.isExpanded,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(

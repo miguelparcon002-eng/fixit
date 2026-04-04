@@ -3,20 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/booking_notes_parser.dart';
 import '../../providers/booking_provider.dart';
-
 class BookingDeviceDetailsScreen extends ConsumerWidget {
   final String bookingId;
-
   const BookingDeviceDetailsScreen({super.key, required this.bookingId});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingsAsync = ref.watch(customerBookingsProvider);
-
     return bookingsAsync.when(
       loading: () => Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
@@ -82,10 +77,8 @@ class BookingDeviceDetailsScreen extends ConsumerWidget {
             body: const Center(child: Text('Booking not found')),
           );
         }
-
         final parsed = parseBookingNotes(booking.diagnosticNotes);
         final copyText = parsed.toPrettyText();
-
         return Scaffold(
           backgroundColor: const Color(0xFFF5F7FA),
           appBar: AppBar(
@@ -184,7 +177,6 @@ class BookingDeviceDetailsScreen extends ConsumerWidget {
                   ),
                 if ((parsed.promoCode ?? '').trim().isNotEmpty || (parsed.discount ?? '').trim().isNotEmpty)
                   const SizedBox(height: 16),
-
                 _SectionCard(
                   title: 'Raw Booking Notes',
                   children: [
@@ -199,13 +191,10 @@ class BookingDeviceDetailsScreen extends ConsumerWidget {
     );
   }
 }
-
 class _SectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
-
   const _SectionCard({required this.title, required this.children});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -232,14 +221,11 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
   const _InfoTile({required this.icon, required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -281,18 +267,14 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
-
 class _RawNotesBox extends StatefulWidget {
   final String text;
   const _RawNotesBox({required this.text});
-
   @override
   State<_RawNotesBox> createState() => _RawNotesBoxState();
 }
-
 class _RawNotesBoxState extends State<_RawNotesBox> {
   bool expanded = false;
-
   @override
   Widget build(BuildContext context) {
     final t = widget.text.trim();
@@ -303,7 +285,6 @@ class _RawNotesBoxState extends State<_RawNotesBox> {
         style: TextStyle(color: Colors.grey[600]),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -328,7 +309,6 @@ class _RawNotesBoxState extends State<_RawNotesBox> {
       ],
     );
   }
-
   String _collapse(String input) {
     final lines = input.split('\n');
     if (lines.length <= 6) return input;

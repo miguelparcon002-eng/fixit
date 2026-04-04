@@ -8,7 +8,6 @@ class UserAddress {
   final bool isDefault;
   final DateTime createdAt;
   final DateTime updatedAt;
-
   UserAddress({
     required this.id,
     required this.userId,
@@ -20,7 +19,6 @@ class UserAddress {
     required this.createdAt,
     required this.updatedAt,
   });
-
   factory UserAddress.fromJson(Map<String, dynamic> json) {
     return UserAddress(
       id: json['id'] as String,
@@ -34,7 +32,6 @@ class UserAddress {
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -48,7 +45,6 @@ class UserAddress {
       'updated_at': updatedAt.toIso8601String(),
     };
   }
-
   UserAddress copyWith({
     String? id,
     String? userId,

@@ -17,7 +17,6 @@ class SupportTicket {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final DateTime? resolvedAt;
-
   SupportTicket({
     required this.id,
     required this.customerId,
@@ -38,7 +37,6 @@ class SupportTicket {
     this.updatedAt,
     this.resolvedAt,
   });
-
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
     return SupportTicket(
       id: json['id'] as String,
@@ -71,7 +69,6 @@ class SupportTicket {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -94,7 +91,6 @@ class SupportTicket {
       'resolved_at': resolvedAt?.toIso8601String(),
     };
   }
-
   SupportTicket copyWith({
     String? id,
     String? customerId,
@@ -137,7 +133,6 @@ class SupportTicket {
     );
   }
 }
-
 class TicketMessage {
   final String id;
   final String ticketId;
@@ -148,7 +143,6 @@ class TicketMessage {
   final List<String> attachments;
   final DateTime createdAt;
   final bool isRead;
-
   TicketMessage({
     required this.id,
     required this.ticketId,
@@ -160,7 +154,6 @@ class TicketMessage {
     required this.createdAt,
     this.isRead = false,
   });
-
   factory TicketMessage.fromJson(Map<String, dynamic> json) {
     return TicketMessage(
       id: json['id'] as String,
@@ -176,7 +169,6 @@ class TicketMessage {
       isRead: json['is_read'] as bool? ?? false,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,

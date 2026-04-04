@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,46 +6,34 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_request_provider.dart';
-
 class PostProblemScreen extends ConsumerStatefulWidget {
   const PostProblemScreen({super.key});
-
   @override
   ConsumerState<PostProblemScreen> createState() => _PostProblemScreenState();
 }
-
 class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _detailsController = TextEditingController();
   final _mapController = MapController();
-
-  // Location
   double? _lat;
   double? _lng;
   String _address = '';
   bool _locating = false;
   bool _reverseGeocoding = false;
   String? _locationError;
-
-  // Default map centre (San Francisco, Agusan del Sur) — used when GPS is unavailable
   static const double _defaultLat = 8.5048;
   static const double _defaultLng = 125.9676;
-
-  // Device
   String? _deviceType; // 'Mobile' or 'Laptop'
   String? _brand;
   String? _model;
   final Set<String> _selectedProblems = {};
-
   static const Map<String, List<String>> _brands = {
     'Mobile': ['Apple', 'Samsung', 'Xiaomi', 'Oppo', 'Vivo', 'Realme', 'Huawei', 'Other'],
     'Laptop': ['Apple', 'Lenovo', 'HP', 'Acer', 'Asus', 'Dell', 'Other'],
   };
-
   static const Map<String, Map<String, List<String>>> _models = {
     'Mobile': {
       'Apple': ['iPhone 16 Pro Max', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro Max', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro Max', 'iPhone 14', 'iPhone 13', 'iPhone 12', 'iPhone SE'],
@@ -68,7 +55,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       'Other': [],
     },
   };
-
   static const List<String> _problems = [
     'Screen Cracked',
     'Battery Drains',
@@ -80,23 +66,18 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
     'Speaker / Mic',
     'Camera Issue',
   ];
-
   bool _submitting = false;
-
   @override
   void initState() {
     super.initState();
     _getLocation();
   }
-
   @override
   void dispose() {
     _detailsController.dispose();
     _mapController.dispose();
     super.dispose();
   }
-
-  // ── Reverse geocode via Nominatim (web + mobile compatible) ─────────────
   Future<String> _reverseGeocodeCoords(double lat, double lng) async {
     try {
       final uri = Uri.parse(
@@ -132,7 +113,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
     } catch (_) {}
     return '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
   }
-
   void _fallbackToDefault(String errorMsg) {
     if (!mounted) return;
     setState(() {
@@ -142,7 +122,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       _locating = false;
     });
   }
-
   Future<void> _getLocation() async {
     setState(() { _locating = true; _locationError = null; });
     try {
@@ -163,8 +142,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
         _fallbackToDefault('Location permanently denied. Tap the map to pin manually.');
         return;
       }
-      // Use medium accuracy + 15-second timeout — emulators often can't get a
-      // high-accuracy GPS fix and will hang indefinitely without a timeout.
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
       ).timeout(const Duration(seconds: 15));
@@ -182,7 +159,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       _fallbackToDefault('Could not detect GPS. Tap the map to pin your location.');
     }
   }
-
   Future<void> _onMapTap(TapPosition _, LatLng point) async {
     setState(() {
       _lat = point.latitude;
@@ -194,8 +170,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
     final addr = await _reverseGeocodeCoords(point.latitude, point.longitude);
     if (mounted) setState(() { _address = addr; _reverseGeocoding = false; });
   }
-
-  // ── Submit ───────────────────────────────────────────────────────────────
   Future<void> _submit() async {
     if (_deviceType == null) {
       _showError('Please select a device type.');
@@ -213,13 +187,10 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       _showError('Please wait for your location or tap the map to pin it.');
       return;
     }
-
     setState(() => _submitting = true);
     try {
       final user = ref.read(currentUserProvider).value;
       if (user == null) throw Exception('Not logged in');
-
-      // Encode structured info into problemDescription
       final modelLine = (_model != null && _model!.isNotEmpty) ? 'Model: $_model\n' : '';
       final description = [
         'Brand: $_brand',
@@ -228,7 +199,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
         if (_detailsController.text.trim().isNotEmpty)
           '---\n${_detailsController.text.trim()}',
       ].where((s) => s.isNotEmpty).join('\n');
-
       final request = await ref.read(jobRequestServiceProvider).createRequest(
             customerId: user.id,
             deviceType: _deviceType!,
@@ -237,14 +207,11 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
             longitude: _lng!,
             address: _address,
           );
-
-      // Notify all technicians — fire-and-forget, doesn't block the UI
       ref.read(jobRequestServiceProvider).notifyAllTechnicians(
         deviceType: _deviceType!,
         address: _address,
         requestId: request.id,
       );
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -262,14 +229,11 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       if (mounted) setState(() => _submitting = false);
     }
   }
-
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.orange.shade700),
     );
   }
-
-  // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -310,7 +274,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ),
     );
   }
-
   Widget _buildAppBar() {
     return SliverAppBar(
       expandedHeight: 120,
@@ -360,8 +323,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ),
     );
   }
-
-  // ── Section helpers ──────────────────────────────────────────────────────
   Widget _sectionLabel(String text, {IconData? icon}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -383,7 +344,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ),
     );
   }
-
   Widget _card({required Widget child, EdgeInsets? padding}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -402,8 +362,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       child: child,
     );
   }
-
-  // ── Device Type ──────────────────────────────────────────────────────────
   Widget _buildDeviceTypeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,7 +380,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
   Widget _deviceTypeCard(String type, IconData icon) {
     final selected = _deviceType == type;
     return GestureDetector(
@@ -480,8 +437,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ),
     );
   }
-
-  // ── Brand ────────────────────────────────────────────────────────────────
   Widget _buildBrandSection() {
     final brands = _brands[_deviceType] ?? [];
     return Column(
@@ -530,8 +485,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
-  // ── Model ────────────────────────────────────────────────────────────────
   Widget _buildModelSection() {
     final models = _models[_deviceType]?[_brand] ?? [];
     return Column(
@@ -552,8 +505,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
-  // ── Problems ─────────────────────────────────────────────────────────────
   Widget _buildProblemsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,8 +555,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
-  // ── Additional Details ───────────────────────────────────────────────────
   Widget _buildDetailsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -622,8 +571,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
-  // ── Location ─────────────────────────────────────────────────────────────
   Widget _buildLocationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,7 +591,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
           ),
           child: Column(
             children: [
-              // Map
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 child: SizedBox(
@@ -699,8 +645,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
                                   ),
                               ],
                             ),
-
-                            // GPS error banner — map still usable, customer can tap to pin
                             if (_locationError != null)
                               Positioned(
                                 bottom: 0,
@@ -736,8 +680,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
                                   ),
                                 ),
                               ),
-
-                            // Tap-to-pin hint
                             Positioned(
                               top: 8,
                               left: 0,
@@ -763,7 +705,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
                                 ),
                               ),
                             ),
-
                             if (_reverseGeocoding)
                               const Positioned(
                                 bottom: 10,
@@ -778,8 +719,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
                         ),
                 ),
               ),
-
-              // Address row
               Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -838,8 +777,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ],
     );
   }
-
-  // ── Submit Button ────────────────────────────────────────────────────────
   Widget _buildSubmitButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -896,8 +833,6 @@ class _PostProblemScreenState extends ConsumerState<PostProblemScreen> {
       ),
     );
   }
-
-  // ── Input decoration ─────────────────────────────────────────────────────
   InputDecoration _inputDeco(String hint) => InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),

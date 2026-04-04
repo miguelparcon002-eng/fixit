@@ -16,18 +16,14 @@ import '../../core/utils/booking_notes_parser.dart';
 import '../../services/notification_service.dart';
 import '../../services/payment_service.dart';
 import '../technician/widgets/customer_location_sheet.dart';
-
 class BookingDetailScreen extends ConsumerWidget {
   final String bookingId;
   const BookingDetailScreen({super.key, required this.bookingId});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Load booking by ID so this screen works for both Customers and Technicians.
     final bookingAsync = ref.watch(bookingByIdProvider(bookingId));
     final currentUser = ref.watch(currentUserProvider).value;
     final isTechnician = currentUser?.role == 'technician';
-
     return bookingAsync.when(
       loading: () => Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
@@ -92,7 +88,6 @@ class BookingDetailScreen extends ConsumerWidget {
             body: const Center(child: Text('Booking not found')),
           );
         }
-
         if (isTechnician) {
           return _TechBookingDetailView(booking: booking);
         }
@@ -101,13 +96,9 @@ class BookingDetailScreen extends ConsumerWidget {
     );
   }
 }
-
 class _BookingDetailView extends ConsumerWidget {
   final BookingModel booking;
-
   const _BookingDetailView({required this.booking});
-
-  /// Customers can cancel at any active stage before completion.
   bool get _isCancellable => [
         AppConstants.bookingRequested,
         AppConstants.bookingAccepted,
@@ -115,26 +106,20 @@ class _BookingDetailView extends ConsumerWidget {
         AppConstants.bookingArrived,
         AppConstants.bookingInProgress,
       ].contains(booking.status);
-
-  /// Fee applies once technician has accepted (en_route, arrived, in_progress).
   bool get _cancellationHasFee => [
         AppConstants.bookingAccepted,
         AppConstants.bookingEnRoute,
         AppConstants.bookingArrived,
         AppConstants.bookingInProgress,
       ].contains(booking.status);
-
   Future<void> _showCancelDialog(BuildContext context, WidgetRef ref) async {
     final isInProgress = booking.status == AppConstants.bookingInProgress;
     final isArrived = booking.status == AppConstants.bookingArrived;
     final distanceFee = booking.parsedDistanceFee ?? 0.0;
-    // ₱100 technician convenience fee is added when the tech has already
-    // arrived or started work (the tech made the trip to the customer's location).
     const convenenceFee = 100.0;
     final arrivedFee = (isArrived || isInProgress) ? convenenceFee : 0.0;
     final totalFee = distanceFee + arrivedFee;
     final hasFee = _cancellationHasFee && totalFee > 0;
-
     final reasons = [
       'Change of plans',
       'Found another technician',
@@ -142,10 +127,8 @@ class _BookingDetailView extends ConsumerWidget {
       'Technician taking too long to respond',
       'Other',
     ];
-
     String? selectedReason;
     final otherController = TextEditingController();
-
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -165,7 +148,6 @@ class _BookingDetailView extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Fee warning for in-progress cancellations
                 if (hasFee) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -300,31 +282,23 @@ class _BookingDetailView extends ConsumerWidget {
         ),
       ),
     );
-
     if (confirmed != true || !context.mounted) return;
-
     final reason = selectedReason == 'Other'
         ? otherController.text.trim().isNotEmpty
             ? otherController.text.trim()
             : 'Other'
         : selectedReason!;
-
     try {
       final bookingService = ref.read(bookingServiceProvider);
-      // When a fee applies, hold in cancellation_pending until admin confirms payment.
-      // Only fully cancel immediately when there is no fee.
       final newStatus = hasFee
           ? AppConstants.bookingCancellationPending
           : AppConstants.bookingCancelled;
-
       await bookingService.updateBookingStatus(
         bookingId: booking.id,
         status: newStatus,
         cancellationReason: reason,
         cancellationFee: hasFee ? totalFee : null,
       );
-
-      // Notify the technician
       final techMessage = hasFee
           ? 'A customer has initiated a cancellation. A cancellation fee of ₱${totalFee.toStringAsFixed(2)} is pending admin confirmation. Reason: $reason'
           : 'A customer has cancelled their booking. Reason: $reason';
@@ -335,14 +309,10 @@ class _BookingDetailView extends ConsumerWidget {
         message: techMessage,
         data: {'booking_id': booking.id, 'route': '/tech-jobs'},
       );
-
       ref.invalidate(bookingByIdProvider(booking.id));
       ref.invalidate(customerBookingsProvider);
-
       if (!context.mounted) return;
       if (hasFee) {
-        // Redirect customer to pay the cancellation fee.
-        // Booking stays as cancellation_pending until admin verifies.
         context.pushReplacement(
           '/payment/${booking.id}?amount=${totalFee.toStringAsFixed(2)}&type=cancellation_fee',
         );
@@ -362,16 +332,12 @@ class _BookingDetailView extends ConsumerWidget {
       );
     }
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Fetch technician contact number for Call/Message buttons
     final techUserAsync = booking.technicianId.isNotEmpty
         ? ref.watch(userByIdProvider(booking.technicianId))
         : const AsyncData(null);
     final techPhone = techUserAsync.value?.contactNumber;
-
-    // Determine colors and friendly label based on booking status
     Color statusColor;
     String statusLabel;
     switch (booking.status.toLowerCase()) {
@@ -416,8 +382,6 @@ class _BookingDetailView extends ConsumerWidget {
         statusColor = Colors.grey;
         statusLabel = booking.status.replaceAll('_', ' ').toUpperCase();
     }
-
-    // Format dates
     final dateFormat = DateFormat('MMM dd, yyyy');
     final timeFormat = DateFormat('h:mm a');
     final bookingDate = booking.scheduledDate != null
@@ -426,25 +390,16 @@ class _BookingDetailView extends ConsumerWidget {
     final bookingTime = booking.scheduledDate != null
         ? timeFormat.format(booking.scheduledDate!)
         : 'Not scheduled';
-
-    // Parse device details from diagnosticNotes (supports multiline details)
     final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
     final deviceType = parsedNotes.device;
     final deviceModel = parsedNotes.model;
     final deviceProblem = parsedNotes.problem;
     final deviceDetails = parsedNotes.details;
-
-    // Get location
     final location = booking.customerAddress ?? 'No address provided';
-
-    // Calculate final amount
     final estimatedCost = booking.estimatedCost ?? 0.0;
     final finalCost = booking.finalCost ?? estimatedCost;
-
-    // Parse technician notes into general assessment + price adjustments
     final techNotes = booking.technicianNotes;
     final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
-    // Lines to skip — already shown in the payment breakdown
     final skipLineRegex = RegExp(r'^(Service Fee:|Parts Used:|• .+ — [^\d]*[\d.]+$)');
     final techAdjustments = <(bool, double, String?)>[];
     final techGeneralLines = <String>[];
@@ -463,7 +418,6 @@ class _BookingDetailView extends ConsumerWidget {
       }
     }
     final hasTechNotes = techGeneralLines.isNotEmpty;
-    // Check tech notes section first for a service fee (tech's assessed value takes priority)
     final techServiceFeeSet = techNotes != null &&
         RegExp(r'Service Fee:[^\d]*([\d.]+)').hasMatch(techNotes);
     final hasBreakdown = techServiceFeeSet ||
@@ -471,7 +425,6 @@ class _BookingDetailView extends ConsumerWidget {
         booking.parsedDistanceFee != null ||
         booking.partsList.isNotEmpty ||
         techAdjustments.isNotEmpty;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -519,7 +472,6 @@ class _BookingDetailView extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status Card
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
@@ -538,8 +490,6 @@ class _BookingDetailView extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Device Details
             _SectionCard(
               title: 'Device Details',
               trailing: TextButton.icon(
@@ -576,8 +526,6 @@ class _BookingDetailView extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Booking Information
             _SectionCard(
               title: 'Booking Information',
               children: [
@@ -641,8 +589,6 @@ class _BookingDetailView extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Service Warranty Information
             _SectionCard(
               title: 'Service Warranty',
               children: [
@@ -690,12 +636,8 @@ class _BookingDetailView extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Technician Information
             _TechnicianSection(technicianId: booking.technicianId),
             const SizedBox(height: 16),
-
-            // Technician Notes — assessment only (price adjustments shown separately below)
             if (hasTechNotes) ...[
               _SectionCard(
                 title: 'Technician Notes',
@@ -709,8 +651,6 @@ class _BookingDetailView extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
-
-            // Price Adjustments — shown whenever technician used "Adjust Price"
             if (techAdjustments.isNotEmpty) ...[
               _SectionCard(
                 title: 'Price Adjustments',
@@ -798,8 +738,6 @@ class _BookingDetailView extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
-
-            // Payment Information
             _SectionCard(
               title: 'Payment',
               children: [
@@ -843,8 +781,6 @@ class _BookingDetailView extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Job status tracker — visible for all active bookings
             if ([
               AppConstants.bookingAccepted,
               AppConstants.bookingEnRoute,
@@ -857,24 +793,17 @@ class _BookingDetailView extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
             ],
-
-            // Cancellation Policy Card
             if (booking.status != AppConstants.bookingCancelled &&
                 booking.status != AppConstants.bookingCancellationPending &&
                 booking.status != AppConstants.bookingCompleted &&
                 booking.status != AppConstants.bookingPaid &&
                 booking.status != AppConstants.bookingClosed)
               _CancellationPolicyCard(booking: booking),
-
-            // Cancellation fee payment section — shown while pending AND after cancelled
             if ((booking.status == AppConstants.bookingCancellationPending ||
                     booking.status == AppConstants.bookingCancelled) &&
                 (booking.parsedDistanceFee ?? 0) > 0)
               _CancellationFeeSection(booking: booking),
-
             const SizedBox(height: 24),
-
-            // Action Buttons — Call/Message only shown when job is in progress
             if (booking.status == 'in_progress') ...[
               Row(
                 children: [
@@ -917,8 +846,6 @@ class _BookingDetailView extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
             ],
-
-            // Cancel button — shown for requested, accepted, or in_progress
             if (_isCancellable)
               SizedBox(
                 width: double.infinity,
@@ -942,11 +869,9 @@ class _BookingDetailView extends ConsumerWidget {
     );
   }
 }
-
 class _CancellationPolicyCard extends StatelessWidget {
   final BookingModel booking;
   const _CancellationPolicyCard({required this.booking});
-
   @override
   Widget build(BuildContext context) {
     final isRequested = booking.status == AppConstants.bookingRequested;
@@ -960,7 +885,6 @@ class _CancellationPolicyCard extends StatelessWidget {
     final feeText = distanceFee != null && distanceFee > 0
         ? '₱${distanceFee.toStringAsFixed(2)} distance fee'
         : 'Distance/travel fee applies';
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -995,7 +919,6 @@ class _CancellationPolicyCard extends StatelessWidget {
             ),
           ),
           Divider(height: 1, color: Colors.grey.shade100),
-          // Row 1 — Free during request
           _PolicyRow(
             icon: Icons.check_circle_rounded,
             iconColor: Colors.green,
@@ -1006,7 +929,6 @@ class _CancellationPolicyCard extends StatelessWidget {
             isActive: isRequested,
           ),
           Divider(height: 1, color: Colors.grey.shade100),
-          // Row 2 — Fee after acceptance
           _PolicyRow(
             icon: Icons.warning_amber_rounded,
             iconColor: Colors.orange,
@@ -1023,7 +945,6 @@ class _CancellationPolicyCard extends StatelessWidget {
     );
   }
 }
-
 class _PolicyRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -1032,7 +953,6 @@ class _PolicyRow extends StatelessWidget {
   final String feeLabel;
   final Color feeLabelColor;
   final bool isActive;
-
   const _PolicyRow({
     required this.icon,
     required this.iconColor,
@@ -1042,7 +962,6 @@ class _PolicyRow extends StatelessWidget {
     required this.feeLabelColor,
     required this.isActive,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1098,40 +1017,31 @@ class _PolicyRow extends StatelessWidget {
     );
   }
 }
-
 class _TechnicianSection extends ConsumerWidget {
   final String technicianId;
   const _TechnicianSection({required this.technicianId});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(userByIdProvider(technicianId));
     final techAsync = ref.watch(technicianProfileProvider(technicianId));
     final ratingsAsync = ref.watch(technicianActualRatingsProvider(technicianId));
-
     final user = userAsync.value;
     final tech = techAsync.value;
-
-    // Show loading spinner until at least the user row is ready
     if (userAsync.isLoading) {
       return _SectionCard(
         title: 'Assigned Technician',
         children: const [Center(child: CircularProgressIndicator())],
       );
     }
-
     return _SectionCard(
       title: 'Assigned Technician',
       children: [
-        // ── Name ────────────────────────────────────────────────────
         _InfoRow(
           icon: Icons.person,
           label: 'Name',
           value: user?.fullName ?? 'Unknown Technician',
         ),
         const SizedBox(height: 12),
-
-        // ── Contact number ──────────────────────────────────────────
         if (user?.contactNumber != null && user!.contactNumber!.isNotEmpty) ...[
           _InfoRow(
             icon: Icons.phone_rounded,
@@ -1140,8 +1050,6 @@ class _TechnicianSection extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
         ],
-
-        // ── Rating (live from app_ratings) ──────────────────────────
         ratingsAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (e, st) => const SizedBox.shrink(),
@@ -1156,8 +1064,6 @@ class _TechnicianSection extends ConsumerWidget {
             );
           },
         ),
-
-        // ── Profile details from technician_profiles ─────────────────
         if (tech != null) ...[
           if (tech.specialties.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -1196,18 +1102,15 @@ class _TechnicianSection extends ConsumerWidget {
     );
   }
 }
-
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget? trailing;
   final List<Widget> children;
-
   const _SectionCard({
     required this.title,
     this.trailing,
     required this.children,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1241,20 +1144,17 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Widget? trailing;
-
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
     this.trailing,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1300,36 +1200,28 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Completed booking itemized payment breakdown ─────────────────────────────
-
 class _CompletedPaymentBreakdown extends StatefulWidget {
   final BookingModel booking;
   final double finalCost;
   final double estimatedCost;
   final bool isCompleted;
-
   const _CompletedPaymentBreakdown({
     required this.booking,
     required this.finalCost,
     required this.estimatedCost,
     this.isCompleted = false,
   });
-
   @override
   State<_CompletedPaymentBreakdown> createState() => _CompletedPaymentBreakdownState();
 }
-
 class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> {
   RedeemedVoucher? _voucher;
   bool _loading = true;
-
   @override
   void initState() {
     super.initState();
     _loadVoucher();
   }
-
   Future<void> _loadVoucher() async {
     try {
       final rows = await SupabaseConfig.client
@@ -1344,17 +1236,13 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-
     final booking = widget.booking;
     final voucher = _voucher;
-
-    // Reconstruct pre-voucher total
     double preVoucherTotal;
     double voucherDiscount = 0;
     if (voucher != null) {
@@ -1369,9 +1257,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
     } else {
       preVoucherTotal = widget.finalCost;
     }
-
-    // Prefer the tech-assessed service fee (from tech notes section) over the
-    // original booking estimate (which parsedServiceFee may find first via firstMatch).
     final storedServiceFee = (() {
       final tn = booking.technicianNotes;
       if (tn != null) {
@@ -1384,8 +1269,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
     final storedDistanceFee = booking.parsedDistanceFee;
     final techAdditional = (preVoucherTotal - widget.estimatedCost).clamp(0.0, double.infinity);
     final parts = booking.partsList;
-
-    // Parse individual price adjustments from technician notes
     final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
     final techNotes = booking.technicianNotes;
     final adjustments = <(bool, double, String?)>[];
@@ -1400,11 +1283,9 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
         }
       }
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Row(
           children: [
             const Icon(Icons.receipt_long_rounded, size: 15, color: AppTheme.deepBlue),
@@ -1416,8 +1297,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
           ],
         ),
         const SizedBox(height: 12),
-
-        // ── Base Charges ──────────────────────────────────────
         _BreakdownBlock(
           color: Colors.blue,
           icon: Icons.home_repair_service_rounded,
@@ -1434,8 +1313,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
             ],
           ),
         ),
-
-        // ── Technician Additions ──────────────────────────────
         if ((storedServiceFee != null && storedServiceFee > 0) ||
             adjustments.isNotEmpty ||
             parts.isNotEmpty ||
@@ -1448,10 +1325,8 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Service Fee (from assess & price)
                 if (storedServiceFee != null && storedServiceFee > 0)
                   _BreakdownRow('Service Fee', storedServiceFee, color: Colors.orange.shade800),
-                // Individual price adjustments with reasons
                 for (final (isIncrease, amt, reason) in adjustments) ...[
                   _BreakdownRow(
                     isIncrease ? 'Price Increase' : 'Price Decrease',
@@ -1475,10 +1350,8 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
                       ),
                     ),
                 ],
-                // Fallback for legacy bookings without parsed breakdown
                 if (storedServiceFee == null && adjustments.isEmpty && techAdditional > 0)
                   _BreakdownRow('Service & Repair Charge', techAdditional, color: Colors.orange.shade800),
-                // Parts Used
                 if (parts.isNotEmpty) ...[
                   if (storedServiceFee != null || adjustments.isNotEmpty || techAdditional > 0)
                     const SizedBox(height: 8),
@@ -1503,8 +1376,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
             ),
           ),
         ],
-
-        // ── Voucher Discount ──────────────────────────────────
         if (voucher != null) ...[
           const SizedBox(height: 10),
           _BreakdownBlock(
@@ -1540,8 +1411,6 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
             ),
           ),
         ],
-
-        // ── Total ─────────────────────────────────────────────
         const SizedBox(height: 14),
         Container(height: 1, color: Colors.grey.shade200),
         const SizedBox(height: 14),
@@ -1563,27 +1432,23 @@ class _CompletedPaymentBreakdownState extends State<_CompletedPaymentBreakdown> 
       ],
     );
   }
-
   String _distanceNote(BookingModel b) {
     if (b.diagnosticNotes == null) return '';
     final m = RegExp(r'Distance: ([\d.]+)\s*km').firstMatch(b.diagnosticNotes!);
     return m != null ? ' (${m.group(1)} km)' : '';
   }
 }
-
 class _BreakdownBlock extends StatelessWidget {
   final Color color;
   final IconData icon;
   final String label;
   final Widget child;
-
   const _BreakdownBlock({
     required this.color,
     required this.icon,
     required this.label,
     required this.child,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1612,14 +1477,11 @@ class _BreakdownBlock extends StatelessWidget {
     );
   }
 }
-
 class _BreakdownRow extends StatelessWidget {
   final String label;
   final double amount;
   final Color? color;
-
   const _BreakdownRow(this.label, this.amount, {this.color});
-
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppTheme.textPrimaryColor;
@@ -1636,22 +1498,15 @@ class _BreakdownRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Technician-specific booking detail view ───────────────────────────────
-
 class _TechBookingDetailView extends ConsumerStatefulWidget {
   final BookingModel booking;
   const _TechBookingDetailView({required this.booking});
-
   @override
   ConsumerState<_TechBookingDetailView> createState() => _TechBookingDetailViewState();
 }
-
 class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> {
   bool _isLoading = false;
-
   BookingModel get booking => widget.booking;
-
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _isLoading = true);
     try {
@@ -1660,8 +1515,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
         bookingId: booking.id,
         status: newStatus,
       );
-
-      // Notify the customer about each job progress change
       final (String notifType, String notifTitle, String notifMsg) = switch (newStatus) {
         'in_progress' => (
             'booking_accepted',
@@ -1687,7 +1540,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
         message: notifMsg,
         data: {'booking_id': booking.id, 'route': '/booking/${booking.id}'},
       );
-
       ref.invalidate(bookingByIdProvider(booking.id));
       ref.invalidate(technicianBookingsProvider);
       if (!mounted) return;
@@ -1712,7 +1564,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM dd, yyyy');
@@ -1723,13 +1574,10 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
     final bookingTime = booking.scheduledDate != null
         ? timeFormat.format(booking.scheduledDate!)
         : 'Not scheduled';
-
     final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
     final location = booking.customerAddress ?? 'No address provided';
     final estimatedCost = booking.estimatedCost ?? 0.0;
     final finalCost = booking.finalCost ?? estimatedCost;
-
-    // Parse technician notes into general assessment + price adjustments
     final techNotes = booking.technicianNotes;
     final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
     final skipLineRegex = RegExp(r'^(Service Fee:|Parts Used:|• .+ — [^\d]*[\d.]+$)');
@@ -1757,8 +1605,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
         booking.parsedDistanceFee != null ||
         booking.partsList.isNotEmpty ||
         techAdjustments.isNotEmpty;
-
-    // Status label and color
     final String statusLabel;
     final Color statusColor;
     switch (booking.status.toLowerCase()) {
@@ -1808,9 +1654,7 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
         statusLabel = booking.status.replaceAll('_', ' ');
         statusColor = Colors.grey;
     }
-
     final customerUserAsync = ref.watch(userByIdProvider(booking.customerId));
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -1836,7 +1680,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Status banner
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
@@ -1855,8 +1698,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Customer Info
                   _SectionCard(
                     title: 'Customer',
                     children: [
@@ -1928,8 +1769,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Device Details
                   _SectionCard(
                     title: 'Device Details',
                     trailing: TextButton.icon(
@@ -1966,8 +1805,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Booking Information
                   _SectionCard(
                     title: 'Booking Information',
                     children: [
@@ -2033,8 +1870,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Technician Notes — assessment lines (from assess & price)
                   if (hasTechNotes) ...[
                     _SectionCard(
                       title: 'Technician Notes',
@@ -2048,8 +1883,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // Price Adjustments — from "Adjust Price" button
                   if (techAdjustments.isNotEmpty) ...[
                     _SectionCard(
                       title: 'Price Adjustments',
@@ -2137,8 +1970,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // Payment
                   _SectionCard(
                     title: 'Payment',
                     children: [
@@ -2181,8 +2012,6 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
                     ],
                   ),
                   const SizedBox(height: 24),
-
-                  // Action buttons based on status
                   if (booking.status == 'requested') ...[
                     Row(
                       children: [
@@ -2243,28 +2072,21 @@ class _TechBookingDetailViewState extends ConsumerState<_TechBookingDetailView> 
     );
   }
 }
-
-/// Shows cancellation fee payment status for cancelled bookings.
-/// If unpaid, offers a "Pay Cancellation Fee" button using the same GCash flow.
 class _CancellationFeeSection extends StatefulWidget {
   final BookingModel booking;
   const _CancellationFeeSection({required this.booking});
-
   @override
   State<_CancellationFeeSection> createState() =>
       _CancellationFeeSectionState();
 }
-
 class _CancellationFeeSectionState extends State<_CancellationFeeSection> {
   Map<String, dynamic>? _feePayment;
   bool _loading = true;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   Future<void> _load() async {
     final p = await PaymentService.getPaymentForBooking(
       widget.booking.id,
@@ -2276,20 +2098,16 @@ class _CancellationFeeSectionState extends State<_CancellationFeeSection> {
       _loading = false;
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final fee = widget.booking.finalCost ?? 0.0;
-
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     }
-
     final status = _feePayment?['status'] as String?;
-
     final (Color bg, Color border, Color textColor, IconData icon, String title, String subtitle) =
         switch (status) {
       'verified' => (
@@ -2317,7 +2135,6 @@ class _CancellationFeeSectionState extends State<_CancellationFeeSection> {
           'A cancellation fee of ₱${fee.toStringAsFixed(2)} applies to this booking.',
         ),
     };
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

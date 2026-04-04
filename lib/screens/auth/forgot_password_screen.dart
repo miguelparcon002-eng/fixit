@@ -4,31 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
-
 enum _ForgotStep { email, otp, newPassword }
-
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
-
   @override
   ConsumerState<ForgotPasswordScreen> createState() =>
       _ForgotPasswordScreenState();
 }
-
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   _ForgotStep _step = _ForgotStep.email;
-
   final _emailController = TextEditingController();
   final List<TextEditingController> _otpControllers =
       List.generate(8, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(8, (_) => FocusNode());
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -42,10 +35,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-
   String get _otpCode =>
       _otpControllers.map((c) => c.text).join();
-
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -57,7 +48,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ),
     );
   }
-
   Future<void> _sendOtp() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
@@ -78,7 +68,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _showError('Failed to send OTP: $e');
     }
   }
-
   Future<void> _verifyOtp() async {
     final code = _otpCode;
     if (code.length < 8) {
@@ -102,7 +91,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _showError('Invalid or expired OTP. Please try again.');
     }
   }
-
   Future<void> _setNewPassword() async {
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
@@ -121,7 +109,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authServiceProvider).updatePassword(password);
-      // Sign out after password reset so user logs in fresh
       await ref.read(authServiceProvider).signOut();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,7 +128,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _showError('Failed to update password: $e');
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,7 +141,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             if (_step == _ForgotStep.otp) {
               setState(() => _step = _ForgotStep.email);
             } else if (_step == _ForgotStep.newPassword) {
-              // Don't allow going back to OTP after verification
               context.go('/login');
             } else {
               context.go('/login');
@@ -178,7 +163,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ),
     );
   }
-
   Widget _buildEmailStep() {
     return Column(
       key: const ValueKey('email'),
@@ -225,7 +209,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ],
     );
   }
-
   Widget _buildOtpStep() {
     return Column(
       key: const ValueKey('otp'),
@@ -277,7 +260,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ],
     );
   }
-
   Widget _buildOtpBox(int index) {
     return SizedBox(
       width: 36,
@@ -315,7 +297,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ),
     );
   }
-
   Widget _buildNewPasswordStep() {
     return Column(
       key: const ValueKey('newPassword'),
@@ -394,7 +375,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       ],
     );
   }
-
   Widget _label(String text) {
     return Text(
       text,
@@ -402,7 +382,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
     );
   }
-
   InputDecoration _inputDecoration({
     required String hint,
     required IconData prefix,
@@ -427,7 +406,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
-
   Widget _primaryButton({
     required String label,
     required VoidCallback? onPressed,

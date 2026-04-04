@@ -3,45 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/image_upload_service.dart';
 import '../booking/widgets/location_picker_sheet.dart';
-
 class TechEditProfileScreen extends ConsumerStatefulWidget {
   const TechEditProfileScreen({super.key});
-
   @override
   ConsumerState<TechEditProfileScreen> createState() =>
       _TechEditProfileScreenState();
 }
-
 class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _locationController;
-
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
   bool _isUploadingImage = false;
   String? _profileImageUrl;
-
-  // Location picked from map
   LatLng? _pickedLatLng;
-
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _locationController = TextEditingController();
-
-    // Load profile data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Load user image URL
       final userAsync = ref.read(currentUserProvider);
       userAsync.whenData((user) {
         if (!mounted) return;
@@ -49,8 +38,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
           _profileImageUrl = user?.profilePicture;
         });
       });
-
-      // Load profile data
       final profileAsync = ref.read(profileProvider);
       profileAsync.whenData((profile) {
         if (!mounted) return;
@@ -62,7 +49,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       });
     });
   }
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -70,10 +56,8 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
     _locationController.dispose();
     super.dispose();
   }
-
   Future<void> _pickAndUploadProfileImage() async {
     if (_isUploadingImage) return;
-
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -81,31 +65,23 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-
       if (pickedFile == null) return;
-
       setState(() => _isUploadingImage = true);
-
       final user = await ref.read(currentUserProvider.future);
       if (user == null) {
         throw Exception('User not found');
       }
-
       final newUrl = await ImageUploadService.uploadAndSaveProfileImage(
         userId: user.id,
         imageFile: pickedFile,
         oldImageUrl: user.profilePicture,
       );
-
       if (!mounted) return;
       setState(() {
         _profileImageUrl = newUrl;
       });
-
-      // Refresh user/profile so the image persists across screens/app restarts
       ref.invalidate(currentUserProvider);
       ref.invalidate(profileProvider);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -115,7 +91,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
         );
       }
     } catch (e) {
-      // This will now show the *real* Supabase Storage error (unauthorized, bucket missing, RLS, etc.)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -130,17 +105,12 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       }
     }
   }
-
   Future<void> _saveProfile() async {  
-
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
-      // Update profile information in local storage
       await ref
           .read(profileProvider.notifier)
           .updateEmail(_emailController.text.trim());
@@ -158,7 +128,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
             .read(profileProvider.notifier)
             .updateLocation(_locationController.text.trim());
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -183,11 +152,9 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -237,7 +204,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
             final maxWidth = constraints.maxWidth >= 700
                 ? 560.0
                 : double.infinity;
-
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
               child: Center(
@@ -270,7 +236,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
                                   loading: () => '…',
                                   error: (error, stackTrace) => '?',
                                 );
-
                                 return Stack(
                                   children: [
                                     GestureDetector(
@@ -359,7 +324,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       _SectionCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,7 +362,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       Consumer(
                         builder: (context, ref, child) {
                           final userAsync = ref.watch(currentUserProvider);
@@ -407,14 +370,12 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
                             loading: () => false,
                             error: (error, stackTrace) => false,
                           );
-
                           final statusText = isVerified
                               ? 'Certified technician'
                               : 'Pending verification';
                           final statusColor = isVerified
                               ? AppTheme.successColor
                               : AppTheme.warningColor;
-
                           return _SectionCard(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,21 +441,18 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       ),
     );
   }
-
   Future<void> _openMapPicker(BuildContext context) async {
     final userAsync = ref.read(currentUserProvider);
     final user = userAsync.value;
     final initial = (user?.latitude != null && user?.longitude != null)
         ? LatLng(user!.latitude!, user.longitude!)
         : _pickedLatLng;
-
     final result = await showModalBottomSheet<PickedLocation>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => LocationPickerSheet(initialLocation: initial),
     );
-
     if (result != null && mounted) {
       setState(() {
         _pickedLatLng = result.latLng;
@@ -502,11 +460,9 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       });
     }
   }
-
   Widget _buildLocationPicker(BuildContext context) {
     final hasLocation = _locationController.text.isNotEmpty;
     final isPinned = _pickedLatLng != null;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -575,7 +531,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       ],
     );
   }
-
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -587,7 +542,6 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
     String? Function(String?)? validator,
   }) {
     final theme = Theme.of(context);
-
     return TextFormField(
       controller: controller,
       enabled: enabled,
@@ -615,10 +569,8 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
       ),
     );
   }
-
   Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     final theme = Theme.of(context);
-
     return Row(
       children: [
         Expanded(
@@ -642,12 +594,9 @@ class _TechEditProfileScreenState extends ConsumerState<TechEditProfileScreen> {
     );
   }
 }
-
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child});
-
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -667,17 +616,13 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, this.subtitle});
-
   final String title;
   final String? subtitle;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

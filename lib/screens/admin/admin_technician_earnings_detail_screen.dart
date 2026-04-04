@@ -3,15 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/admin_earnings_provider.dart';
-
 class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
   final String technicianId;
-
   const AdminTechnicianEarningsDetailScreen({
     super.key,
     required this.technicianId,
   });
-
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
@@ -19,12 +16,10 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
     final minute = date.minute.toString().padLeft(2, '0');
     return '${months[date.month - 1]} ${date.day}, ${date.year} - $hour:$minute $amPm';
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final earningsAsync = ref.watch(technicianEarningsProvider(technicianId));
     final transactionsAsync = ref.watch(technicianTransactionsProvider(technicianId));
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -63,7 +58,6 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Technician info card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -154,12 +148,8 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Weekly Payout Card
               _WeeklyPayoutCard(earnings: earnings),
               const SizedBox(height: 16),
-
-              // Earnings summary card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -293,8 +283,6 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Transaction History
               Row(
                 children: [
                   const Text(
@@ -319,8 +307,6 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-
-              // Transactions list
               transactionsAsync.when(
                 data: (transactions) {
                   if (transactions.isEmpty) {
@@ -351,7 +337,6 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
                       ),
                     );
                   }
-
                   return Column(
                     children: transactions.map((transaction) {
                       return _TransactionCard(
@@ -423,34 +408,26 @@ class AdminTechnicianEarningsDetailScreen extends ConsumerWidget {
     );
   }
 }
-
 class _WeeklyPayoutCard extends StatelessWidget {
   final dynamic earnings;
-
   const _WeeklyPayoutCard({required this.earnings});
-
-  /// Days until next Saturday (0 = today is Saturday)
   int _daysUntilSaturday() {
     final now = DateTime.now();
-    // DateTime weekday: Monday=1 ... Saturday=6, Sunday=7
     final daysUntil = (6 - now.weekday + 7) % 7;
     return daysUntil;
   }
-
   String _nextSaturdayLabel() {
     final days = _daysUntilSaturday();
     if (days == 0) return 'Today (Saturday)';
     if (days == 1) return 'Tomorrow';
     return 'In $days days';
   }
-
   @override
   Widget build(BuildContext context) {
     final weekEarnings = (earnings.weekEarnings as double);
     final platformFee = weekEarnings * 0.03;
     final netPayout = weekEarnings - platformFee;
     final daysLeft = _daysUntilSaturday();
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -577,20 +554,17 @@ class _WeeklyPayoutCard extends StatelessWidget {
     );
   }
 }
-
 class _PayoutRow extends StatelessWidget {
   final String label;
   final String value;
   final Color valueColor;
   final bool bold;
-
   const _PayoutRow({
     required this.label,
     required this.value,
     required this.valueColor,
     required this.bold,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -616,18 +590,15 @@ class _PayoutRow extends StatelessWidget {
     );
   }
 }
-
 class _EarningMetric extends StatelessWidget {
   final String label;
   final String value;
   final String subtitle;
-
   const _EarningMetric({
     required this.label,
     required this.value,
     required this.subtitle,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -662,16 +633,13 @@ class _EarningMetric extends StatelessWidget {
     );
   }
 }
-
 class _TransactionCard extends StatelessWidget {
   final dynamic transaction;
   final String Function(DateTime) formatDate;
-
   const _TransactionCard({
     required this.transaction,
     required this.formatDate,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(

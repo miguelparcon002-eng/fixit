@@ -27,7 +27,6 @@ class BookingModel {
   final DateTime? paidAt;
   final DateTime? cancelledAt;
   final DateTime? updatedAt;
-
   BookingModel({
     required this.id,
     required this.customerId,
@@ -58,7 +57,6 @@ class BookingModel {
     this.cancelledAt,
     this.updatedAt,
   });
-
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     return BookingModel(
       id: json['id'] as String,
@@ -109,7 +107,6 @@ class BookingModel {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -142,21 +139,15 @@ class BookingModel {
       'updated_at': updatedAt?.toIso8601String(),
     };
   }
-
-  // Helper getters for UI compatibility (matching LocalBooking fields)
   String get icon => '📱'; // Default icon
-  
   String get deviceName => 'Service'; // Will be replaced when we fetch service details
-  
   String get serviceName => 'Repair Service'; // Will be replaced when we fetch service details
-  
   String get date {
     if (scheduledDate == null) return 'TBD';
     final date = scheduledDate!;
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
-  
   String get time {
     if (scheduledDate == null) return 'TBD';
     final date = scheduledDate!;
@@ -165,58 +156,33 @@ class BookingModel {
     final period = date.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';
   }
-  
   String get location => customerAddress ?? 'N/A';
-  
   String get technician => 'Technician'; // Will be replaced when we fetch technician details
-  
   String get total => '₱${finalCost?.toStringAsFixed(2) ?? estimatedCost?.toStringAsFixed(2) ?? '0.00'}';
-  
   String get customerName => 'Customer'; // Will be replaced when we fetch customer details
-  
   String get customerPhone => 'No phone'; // Will be replaced when we fetch customer details
-  
-  /// Derived booking type based on how CreateBookingScreen currently persists it.
-  ///
-  /// Today this is encoded into `diagnostic_notes` as a line like:
-  ///   Booking Type: EMERGENCY
-  ///
-  /// If you later add a dedicated column (recommended), update this getter.
   bool get isEmergency {
     final notes = diagnosticNotes;
     if (notes == null || notes.trim().isEmpty) return false;
-
-    // Historically, different screens wrote different labels into diagnostic_notes.
-    // Accept any of the known formats so technician/admin UIs stay consistent.
     final patterns = <RegExp>[
       RegExp(r'Booking Type:\s*EMERGENCY', caseSensitive: false),
       RegExp(r'Repair Type:\s*Emergency', caseSensitive: false),
       RegExp(r'Priority:\s*EMERGENCY', caseSensitive: false),
       RegExp(r'\bEMERGENCY\b', caseSensitive: false),
     ];
-
     return patterns.any((p) => p.hasMatch(notes));
   }
-
-  /// Priority used by technician UI chips.
-  /// We treat Emergency bookings as HIGH priority.
   String get priority => isEmergency ? 'High' : 'Normal';
-  
   String? get moreDetails {
-    // Extract only the customer's original booking details (before "---TECHNICIAN NOTES---")
     if (diagnosticNotes == null) return null;
     final parts = diagnosticNotes!.split('---TECHNICIAN NOTES---');
     var customer = parts[0].trim();
-    // Strip internal [POST_PROBLEM] marker — it's used only for source detection,
-    // not meant to be displayed to anyone.
     if (customer.startsWith('[POST_PROBLEM]')) {
       customer = customer.replaceFirst(RegExp(r'^\[POST_PROBLEM\]\n?'), '').trim();
     }
     return customer.isEmpty ? null : customer;
   }
-
   String? get technicianNotes {
-    // Extract only technician's notes (after "---TECHNICIAN NOTES---")
     if (diagnosticNotes == null) return null;
     final parts = diagnosticNotes!.split('---TECHNICIAN NOTES---');
     if (parts.length > 1) {
@@ -224,47 +190,36 @@ class BookingModel {
     }
     return null;
   }
-
   String? get promoCode {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Promo Code: ([A-Z0-9]+)').firstMatch(diagnosticNotes!);
     return match?.group(1);
   }
-
   String? get redeemedVoucherId {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Redeemed Voucher ID: ([\w-]+)').firstMatch(diagnosticNotes!);
     return match?.group(1);
   }
-
   String? get discountAmount {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Discount: ([\d.]+%|₱[\d.]+)').firstMatch(diagnosticNotes!);
     return match?.group(1);
   }
-
-  /// Service fee stored in diagnostic notes. Null for legacy bookings.
-  /// Uses [^\d]* so the ₱ character encoding never causes a mismatch.
   double? get parsedServiceFee {
     if (diagnosticNotes == null) return null;
     final m = RegExp(r'Service Fee:[^\d]*([\d.]+)').firstMatch(diagnosticNotes!);
     return m != null ? double.tryParse(m.group(1)!) : null;
   }
-
-  /// Distance/travel fee stored in diagnostic notes. Null for legacy bookings.
   double? get parsedDistanceFee {
     if (diagnosticNotes == null) return null;
     final m = RegExp(r'Distance Fee:[^\d]*([\d.]+)').firstMatch(diagnosticNotes!);
     return m != null ? double.tryParse(m.group(1)!) : null;
   }
-
-  /// Platform convenience fee rate (decimal, e.g. 0.05 = 5%). Defaults to 5%.
   double get convenienceFeeRate {
     if (diagnosticNotes == null) return 0.05;
     final m = RegExp(r'Convenience Fee Rate: ([\d.]+)').firstMatch(diagnosticNotes!);
     return m != null ? (double.tryParse(m.group(1)!) ?? 5.0) / 100.0 : 0.05;
   }
-
   String? get originalPrice {
     if (diagnosticNotes == null) return null;
     final match = RegExp(r'Original Price: ₱([\d.]+)').firstMatch(diagnosticNotes!);

@@ -9,7 +9,6 @@ class JobRequestModel {
   final String status; // open, accepted, completed, cancelled
   final String? technicianId;
   final DateTime createdAt;
-
   const JobRequestModel({
     required this.id,
     required this.customerId,
@@ -22,7 +21,6 @@ class JobRequestModel {
     this.technicianId,
     required this.createdAt,
   });
-
   factory JobRequestModel.fromJson(Map<String, dynamic> json) {
     return JobRequestModel(
       id: json['id'] as String,
@@ -37,7 +35,6 @@ class JobRequestModel {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
-
   Map<String, dynamic> toJson() => {
         'customer_id': customerId,
         'device_type': deviceType,
@@ -48,7 +45,6 @@ class JobRequestModel {
         'status': status,
         if (technicianId != null) 'technician_id': technicianId,
       };
-
   JobRequestModel copyWith({
     String? status,
     String? technicianId,

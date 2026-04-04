@@ -7,30 +7,24 @@ import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../services/notification_service.dart';
-
 class AdminTicketDetailScreen extends ConsumerStatefulWidget {
   final String ticketId;
-
   const AdminTicketDetailScreen({super.key, required this.ticketId});
-
   @override
   ConsumerState<AdminTicketDetailScreen> createState() =>
       _AdminTicketDetailScreenState();
 }
-
 class _AdminTicketDetailScreenState
     extends ConsumerState<AdminTicketDetailScreen> {
   final TextEditingController _replyController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
-
   @override
   void dispose() {
     _replyController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-
   Color _getPriorityColor(String priority) {
     switch (priority) {
       case 'urgent':
@@ -45,7 +39,6 @@ class _AdminTicketDetailScreenState
         return Colors.grey;
     }
   }
-
   Color _getStatusColor(String status) {
     switch (status) {
       case 'open':
@@ -60,7 +53,6 @@ class _AdminTicketDetailScreenState
         return Colors.grey;
     }
   }
-
   String _getCategoryLabel(String category) {
     switch (category) {
       case 'booking_issue':
@@ -75,12 +67,9 @@ class _AdminTicketDetailScreenState
         return 'Other';
     }
   }
-
   Future<void> _sendReply(SupportTicket ticket) async {
     if (_replyController.text.trim().isEmpty) return;
-
     setState(() => _isLoading = true);
-
     try {
       final message = TicketMessage(
         id: 'msg_${const Uuid().v4().substring(0, 8)}',
@@ -91,12 +80,9 @@ class _AdminTicketDetailScreenState
         message: _replyController.text.trim(),
         createdAt: DateTime.now(),
       );
-
       await ref
           .read(supportTicketsProvider.notifier)
           .addMessage(widget.ticketId, message);
-
-      // Notify customer of admin reply
       final ticket = ref.read(ticketByIdProvider(widget.ticketId));
       if (ticket != null) {
         await NotificationService().sendNotification(
@@ -107,10 +93,7 @@ class _AdminTicketDetailScreenState
           data: {'ticket_id': widget.ticketId, 'route': '/my-tickets'},
         );
       }
-
       _replyController.clear();
-
-      // Scroll to bottom
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -120,7 +103,6 @@ class _AdminTicketDetailScreenState
           );
         }
       });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -144,14 +126,11 @@ class _AdminTicketDetailScreenState
       }
     }
   }
-
   Future<void> _updateStatus(String newStatus) async {
     final ticket = ref.read(ticketByIdProvider(widget.ticketId));
     await ref
         .read(supportTicketsProvider.notifier)
         .updateTicketStatus(widget.ticketId, newStatus);
-
-    // Notify customer of status change
     if (ticket != null) {
       final statusLabel = newStatus.replaceAll('_', ' ');
       await NotificationService().sendNotification(
@@ -162,7 +141,6 @@ class _AdminTicketDetailScreenState
         data: {'ticket_id': widget.ticketId, 'route': '/my-tickets'},
       );
     }
-
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,7 +153,6 @@ class _AdminTicketDetailScreenState
       );
     }
   }
-
   void _showStatusDialog(SupportTicket ticket) {
     showModalBottomSheet(
       context: context,
@@ -232,10 +209,8 @@ class _AdminTicketDetailScreenState
       ),
     );
   }
-
   void _showResolveTicketDialog(SupportTicket ticket) {
     final TextEditingController resolutionController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -274,7 +249,6 @@ class _AdminTicketDetailScreenState
                   ],
                 ),
                 const SizedBox(height: 20),
-                // Resolution Steps
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -349,7 +323,6 @@ class _AdminTicketDetailScreenState
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Warning if no admin reply yet
                 if (!ticket.messages.any((m) => m.senderRole == 'admin'))
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -404,7 +377,6 @@ class _AdminTicketDetailScreenState
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
-                          // Send resolution message if provided
                           if (resolutionController.text.trim().isNotEmpty) {
                             final message = TicketMessage(
                               id: 'msg_${const Uuid().v4().substring(0, 8)}',
@@ -420,12 +392,9 @@ class _AdminTicketDetailScreenState
                                 .read(supportTicketsProvider.notifier)
                                 .addMessage(widget.ticketId, message);
                           }
-
-                          // Update status to resolved
                           await ref
                               .read(supportTicketsProvider.notifier)
                               .updateTicketStatus(widget.ticketId, 'resolved');
-
                           resolutionController.dispose();
                           if (context.mounted) {
                             Navigator.pop(context);
@@ -466,7 +435,6 @@ class _AdminTicketDetailScreenState
       ),
     );
   }
-
   void _showMoreOptions(SupportTicket ticket) {
     showModalBottomSheet(
       context: context,
@@ -560,7 +528,6 @@ class _AdminTicketDetailScreenState
       ),
     );
   }
-
   void _showDeleteConfirmation() {
     final outerContext = context;
     showDialog(
@@ -600,11 +567,9 @@ class _AdminTicketDetailScreenState
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final ticket = ref.watch(ticketByIdProvider(widget.ticketId));
-
     if (ticket == null) {
       return Scaffold(
         backgroundColor: AppTheme.backgroundColor,
@@ -651,12 +616,10 @@ class _AdminTicketDetailScreenState
         ),
       );
     }
-
     final messages = ticket.messages;
     final priorityColor = _getPriorityColor(ticket.priority);
     final statusColor = _getStatusColor(ticket.status);
     final categoryLabel = _getCategoryLabel(ticket.category);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -690,7 +653,6 @@ class _AdminTicketDetailScreenState
       ),
       body: Column(
         children: [
-          // Ticket Info Header
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
@@ -828,7 +790,6 @@ class _AdminTicketDetailScreenState
               ],
             ),
           ),
-          // Messages List
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
@@ -865,7 +826,6 @@ class _AdminTicketDetailScreenState
                             },
                           ),
                   ),
-                  // Reply Input
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -936,13 +896,10 @@ class _AdminTicketDetailScreenState
     );
   }
 }
-
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
-
   const _InfoChip({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -962,13 +919,10 @@ class _InfoChip extends StatelessWidget {
     );
   }
 }
-
 class _MessageBubble extends StatelessWidget {
   final TicketMessage message;
   final bool isAdmin;
-
   const _MessageBubble({required this.message, required this.isAdmin});
-
   String get timeString {
     final hour = message.createdAt.hour;
     final minute = message.createdAt.minute.toString().padLeft(2, '0');
@@ -976,7 +930,6 @@ class _MessageBubble extends StatelessWidget {
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     return '$displayHour:$minute $period';
   }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1087,14 +1040,12 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 }
-
 class _StatusOption extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _StatusOption({
     required this.label,
     required this.icon,
@@ -1102,7 +1053,6 @@ class _StatusOption extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1137,20 +1087,17 @@ class _StatusOption extends StatelessWidget {
     );
   }
 }
-
 class _ResolutionStep extends StatelessWidget {
   final String number;
   final String title;
   final String description;
   final bool isCompleted;
-
   const _ResolutionStep({
     required this.number,
     required this.title,
     required this.description,
     required this.isCompleted,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(

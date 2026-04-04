@@ -3,15 +3,11 @@ import '../models/technician_profile_model.dart';
 import '../services/technician_service.dart';
 import '../core/config/supabase_config.dart';
 import 'auth_provider.dart';
-
 final technicianServiceProvider = Provider((ref) => TechnicianService());
-
 final technicianProfileProvider = FutureProvider.family<TechnicianProfileModel?, String>((ref, userId) async {
   final technicianService = ref.watch(technicianServiceProvider);
   return await technicianService.getProfileByUserId(userId);
 });
-
-/// Computes (averageRating, ratingCount) from app_ratings — the authoritative source for displayed ratings.
 final technicianActualRatingsProvider = FutureProvider.family<(double, int), String>((ref, technicianId) async {
   final response = await SupabaseConfig.client
       .from('app_ratings')
@@ -25,9 +21,6 @@ final technicianActualRatingsProvider = FutureProvider.family<(double, int), Str
   final avg = ratings.reduce((a, b) => a + b) / ratings.length;
   return (avg, ratings.length);
 });
-
-// Watches the current technician's availability status.
-// Returns null while loading or if no profile found.
 final currentTechAvailabilityProvider = StreamProvider<bool?>((ref) async* {
   final userAsync = await ref.watch(currentUserProvider.future);
   if (userAsync == null) { yield null; return; }
@@ -35,17 +28,13 @@ final currentTechAvailabilityProvider = StreamProvider<bool?>((ref) async* {
   final profile = await service.getProfileByUserId(userAsync.id);
   yield profile?.isAvailable;
 });
-
-// Notifier that loads and persists availability. Keyed on userId only (stable).
 class TechAvailabilityNotifier extends StateNotifier<AsyncValue<bool>> {
   final TechnicianService _service;
   final String _userId;
-
   TechAvailabilityNotifier(this._service, this._userId)
       : super(const AsyncValue.loading()) {
     _init();
   }
-
   Future<void> _init() async {
     try {
       final profile = await _service.getProfileByUserId(_userId);
@@ -54,7 +43,6 @@ class TechAvailabilityNotifier extends StateNotifier<AsyncValue<bool>> {
       if (mounted) state = AsyncValue.error(e, s);
     }
   }
-
   Future<void> setAvailability(bool value) async {
     state = const AsyncValue.loading();
     try {
@@ -65,8 +53,6 @@ class TechAvailabilityNotifier extends StateNotifier<AsyncValue<bool>> {
     }
   }
 }
-
-// Stable family keyed on userId only — provider survives re-renders.
 final techAvailabilityProviderFamily =
     StateNotifierProvider.family<TechAvailabilityNotifier, AsyncValue<bool>, String>(
   (ref, userId) => TechAvailabilityNotifier(
@@ -74,13 +60,11 @@ final techAvailabilityProviderFamily =
     userId,
   ),
 );
-
 class SearchTechniciansParams {
   final String? specialty;
   final double? maxRate;
   final double? minRating;
   final bool? isAvailable;
-
   SearchTechniciansParams({
     this.specialty,
     this.maxRate,
@@ -88,7 +72,6 @@ class SearchTechniciansParams {
     this.isAvailable,
   });
 }
-
 final searchTechniciansProvider = FutureProvider.family<List<TechnicianProfileModel>, SearchTechniciansParams>((ref, params) async {
   final technicianService = ref.watch(technicianServiceProvider);
   return await technicianService.searchTechnicians(

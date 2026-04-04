@@ -3,11 +3,8 @@ import '../models/support_ticket_model.dart';
 import '../core/config/supabase_config.dart';
 import '../core/utils/app_logger.dart';
 import 'auth_provider.dart';
-
-// Support Ticket Service — reads/writes directly to the `support_tickets` Supabase table
 class SupportTicketService {
   final _supabase = SupabaseConfig.client;
-
   Future<List<SupportTicket>> loadAllTickets() async {
     try {
       final response = await _supabase
@@ -22,7 +19,6 @@ class SupportTicketService {
       return [];
     }
   }
-
   Future<List<SupportTicket>> loadTicketsForUser(String customerId) async {
     try {
       final response = await _supabase
@@ -38,7 +34,6 @@ class SupportTicketService {
       return [];
     }
   }
-
   Future<SupportTicket?> createTicket(SupportTicket ticket) async {
     try {
       final data = {
@@ -71,7 +66,6 @@ class SupportTicketService {
       return null;
     }
   }
-
   Future<bool> updateTicket(SupportTicket ticket) async {
     try {
       await _supabase
@@ -95,7 +89,6 @@ class SupportTicketService {
       return false;
     }
   }
-
   Future<bool> deleteTicket(String ticketId) async {
     try {
       await _supabase.from('support_tickets').delete().eq('id', ticketId);
@@ -106,10 +99,8 @@ class SupportTicketService {
       return false;
     }
   }
-
   Future<bool> addMessage(String ticketId, TicketMessage message) async {
     try {
-      // Fetch current messages, append new one, save back
       final response = await _supabase
           .from('support_tickets')
           .select('messages')
@@ -129,7 +120,6 @@ class SupportTicketService {
       return false;
     }
   }
-
   Future<bool> updateTicketStatus(String ticketId, String status) async {
     try {
       await _supabase.from('support_tickets').update({
@@ -146,18 +136,12 @@ class SupportTicketService {
     }
   }
 }
-
-// Provider for the service
 final supportTicketServiceProvider = Provider((ref) => SupportTicketService());
-
-// State notifier — all tickets (admin view)
 class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
   final SupportTicketService _service;
-
   SupportTicketNotifier(this._service) : super([]) {
     _loadTickets();
   }
-
   Future<void> _loadTickets() async {
     try {
       final tickets = await _service.loadAllTickets();
@@ -166,15 +150,12 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
       AppLogger.p('SupportTicketNotifier: Error loading tickets - $e');
     }
   }
-
   Future<void> reload() async => _loadTickets();
-
   Future<SupportTicket?> createTicket(SupportTicket ticket) async {
     final result = await _service.createTicket(ticket);
     if (result != null) state = [result, ...state];
     return result;
   }
-
   Future<bool> updateTicket(SupportTicket ticket) async {
     final result = await _service.updateTicket(ticket);
     if (result) {
@@ -182,13 +163,11 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
     }
     return result;
   }
-
   Future<bool> deleteTicket(String ticketId) async {
     final result = await _service.deleteTicket(ticketId);
     if (result) state = state.where((t) => t.id != ticketId).toList();
     return result;
   }
-
   Future<bool> addMessage(String ticketId, TicketMessage message) async {
     final result = await _service.addMessage(ticketId, message);
     if (result) {
@@ -205,7 +184,6 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
     }
     return result;
   }
-
   Future<bool> updateTicketStatus(String ticketId, String status) async {
     final result = await _service.updateTicketStatus(ticketId, status);
     if (result) {
@@ -222,7 +200,6 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
     }
     return result;
   }
-
   SupportTicket? getTicketById(String ticketId) {
     try {
       return state.firstWhere((t) => t.id == ticketId);
@@ -231,36 +208,27 @@ class SupportTicketNotifier extends StateNotifier<List<SupportTicket>> {
     }
   }
 }
-
-// Main provider for all tickets (admin)
 final supportTicketsProvider = StateNotifierProvider<SupportTicketNotifier, List<SupportTicket>>(
   (ref) => SupportTicketNotifier(ref.watch(supportTicketServiceProvider)),
 );
-
-// Provider for the current user's own tickets only
 final customerTicketsProvider = FutureProvider<List<SupportTicket>>((ref) async {
   final user = await ref.watch(currentUserProvider.future);
   if (user == null) return [];
   final service = ref.watch(supportTicketServiceProvider);
   return service.loadTicketsForUser(user.id);
 });
-
-// Derived count providers
 final openTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'open').length;
 });
-
 final inProgressTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'in_progress').length;
 });
-
 final resolvedTicketsCountProvider = Provider<int>((ref) {
   final tickets = ref.watch(supportTicketsProvider);
   return tickets.where((t) => t.status == 'resolved' || t.status == 'closed').length;
 });
-
 final ticketByIdProvider = Provider.family<SupportTicket?, String>((ref, ticketId) {
   final tickets = ref.watch(supportTicketsProvider);
   try {

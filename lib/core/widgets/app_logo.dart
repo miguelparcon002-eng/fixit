@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-
 class AppLogo extends StatelessWidget {
   final double size;
   final bool showText;
   final Color textColor;
   final String text;
   final String assetPath;
-
   const AppLogo({
     super.key,
     this.size = 40,
@@ -15,7 +13,6 @@ class AppLogo extends StatelessWidget {
     this.text = 'FixIT',
     this.assetPath = 'assets/images/logo_gears.png',
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -26,7 +23,6 @@ class AppLogo extends StatelessWidget {
           width: size,
           height: size,
           errorBuilder: (context, error, stackTrace) {
-            // Fallback to settings icon if image not found
             return Icon(Icons.settings, size: size, color: textColor);
           },
         ),

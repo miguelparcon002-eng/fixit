@@ -14,7 +14,6 @@ class ServiceModel {
   final bool isActive;
   final DateTime createdAt;
   final DateTime? updatedAt;
-
   ServiceModel({
     required this.id,
     this.technicianId,  // Made optional
@@ -32,7 +31,6 @@ class ServiceModel {
     required this.createdAt,
     this.updatedAt,
   });
-
   factory ServiceModel.fromJson(Map<String, dynamic> json) {
     return ServiceModel(
       id: json['id'] as String,
@@ -56,7 +54,6 @@ class ServiceModel {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,

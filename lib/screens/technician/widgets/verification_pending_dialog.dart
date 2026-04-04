@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/verification_request_model.dart';
 import 'package:go_router/go_router.dart';
-
-/// Dialog for new technicians who haven't submitted verification yet
 class VerificationNotSubmittedDialog extends StatelessWidget {
   const VerificationNotSubmittedDialog({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -18,7 +15,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Animated icon
               TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.0, end: 1.0),
                 duration: const Duration(milliseconds: 800),
@@ -41,8 +37,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 20),
-              
-              // Title
               const Text(
                 'Verification Required',
                 style: TextStyle(
@@ -53,8 +47,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
-              // Message
               Text(
                 'To start accepting repair jobs, you need to complete the verification process.',
                 style: TextStyle(
@@ -65,8 +57,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              
-              // Requirements info
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -100,8 +90,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Info message
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -125,8 +113,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Proceed button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -156,7 +142,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              // Maybe later button
               SizedBox(
                 width: double.infinity,
                 height: 44,
@@ -182,7 +167,6 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
         ),
     );
   }
-
   Widget _buildRequirementItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -204,15 +188,12 @@ class VerificationNotSubmittedDialog extends StatelessWidget {
     );
   }
 }
-
 class VerificationPendingDialog extends StatelessWidget {
   final VerificationRequestModel verificationRequest;
-  
   const VerificationPendingDialog({
     super.key,
     required this.verificationRequest,
   });
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -226,11 +207,8 @@ class VerificationPendingDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Animated icon
               _buildAnimatedIcon(),
               const SizedBox(height: 20),
-              
-              // Title
               const Text(
                 'Verification Pending',
                 style: TextStyle(
@@ -241,8 +219,6 @@ class VerificationPendingDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
-              // Message
               Text(
                 'Your verification documents are being reviewed by our admin team.',
                 style: TextStyle(
@@ -253,8 +229,6 @@ class VerificationPendingDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              
-              // Status info
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -293,8 +267,6 @@ class VerificationPendingDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Documents count
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -311,8 +283,6 @@ class VerificationPendingDialog extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              
-              // Info message
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -336,14 +306,11 @@ class VerificationPendingDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Just refresh - don't close dialog
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
@@ -368,7 +335,6 @@ class VerificationPendingDialog extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildAnimatedIcon() {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -392,11 +358,9 @@ class VerificationPendingDialog extends StatelessWidget {
       },
     );
   }
-
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
         return '${difference.inMinutes} minutes ago';
@@ -409,16 +373,12 @@ class VerificationPendingDialog extends StatelessWidget {
     }
   }
 }
-
-/// Dialog for rejected verification
 class VerificationRejectedDialog extends StatelessWidget {
   final VerificationRequestModel verificationRequest;
-  
   const VerificationRejectedDialog({
     super.key,
     required this.verificationRequest,
   });
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -432,7 +392,6 @@ class VerificationRejectedDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -446,8 +405,6 @@ class VerificationRejectedDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Title
               const Text(
                 'Verification Rejected',
                 style: TextStyle(
@@ -458,8 +415,6 @@ class VerificationRejectedDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
-              // Message
               Text(
                 'Unfortunately, your verification request was not approved.',
                 style: TextStyle(
@@ -470,8 +425,6 @@ class VerificationRejectedDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              
-              // Admin notes
               if (verificationRequest.adminNotes != null && verificationRequest.adminNotes!.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -510,8 +463,6 @@ class VerificationRejectedDialog extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 20),
-              
-              // Resubmit button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -544,16 +495,12 @@ class VerificationRejectedDialog extends StatelessWidget {
     );
   }
 }
-
-/// Dialog for resubmission request
 class VerificationResubmitDialog extends StatelessWidget {
   final VerificationRequestModel verificationRequest;
-  
   const VerificationResubmitDialog({
     super.key,
     required this.verificationRequest,
   });
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -567,7 +514,6 @@ class VerificationResubmitDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -581,8 +527,6 @@ class VerificationResubmitDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Title
               const Text(
                 'Resubmission Required',
                 style: TextStyle(
@@ -593,8 +537,6 @@ class VerificationResubmitDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
-              // Message
               Text(
                 'Please resubmit your verification documents with the requested changes.',
                 style: TextStyle(
@@ -605,8 +547,6 @@ class VerificationResubmitDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              
-              // Admin notes
               if (verificationRequest.adminNotes != null && verificationRequest.adminNotes!.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -645,8 +585,6 @@ class VerificationResubmitDialog extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 20),
-              
-              // Resubmit button
               SizedBox(
                 width: double.infinity,
                 height: 48,

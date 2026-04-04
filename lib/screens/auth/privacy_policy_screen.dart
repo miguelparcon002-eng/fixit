@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-
 class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
-
   @override
   State<PrivacyPolicyScreen> createState() => _PrivacyPolicyScreenState();
 }
-
 class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
-  
   final List<bool> _expandedSections = List.generate(10, (index) => false);
-
   @override
   void initState() {
     super.initState();
@@ -28,7 +23,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       curve: Curves.easeInOut,
     );
     _animationController.forward();
-    
     _scrollController.addListener(() {
       if (_scrollController.offset > 300 && !_showScrollToTop) {
         setState(() => _showScrollToTop = true);
@@ -37,14 +31,12 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       }
     });
   }
-
   @override
   void dispose() {
     _animationController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,7 +55,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
         child: SafeArea(
           child: Column(
             children: [
-              // Enhanced Header with animation
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
@@ -139,7 +130,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                   ),
                 ),
               ),
-              // Content with enhanced scrolling
               Expanded(
                 child: FadeTransition(
                   opacity: _fadeAnimation,
@@ -167,11 +157,8 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                          // Introduction Card
                           _buildIntroCard(),
                           const SizedBox(height: 24),
-
-                          // Section 1
                           _buildExpandableSection(
                             index: 0,
                             icon: Icons.folder_rounded,
@@ -196,8 +183,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Section 2
                           _buildExpandableSection(
                             index: 1,
                             icon: Icons.settings_rounded,
@@ -217,8 +202,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Section 3
                           _buildExpandableSection(
                             index: 2,
                             icon: Icons.share_rounded,
@@ -274,8 +257,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Sections 4-9 (Expandable)
                           _buildExpandableSection(
                             index: 3,
                             icon: Icons.security_rounded,
@@ -297,7 +278,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
                           _buildExpandableSection(
                             index: 4,
                             icon: Icons.gavel_rounded,
@@ -317,7 +297,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
                           _buildExpandableSection(
                             index: 5,
                             icon: Icons.access_time_filled_rounded,
@@ -334,7 +313,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
                           _buildExpandableSection(
                             index: 6,
                             icon: Icons.cookie_rounded,
@@ -346,7 +324,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
                           _buildExpandableSection(
                             index: 7,
                             icon: Icons.child_care_rounded,
@@ -358,7 +335,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
                           _buildExpandableSection(
                             index: 8,
                             icon: Icons.update_rounded,
@@ -370,8 +346,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 16),
-
-                          // Section 10 - Contact
                           _buildExpandableSection(
                             index: 9,
                             icon: Icons.contact_mail_rounded,
@@ -409,14 +383,11 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                             ),
                           ),
                           const SizedBox(height: 24),
-
-                          // Footer
                           _buildFooter(),
                           const SizedBox(height: 16),
                               ],
                             ),
                           ),
-                          // Scroll to top button
                           if (_showScrollToTop)
                             Positioned(
                               bottom: 20,
@@ -440,7 +411,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
                   ),
                 ),
               ),
-              // Accept Button
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
@@ -492,9 +462,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
-  // Helper Methods
-
   Widget _buildIntroCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -553,7 +520,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
   Widget _buildExpandableSection({
     required int index,
     required IconData icon,
@@ -562,7 +528,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
     required Widget content,
   }) {
     final isExpanded = _expandedSections[index];
-    
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -659,7 +624,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
   Widget _buildSubHeader(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -673,7 +637,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -733,8 +696,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
-
   Widget _buildBulletPoint(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -767,7 +728,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> with SingleTi
       ),
     );
   }
-
   Widget _buildContactItem(IconData icon, String text) {
     return Row(
       children: [

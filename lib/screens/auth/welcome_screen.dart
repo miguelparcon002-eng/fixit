@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
-
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
-
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
-
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin {
   late AnimationController _mainController;
@@ -22,25 +19,20 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _buttonFade;
   late Animation<Offset> _buttonSlide;
   late Animation<double> _pulseAnimation;
-
   @override
   void initState() {
     super.initState();
-
     _mainController = AnimationController(
       duration: const Duration(milliseconds: 1800),
       vsync: this,
     );
-
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 2400),
       vsync: this,
     )..repeat(reverse: true);
-
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
@@ -53,7 +45,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         curve: const Interval(0.0, 0.5, curve: Curves.elasticOut),
       ),
     );
-
     _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
@@ -67,7 +58,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       parent: _mainController,
       curve: const Interval(0.25, 0.55, curve: Curves.easeOutCubic),
     ));
-
     _cardFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
@@ -81,7 +71,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       parent: _mainController,
       curve: const Interval(0.45, 0.75, curve: Curves.easeOutCubic),
     ));
-
     _buttonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
@@ -95,22 +84,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       parent: _mainController,
       curve: const Interval(0.65, 1.0, curve: Curves.easeOutCubic),
     ));
-
     _mainController.forward();
   }
-
   @override
   void dispose() {
     _mainController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -162,11 +147,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
-
   Widget _buildBackgroundDecorations(double screenHeight, double screenWidth) {
     return Stack(
       children: [
-        // Large top-right orb
         Positioned(
           top: -100,
           right: -80,
@@ -186,7 +169,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         ),
-        // Bottom-left orb
         Positioned(
           bottom: -140,
           left: -120,
@@ -204,7 +186,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         ),
-        // Small floating orb left
         Positioned(
           top: screenHeight * 0.3,
           left: -20,
@@ -217,7 +198,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         ),
-        // Small floating orb right
         Positioned(
           top: screenHeight * 0.5,
           right: -15,
@@ -230,7 +210,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         ),
-        // Tiny accent dot
         Positioned(
           top: screenHeight * 0.15,
           left: screenWidth * 0.15,
@@ -243,7 +222,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ),
           ),
         ),
-        // Another accent dot
         Positioned(
           top: screenHeight * 0.65,
           right: screenWidth * 0.2,
@@ -259,7 +237,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ],
     );
   }
-
   Widget _buildLogo() {
     return AnimatedBuilder(
       animation: Listenable.merge([_mainController, _pulseController]),
@@ -313,7 +290,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       },
     );
   }
-
   Widget _buildTitle() {
     return FadeTransition(
       opacity: _titleFade,
@@ -321,7 +297,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         position: _titleSlide,
         child: Column(
           children: [
-            // App name
             ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
                 colors: [Colors.white, Color(0xFFE0E7FF)],
@@ -340,7 +315,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               ),
             ),
             const SizedBox(height: 12),
-            // Tagline pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
@@ -366,7 +340,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
-
   Widget _buildFeatureCard() {
     return FadeTransition(
       opacity: _cardFade,
@@ -422,7 +395,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
-
   Widget _buildFeatureChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -451,7 +423,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
     );
   }
-
   Widget _buildBottomSection() {
     return FadeTransition(
       opacity: _buttonFade,
@@ -462,7 +433,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Get Started button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -495,7 +465,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              // Already have an account
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

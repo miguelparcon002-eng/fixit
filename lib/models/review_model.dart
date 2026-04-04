@@ -6,7 +6,6 @@ class ReviewModel {
   final int rating;
   final String? review;
   final DateTime createdAt;
-
   ReviewModel({
     required this.id,
     required this.bookingId,
@@ -16,7 +15,6 @@ class ReviewModel {
     this.review,
     required this.createdAt,
   });
-
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
     return ReviewModel(
       id: json['id'] as String,
@@ -28,7 +26,6 @@ class ReviewModel {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,

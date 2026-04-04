@@ -1,31 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../models/admin_technician_list_item.dart';
 import '../../providers/admin_technicians_provider.dart';
 import 'widgets/admin_notifications_dialog.dart';
 import 'widgets/admin_technician_details_sheet.dart';
-
 enum _TechnicianSort { experience, createdAt, jobsDone }
-
 enum _VerifiedFilter { all, verified, unverified, suspended }
-
 class AdminTechniciansScreen extends ConsumerStatefulWidget {
   const AdminTechniciansScreen({super.key});
-
   @override
   ConsumerState<AdminTechniciansScreen> createState() =>
       _AdminTechniciansScreenState();
 }
-
 class _AdminTechniciansScreenState
     extends ConsumerState<AdminTechniciansScreen> {
   _TechnicianSort _sort = _TechnicianSort.jobsDone;
   _VerifiedFilter _verifiedFilter = _VerifiedFilter.all;
-
   String get _verifiedFilterLabel {
     switch (_verifiedFilter) {
       case _VerifiedFilter.all:
@@ -38,7 +31,6 @@ class _AdminTechniciansScreenState
         return 'Suspended';
     }
   }
-
   String get _sortLabel {
     switch (_sort) {
       case _TechnicianSort.experience:
@@ -49,15 +41,11 @@ class _AdminTechniciansScreenState
         return 'Bookings done';
     }
   }
-
   int _compare(AdminTechnicianListItem a, AdminTechnicianListItem b) {
-    // Keep suspended at the bottom.
     if (a.isSuspended != b.isSuspended) {
       return a.isSuspended ? 1 : -1;
     }
-
     int desc(num x, num y) => y.compareTo(x);
-
     switch (_sort) {
       case _TechnicianSort.experience:
         return desc(a.profile?.yearsExperience ?? 0, b.profile?.yearsExperience ?? 0);
@@ -69,7 +57,6 @@ class _AdminTechniciansScreenState
         return desc(a.completedBookings, b.completedBookings);
     }
   }
-
   void _pickVerifiedFilter(BuildContext context) {
     showDialog(
       context: context,
@@ -123,7 +110,6 @@ class _AdminTechniciansScreenState
       },
     );
   }
-
   List<AdminTechnicianListItem> _applyVerifiedFilter(List<AdminTechnicianListItem> items) {
     switch (_verifiedFilter) {
       case _VerifiedFilter.all:
@@ -136,7 +122,6 @@ class _AdminTechniciansScreenState
         return items.where((t) => t.isSuspended).toList();
     }
   }
-
   void _pickSort(BuildContext context) {
     showDialog(
       context: context,
@@ -181,12 +166,10 @@ class _AdminTechniciansScreenState
       },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final techsAsync = ref.watch(adminTechniciansProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -261,7 +244,6 @@ class _AdminTechniciansScreenState
               ),
             );
           }
-
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: sorted.length,
@@ -297,23 +279,18 @@ class _AdminTechniciansScreenState
     );
   }
 }
-
 class _TechnicianCard extends StatelessWidget {
   final AdminTechnicianListItem technician;
   final VoidCallback onTap;
-
   const _TechnicianCard({required this.technician, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final profile = technician.profile;
-
     final specialties = profile?.specialties ?? const <String>[];
     final rating = profile?.rating ?? 0.0;
     final jobs = technician.completedBookings;
     final experienceYears = profile?.yearsExperience ?? 0;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -517,18 +494,15 @@ class _TechnicianCard extends StatelessWidget {
     );
   }
 }
-
 class _SortOption extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _SortOption({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -572,14 +546,11 @@ class _SortOption extends StatelessWidget {
     );
   }
 }
-
 class _MiniStat extends StatelessWidget {
   final IconData icon;
   final String value;
   final Color color;
-
   const _MiniStat({required this.icon, required this.value, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(

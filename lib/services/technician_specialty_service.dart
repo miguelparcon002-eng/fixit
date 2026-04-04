@@ -1,11 +1,8 @@
 import '../core/config/supabase_config.dart';
 import '../models/technician_specialty.dart';
 import '../core/utils/app_logger.dart';
-
 class TechnicianSpecialtyService {
   final _supabase = SupabaseConfig.client;
-
-  /// Get all specialties for a technician
   Future<List<TechnicianSpecialty>> getTechnicianSpecialties(String technicianId) async {
     try {
       final response = await _supabase
@@ -13,7 +10,6 @@ class TechnicianSpecialtyService {
           .select()
           .eq('technician_id', technicianId)
           .order('created_at', ascending: false);
-
       return (response as List)
           .map((json) => TechnicianSpecialty.fromJson(json))
           .toList();
@@ -22,8 +18,6 @@ class TechnicianSpecialtyService {
       return [];
     }
   }
-
-  /// Add a specialty to a technician
   Future<TechnicianSpecialty?> addSpecialty({
     required String technicianId,
     required String specialtyName,
@@ -37,7 +31,6 @@ class TechnicianSpecialtyService {
           })
           .select()
           .single();
-
       AppLogger.p('TechnicianSpecialtyService: Specialty added successfully');
       return TechnicianSpecialty.fromJson(response);
     } catch (e) {
@@ -45,15 +38,12 @@ class TechnicianSpecialtyService {
       return null;
     }
   }
-
-  /// Remove a specialty from a technician
   Future<bool> removeSpecialty(String specialtyId) async {
     try {
       await _supabase
           .from('technician_specialties')
           .delete()
           .eq('id', specialtyId);
-
       AppLogger.p('TechnicianSpecialtyService: Specialty removed successfully');
       return true;
     } catch (e) {
@@ -61,34 +51,26 @@ class TechnicianSpecialtyService {
       return false;
     }
   }
-
-  /// Set multiple specialties for a technician (replaces existing)
   Future<List<TechnicianSpecialty>> setSpecialties({
     required String technicianId,
     required List<String> specialtyNames,
   }) async {
     try {
-      // Delete existing specialties
       await _supabase
           .from('technician_specialties')
           .delete()
           .eq('technician_id', technicianId);
-
-      // Insert new specialties
       if (specialtyNames.isEmpty) return [];
-
       final inserts = specialtyNames
           .map((name) => {
                 'technician_id': technicianId,
                 'specialty_name': name,
               })
           .toList();
-
       final response = await _supabase
           .from('technician_specialties')
           .insert(inserts)
           .select();
-
       AppLogger.p('TechnicianSpecialtyService: Specialties updated successfully');
       return (response as List)
           .map((json) => TechnicianSpecialty.fromJson(json))
@@ -98,15 +80,12 @@ class TechnicianSpecialtyService {
       return [];
     }
   }
-
-  /// Search technicians by specialty
   Future<List<String>> searchTechniciansBySpecialty(String specialtyName) async {
     try {
       final response = await _supabase
           .from('technician_specialties')
           .select('technician_id')
           .eq('specialty_name', specialtyName);
-
       return (response as List)
           .map((json) => json['technician_id'] as String)
           .toList();
@@ -115,8 +94,6 @@ class TechnicianSpecialtyService {
       return [];
     }
   }
-
-  /// Stream specialties for real-time updates
   Stream<List<TechnicianSpecialty>> watchTechnicianSpecialties(String technicianId) {
     return _supabase
         .from('technician_specialties')

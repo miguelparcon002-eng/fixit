@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-
 class ServiceManagementScreen extends StatefulWidget {
   const ServiceManagementScreen({super.key});
-
   @override
   State<ServiceManagementScreen> createState() => _ServiceManagementScreenState();
 }
-
 class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
-  // Sample services - in production, fetch from Supabase
   final List<Map<String, dynamic>> _services = [
     {
       'id': '1',
@@ -48,7 +44,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       'description': 'Recover lost or deleted files',
     },
   ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,7 +62,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       ),
       body: Column(
         children: [
-          // Stats Header
           Container(
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
@@ -98,7 +92,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          // Services List
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(20),
@@ -146,7 +139,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       ),
     );
   }
-
   void _showAddServiceDialog() {
     showDialog(
       context: context,
@@ -175,7 +167,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       ),
     );
   }
-
   void _toggleServiceStatus(String id) {
     setState(() {
       final index = _services.indexWhere((s) => s['id'] == id);
@@ -190,7 +181,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       ),
     );
   }
-
   void _editService(Map<String, dynamic> service) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -199,7 +189,6 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
       ),
     );
   }
-
   void _deleteService(String id) {
     showDialog(
       context: context,
@@ -236,20 +225,17 @@ class _ServiceManagementScreenState extends State<ServiceManagementScreen> {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color color;
-
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -284,24 +270,20 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _ServiceCard extends StatelessWidget {
   final Map<String, dynamic> service;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-
   const _ServiceCard({
     required this.service,
     required this.onToggle,
     required this.onEdit,
     required this.onDelete,
   });
-
   @override
   Widget build(BuildContext context) {
     final isActive = service['isActive'] as bool;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

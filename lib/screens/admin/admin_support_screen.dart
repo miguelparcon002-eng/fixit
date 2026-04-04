@@ -5,39 +5,31 @@ import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../core/widgets/app_logo.dart';
-
 class AdminSupportScreen extends ConsumerStatefulWidget {
   const AdminSupportScreen({super.key});
-
   @override
   ConsumerState<AdminSupportScreen> createState() => _AdminSupportScreenState();
 }
-
 class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedFilter = 'all';
   String _selectedPriority = 'all';
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    // Reload tickets when screen is opened
     Future.microtask(() {
       ref.read(supportTicketsProvider.notifier).reload();
     });
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   List<SupportTicket> getFilteredTickets(List<SupportTicket> tickets) {
     return tickets.where((ticket) {
-      // Filter by status tab
       bool matchesTab = true;
       switch (_tabController.index) {
         case 0: // All
@@ -53,19 +45,13 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
           matchesTab = ticket.status == 'resolved' || ticket.status == 'closed';
           break;
       }
-
-      // Filter by category
       bool matchesCategory =
           _selectedFilter == 'all' || ticket.category == _selectedFilter;
-
-      // Filter by priority
       bool matchesPriority =
           _selectedPriority == 'all' || ticket.priority == _selectedPriority;
-
       return matchesTab && matchesCategory && matchesPriority;
     }).toList();
   }
-
   @override
   Widget build(BuildContext context) {
     final tickets = ref.watch(supportTicketsProvider);
@@ -73,7 +59,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
     final inProgressCount = ref.watch(inProgressTicketsCountProvider);
     final resolvedCount = ref.watch(resolvedTicketsCountProvider);
     final filteredTickets = getFilteredTickets(tickets);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -116,7 +101,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
       ),
       body: Column(
         children: [
-          // Stats Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -142,7 +126,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // Tab Bar
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -173,7 +156,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // Tickets List
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
@@ -234,7 +216,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
       ),
     );
   }
-
   void _showFilterDialog() {
     showModalBottomSheet(
       context: context,
@@ -407,23 +388,19 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen>
       ),
     );
   }
-
   void _openTicketDetail(SupportTicket ticket) {
     context.push('/admin-support/${ticket.id}');
   }
 }
-
 class _StatBadge extends StatelessWidget {
   final String label;
   final int count;
   final Color color;
-
   const _StatBadge({
     required this.label,
     required this.count,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -457,13 +434,10 @@ class _StatBadge extends StatelessWidget {
     );
   }
 }
-
 class _TicketCard extends StatelessWidget {
   final SupportTicket ticket;
   final VoidCallback onTap;
-
   const _TicketCard({required this.ticket, required this.onTap});
-
   Color get priorityColor {
     switch (ticket.priority) {
       case 'urgent':
@@ -478,7 +452,6 @@ class _TicketCard extends StatelessWidget {
         return Colors.grey;
     }
   }
-
   Color get statusColor {
     switch (ticket.status) {
       case 'open':
@@ -493,7 +466,6 @@ class _TicketCard extends StatelessWidget {
         return Colors.grey;
     }
   }
-
   IconData get categoryIcon {
     switch (ticket.category) {
       case 'booking_issue':
@@ -508,7 +480,6 @@ class _TicketCard extends StatelessWidget {
         return Icons.help_outline;
     }
   }
-
   String get categoryLabel {
     switch (ticket.category) {
       case 'booking_issue':
@@ -523,7 +494,6 @@ class _TicketCard extends StatelessWidget {
         return 'Other';
     }
   }
-
   String get timeAgo {
     final diff = DateTime.now().difference(ticket.createdAt);
     if (diff.inMinutes < 60) {
@@ -534,7 +504,6 @@ class _TicketCard extends StatelessWidget {
       return '${diff.inDays}d ago';
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -749,20 +718,17 @@ class _TicketCard extends StatelessWidget {
     );
   }
 }
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final Color? color;
   final VoidCallback onTap;
-
   const _FilterChip({
     required this.label,
     required this.isSelected,
     this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

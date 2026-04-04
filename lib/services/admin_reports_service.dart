@@ -1,6 +1,5 @@
 import '../core/config/supabase_config.dart';
 import '../core/utils/booking_notes_parser.dart';
-
 class AdminReportsData {
   final int totalBookings;
   final int dayBookings;
@@ -25,7 +24,6 @@ class AdminReportsData {
   final List<DeviceBreakdownItem> deviceBreakdown;
   final List<AreaBreakdownItem> popularAreas;
   final List<TechPerformanceItem> teamPerformance;
-
   const AdminReportsData({
     required this.totalBookings,
     required this.dayBookings,
@@ -52,15 +50,12 @@ class AdminReportsData {
     required this.teamPerformance,
   });
 }
-
 class DeviceBreakdownItem {
   final String deviceName;
   final int count;
   final double revenue;
   final double percentage;
-  /// Raw model names that belong to this category, with their booking counts.
   final Map<String, int> models;
-
   const DeviceBreakdownItem({
     required this.deviceName,
     required this.count,
@@ -69,19 +64,16 @@ class DeviceBreakdownItem {
     this.models = const {},
   });
 }
-
 class AreaBreakdownItem {
   final String areaName;
   final int count;
   final double revenue;
-
   const AreaBreakdownItem({
     required this.areaName,
     required this.count,
     required this.revenue,
   });
 }
-
 class TechPerformanceItem {
   final String technicianId;
   final String name;
@@ -89,7 +81,6 @@ class TechPerformanceItem {
   final int completedJobs;
   final double revenue;
   final double? averageRating;
-
   const TechPerformanceItem({
     required this.technicianId,
     required this.name,
@@ -99,30 +90,21 @@ class TechPerformanceItem {
     this.averageRating,
   });
 }
-
 class AdminReportsService {
   final _client = SupabaseConfig.client;
-
   Future<AdminReportsData> load() async {
     final now = DateTime.now();
     final dayStart = DateTime(now.year, now.month, now.day);
     final weekAgo = now.subtract(const Duration(days: 7)).toUtc();
     final monthStart = DateTime(now.year, now.month, 1).toUtc();
-    // ── All bookings (for status breakdown + device + area) ──────────────────
     final allBookingsRaw = await _client
         .from('bookings')
         .select('id, status, final_cost, estimated_cost, customer_address, diagnostic_notes, created_at, completed_at, technician_id');
-
     final allBookings = allBookingsRaw as List;
-
-    // ── Users counts ──────────────────────────────────────────────────────────
     final customersRaw = await _client.from('users').select('id, created_at').eq('role', 'customer');
     final techniciansRaw = await _client.from('users').select('id, full_name, profile_image_url').eq('role', 'technician');
-
     final customers = customersRaw as List;
     final technicians = techniciansRaw as List;
-
-    // ── Counts and revenue ────────────────────────────────────────────────────
     int totalBookings = allBookings.length;
     int dayBookings = 0;
     int weekBookings = 0;
@@ -137,8 +119,6 @@ class AdminReportsService {
     double dayRevenue = 0;
     double weekRevenue = 0;
     double monthRevenue = 0;
-
-    // Track new customers by day/week/month
     int dayCustomers = 0;
     int weekCustomers = 0;
     int monthCustomers = 0;
@@ -150,20 +130,13 @@ class AdminReportsService {
         if (created.isAfter(monthStart)) monthCustomers++;
       }
     }
-
-    // Device tally: category -> {count, revenue, models}
     final Map<String, int> deviceCount = {};
     final Map<String, double> deviceRevenue = {};
     final Map<String, Map<String, int>> deviceModels = {}; // category -> {rawModel -> count}
-
-    // Area tally: normalised area label -> {count, revenue}
     final Map<String, int> areaCount = {};
     final Map<String, double> areaRevenue = {};
-
-    // Technician revenue tally
     final Map<String, double> techRevenue = {};
     final Map<String, int> techJobs = {};
-
     for (final b in allBookings) {
       final status = (b['status'] as String? ?? '').toLowerCase();
       final amount = ((b['final_cost'] ?? b['estimated_cost'] ?? 0) as num).toDouble();
@@ -171,8 +144,6 @@ class AdminReportsService {
       final completedAtRaw = b['completed_at'] as String?;
       final eventDate = completedAtRaw != null ? DateTime.parse(completedAtRaw) : createdAt;
       final techId = b['technician_id'] as String?;
-
-      // Status
       if (status == 'pending' || status == 'confirmed' || status == 'accepted' || status == 'in_progress') {
         pendingCount++;
       } else if (status == 'completed') {
@@ -184,7 +155,6 @@ class AdminReportsService {
         if (!eventDate.isBefore(dayStart)) dayRevenue += amount;
         if (eventDate.isAfter(weekAgo)) weekRevenue += amount;
         if (eventDate.isAfter(monthStart)) monthRevenue += amount;
-        // Technician revenue
         if (techId != null) {
           techRevenue[techId] = (techRevenue[techId] ?? 0) + amount;
           techJobs[techId] = (techJobs[techId] ?? 0) + 1;
@@ -192,13 +162,9 @@ class AdminReportsService {
       } else if (status == 'cancelled') {
         cancelledCount++;
       }
-
-      // Period bookings count (all statuses)
       if (!eventDate.isBefore(dayStart)) dayBookings++;
       if (eventDate.isAfter(weekAgo)) weekBookings++;
       if (eventDate.isAfter(monthStart)) monthBookings++;
-
-      // ── Device breakdown (from diagnostic_notes) ──────────────────────────
       final notes = b['diagnostic_notes'] as String?;
       if (notes != null && notes.isNotEmpty) {
         final parsed = parseBookingNotes(notes);
@@ -217,8 +183,6 @@ class AdminReportsService {
           }
         }
       }
-
-      // ── Popular areas (from customer_address) ─────────────────────────────
       final address = b['customer_address'] as String?;
       if (address != null && address.isNotEmpty) {
         final areaKey = _normalizeArea(address);
@@ -230,13 +194,10 @@ class AdminReportsService {
         }
       }
     }
-
-    // ── Ratings per technician ────────────────────────────────────────────────
     final ratingsRaw = await _client
         .from('bookings')
         .select('technician_id, rating')
         .not('rating', 'is', null);
-
     final Map<String, List<int>> techRatings = {};
     for (final r in ratingsRaw as List) {
       final tId = r['technician_id'] as String?;
@@ -245,8 +206,6 @@ class AdminReportsService {
         techRatings.putIfAbsent(tId, () => []).add((rating as num).toInt());
       }
     }
-
-    // ── Build device breakdown list ───────────────────────────────────────────
     final totalDeviceBookings = deviceCount.values.fold(0, (a, b) => a + b);
     final deviceList = deviceCount.entries.map((e) {
       final pct = totalDeviceBookings > 0 ? e.value / totalDeviceBookings : 0.0;
@@ -259,8 +218,6 @@ class AdminReportsService {
       );
     }).toList()
       ..sort((a, b) => b.count.compareTo(a.count));
-
-    // ── Build popular areas list ──────────────────────────────────────────────
     final areaList = areaCount.entries.map((e) {
       return AreaBreakdownItem(
         areaName: e.key,
@@ -269,8 +226,6 @@ class AdminReportsService {
       );
     }).toList()
       ..sort((a, b) => b.count.compareTo(a.count));
-
-    // ── Build team performance list ───────────────────────────────────────────
     final teamList = technicians.map((t) {
       final tId = t['id'] as String;
       final ratings = techRatings[tId] ?? [];
@@ -287,7 +242,6 @@ class AdminReportsService {
       );
     }).toList()
       ..sort((a, b) => b.completedJobs.compareTo(a.completedJobs));
-
     return AdminReportsData(
       totalBookings: totalBookings,
       dayBookings: dayBookings,
@@ -314,8 +268,6 @@ class AdminReportsService {
       teamPerformance: teamList,
     );
   }
-
-  /// Normalise device string to a display label.
   String _normalizeDevice(String raw) {
     final lower = raw.toLowerCase().trim();
     if (lower.contains('iphone') || lower.contains('ios') || (lower.contains('mobile') && lower.contains('apple'))) {
@@ -327,23 +279,16 @@ class AdminReportsService {
     if (lower.contains('android') || lower.contains('mobile phone') || lower.contains('smartphone')) return 'Phone';
     if (lower.contains('tablet') || lower.contains('ipad')) return 'Tablet / iPad';
     if (lower.contains('desktop') || lower.contains('pc')) return 'Desktop / PC';
-    // Title-case fallback
     return raw.trim().split(' ').map((w) {
       if (w.isEmpty) return '';
       return w[0].toUpperCase() + w.substring(1).toLowerCase();
     }).join(' ');
   }
-
-  /// Extract a short area label from a customer address string.
   String _normalizeArea(String address) {
-    // Try to extract barangay
     final brgyMatch = RegExp(r'(Brgy\.?\s+[\w\s]+|Barangay\s+[\w\s]+)', caseSensitive: false).firstMatch(address);
     if (brgyMatch != null) return brgyMatch.group(0)!.trim();
-
-    // Split by comma, use the most specific part (first segment)
     final parts = address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     if (parts.isNotEmpty) return parts.first;
-
     return address.trim();
   }
 }

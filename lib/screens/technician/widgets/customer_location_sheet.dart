@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-/// Shows the customer's pinned location on a map so the technician can navigate to it.
 class CustomerLocationSheet extends StatefulWidget {
   final double latitude;
   final double longitude;
   final String customerName;
   final String address;
-
   const CustomerLocationSheet({
     super.key,
     required this.latitude,
@@ -17,22 +14,18 @@ class CustomerLocationSheet extends StatefulWidget {
     required this.customerName,
     required this.address,
   });
-
   @override
   State<CustomerLocationSheet> createState() => _CustomerLocationSheetState();
 }
-
 class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
   late final MapController _mapController;
   late final LatLng _customerLoc;
-
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
     _customerLoc = LatLng(widget.latitude, widget.longitude);
   }
-
   Future<void> _openInGoogleMaps() async {
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1&destination=${widget.latitude},${widget.longitude}&travelmode=driving',
@@ -41,7 +34,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -61,8 +53,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -93,8 +83,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Map
           Expanded(
             child: FlutterMap(
               mapController: _mapController,
@@ -147,8 +135,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
               ],
             ),
           ),
-
-          // Bottom action area
           Container(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
             decoration: const BoxDecoration(
@@ -160,7 +146,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Coordinates info
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -186,7 +171,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Navigate button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -214,7 +198,6 @@ class _CustomerLocationSheetState extends State<CustomerLocationSheet> {
       ),
     );
   }
-
   @override
   void dispose() {
     _mapController.dispose();

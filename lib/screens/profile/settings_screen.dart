@@ -2,33 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
-
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
-
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
-
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  // App Preferences
   bool _darkMode = false;
   String _language = 'English';
   String _currency = 'PHP (₱)';
-
-  // Display Settings
   bool _highContrast = false;
   String _fontSize = 'Medium';
-
-  // Booking Settings
   bool _autoConfirm = true;
   bool _locationServices = true;
   String _defaultServiceType = 'Same Day';
-
-  // Data & Storage
   bool _autoDownloadUpdates = true;
   bool _cacheEnabled = true;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,7 +47,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          // App Preferences Section
           const Text(
             'App Preferences',
             style: TextStyle(
@@ -102,8 +90,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Display Settings Section
           const Text(
             'Display Settings',
             style: TextStyle(
@@ -134,8 +120,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Booking Settings Section
           const Text(
             'Booking Settings',
             style: TextStyle(
@@ -176,8 +160,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Data & Storage Section
           const Text(
             'Data & Storage',
             style: TextStyle(
@@ -218,8 +200,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Advanced Settings Section
           const Text(
             'Advanced',
             style: TextStyle(
@@ -260,7 +240,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showLanguagePicker() {
     showModalBottomSheet(
       context: context,
@@ -303,7 +282,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showCurrencyPicker() {
     showModalBottomSheet(
       context: context,
@@ -343,7 +321,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showFontSizePicker() {
     showModalBottomSheet(
       context: context,
@@ -383,7 +360,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showServiceTypePicker() {
     showModalBottomSheet(
       context: context,
@@ -422,7 +398,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showClearCacheDialog() {
     showDialog(
       context: context,
@@ -451,7 +426,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
   void _showResetDialog() {
     showDialog(
       context: context,
@@ -493,12 +467,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 }
-
 class _SettingCard extends StatelessWidget {
   final List<Widget> children;
-
   const _SettingCard({required this.children});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -512,14 +483,12 @@ class _SettingCard extends StatelessWidget {
     );
   }
 }
-
 class _SwitchSetting extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   const _SwitchSetting({
     required this.icon,
     required this.title,
@@ -527,7 +496,6 @@ class _SwitchSetting extends StatelessWidget {
     required this.value,
     required this.onChanged,
   });
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -576,20 +544,17 @@ class _SwitchSetting extends StatelessWidget {
     );
   }
 }
-
 class _SelectSetting extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _SelectSetting({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -640,20 +605,17 @@ class _SelectSetting extends StatelessWidget {
     );
   }
 }
-
 class _ActionSetting extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _ActionSetting({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(

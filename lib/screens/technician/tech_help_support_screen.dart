@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/feedback_service.dart';
-
 class TechHelpSupportScreen extends ConsumerWidget {
   const TechHelpSupportScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -45,7 +42,6 @@ class TechHelpSupportScreen extends ConsumerWidget {
             subtitle: 'Contact FixIt support or browse resources for technicians.',
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Expanded(
@@ -74,7 +70,6 @@ class TechHelpSupportScreen extends ConsumerWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 22),
           const _SectionTitle('Contact'),
           const SizedBox(height: 10),
@@ -94,7 +89,6 @@ class TechHelpSupportScreen extends ConsumerWidget {
               }
             },
           ),
-
           const SizedBox(height: 22),
           const _SectionTitle('Resources'),
           const SizedBox(height: 10),
@@ -127,7 +121,6 @@ class TechHelpSupportScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const _TechVideoTutorialsScreen()),
             ),
           ),
-
           const SizedBox(height: 22),
           const _SectionTitle('Feedback'),
           const SizedBox(height: 10),
@@ -159,11 +152,9 @@ class TechHelpSupportScreen extends ConsumerWidget {
     );
   }
 }
-
 class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
-
   @override
   Widget build(BuildContext context) {
     return Text(
@@ -176,13 +167,10 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
-
 class _SupportHeroCard extends StatelessWidget {
   final String title;
   final String subtitle;
-
   const _SupportHeroCard({required this.title, required this.subtitle});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -249,14 +237,12 @@ class _SupportHeroCard extends StatelessWidget {
     );
   }
 }
-
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
-
   const _QuickActionCard({
     required this.icon,
     required this.title,
@@ -264,7 +250,6 @@ class _QuickActionCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -327,14 +312,12 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
 class _SupportOptionTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _SupportOptionTile({
     required this.icon,
     required this.iconColor,
@@ -342,7 +325,6 @@ class _SupportOptionTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -400,12 +382,8 @@ class _SupportOptionTile extends StatelessWidget {
     );
   }
 }
-
-// ─── FAQ Screen ───────────────────────────────────────────────────────────────
-
 class _TechFAQScreen extends StatelessWidget {
   const _TechFAQScreen();
-
   @override
   Widget build(BuildContext context) {
     final faqs = [
@@ -416,7 +394,6 @@ class _TechFAQScreen extends StatelessWidget {
       {'question': 'How do I set my location?', 'answer': 'In Edit Profile, tap the location field to open the map and pin your exact location.'},
       {'question': 'How are my ratings calculated?', 'answer': 'Your rating is the average of all ratings left by customers after completed jobs.'},
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -462,12 +439,8 @@ class _TechFAQScreen extends StatelessWidget {
     );
   }
 }
-
-// ─── Technician Guide Screen ──────────────────────────────────────────────────
-
 class _TechGuideScreen extends StatelessWidget {
   const _TechGuideScreen();
-
   @override
   Widget build(BuildContext context) {
     final sections = [
@@ -533,7 +506,6 @@ class _TechGuideScreen extends StatelessWidget {
         ],
       ),
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -615,20 +587,14 @@ class _TechGuideScreen extends StatelessWidget {
     );
   }
 }
-
 class _GuideSection {
   final IconData icon;
   final String title;
   final List<String> steps;
-
   const _GuideSection({required this.icon, required this.title, required this.steps});
 }
-
-// ─── Video Tutorials Screen ───────────────────────────────────────────────────
-
 class _TechVideoTutorialsScreen extends StatelessWidget {
   const _TechVideoTutorialsScreen();
-
   @override
   Widget build(BuildContext context) {
     final tutorials = [
@@ -639,7 +605,6 @@ class _TechVideoTutorialsScreen extends StatelessWidget {
       _VideoTutorial(icon: Icons.play_circle_fill, title: 'Completing a Job & Rating', duration: '1:50', description: 'How to mark a job complete and what happens after the customer rates you.', color: Colors.amber.shade700),
       _VideoTutorial(icon: Icons.play_circle_fill, title: 'Submitting a Support Ticket', duration: '2:00', description: 'Need help? Learn how to contact support and report issues.', color: AppTheme.errorColor),
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -713,34 +678,25 @@ class _TechVideoTutorialsScreen extends StatelessWidget {
     );
   }
 }
-
 class _VideoTutorial {
   final IconData icon;
   final String title;
   final String duration;
   final String description;
   final Color color;
-
   const _VideoTutorial({required this.icon, required this.title, required this.duration, required this.description, required this.color});
 }
-
-// ─── Feedback / Bug Report Form Screen ───────────────────────────────────────
-
 class _TechFeedbackFormScreen extends StatefulWidget {
   final String type;
   final WidgetRef ref;
-
   const _TechFeedbackFormScreen({required this.type, required this.ref});
-
   @override
   State<_TechFeedbackFormScreen> createState() => _TechFeedbackFormScreenState();
 }
-
 class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
   final _messageController = TextEditingController();
   int _selectedRating = 0;
   bool _submitting = false;
-
   bool get _isFeedback => widget.type == 'feedback';
   String get _title => _isFeedback ? 'Send Feedback' : 'Report a Bug';
   String get _subtitle => _isFeedback
@@ -748,13 +704,11 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
       : 'Let us know what went wrong so we can fix it';
   IconData get _icon => _isFeedback ? Icons.feedback : Icons.bug_report;
   Color get _accentColor => _isFeedback ? AppTheme.primaryCyan : AppTheme.errorColor;
-
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
   }
-
   Future<void> _submit() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) {
@@ -766,14 +720,11 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
       );
       return;
     }
-
     setState(() => _submitting = true);
-
     try {
       final user = widget.ref.read(currentUserProvider).valueOrNull;
       final userId = SupabaseConfig.client.auth.currentUser?.id ?? '';
       final userName = user?.fullName ?? user?.email ?? 'Unknown';
-
       await FeedbackService.submitFeedback(
         userId: userId,
         userName: userName,
@@ -781,7 +732,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
         message: message,
         rating: _isFeedback && _selectedRating > 0 ? _selectedRating : null,
       );
-
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -798,7 +748,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -817,7 +766,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -852,8 +800,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Rating (feedback only)
             if (_isFeedback) ...[
               Container(
                 width: double.infinity,
@@ -903,8 +849,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
               ),
               const SizedBox(height: 16),
             ],
-
-            // Message
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -946,7 +890,6 @@ class _TechFeedbackFormScreenState extends State<_TechFeedbackFormScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

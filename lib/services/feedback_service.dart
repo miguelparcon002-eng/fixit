@@ -1,5 +1,4 @@
 import '../core/config/supabase_config.dart';
-
 class FeedbackService {
   static Future<void> submitFeedback({
     required String userId,
@@ -17,7 +16,6 @@ class FeedbackService {
       'status': 'new',
     });
   }
-
   static Future<List<Map<String, dynamic>>> getAllFeedback() async {
     final response = await SupabaseConfig.client
         .from('user_feedback')
@@ -25,7 +23,6 @@ class FeedbackService {
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
-
   static Future<void> updateFeedbackStatus({
     required String feedbackId,
     required String status,

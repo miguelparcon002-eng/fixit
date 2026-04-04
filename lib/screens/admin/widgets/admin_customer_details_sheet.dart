@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../models/admin_customer_user.dart';
 import '../../../providers/admin_booking_provider.dart';
 import '../../../providers/admin_customers_provider.dart';
 import '../../../providers/admin_customer_actions_provider.dart';
-
 class AdminCustomerDetailsSheet extends ConsumerWidget {
   final AdminCustomerUser customer;
-
   const AdminCustomerDetailsSheet({super.key, required this.customer});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingsAsync = ref.watch(adminBookingsByCustomerProvider(customer.id));
-
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -80,7 +75,6 @@ class AdminCustomerDetailsSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 14),
-
               _Section(
                 title: 'Details',
                 child: Column(
@@ -104,7 +98,6 @@ class AdminCustomerDetailsSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
-
               _Section(
                 title: 'Recent bookings',
                 child: bookingsAsync.when(
@@ -153,7 +146,6 @@ class AdminCustomerDetailsSheet extends ConsumerWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -167,7 +159,6 @@ class AdminCustomerDetailsSheet extends ConsumerWidget {
                         );
                         ref.invalidate(adminCustomersProvider);
                         ref.invalidate(adminCustomerByIdProvider(customer.id));
-
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -226,12 +217,10 @@ class AdminCustomerDetailsSheet extends ConsumerWidget {
     );
   }
 }
-
 class _Section extends StatelessWidget {
   final String title;
   final Widget child;
   const _Section({required this.title, required this.child});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -260,12 +249,10 @@ class _Section extends StatelessWidget {
     );
   }
 }
-
 class _Row extends StatelessWidget {
   final String label;
   final String value;
   const _Row({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Padding(

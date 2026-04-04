@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/notification_icon_mapper.dart';
 import '../../../core/utils/time_ago.dart';
 import '../../../models/notification_model.dart';
 import '../../../providers/admin_notifications_provider.dart';
-
 class AdminNotificationsDialog extends ConsumerWidget {
   const AdminNotificationsDialog({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(adminNotificationsFeedProvider);
     final unreadCount = ref.watch(adminUnreadNotificationsCountProvider);
-
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
@@ -27,7 +23,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -77,7 +72,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
                 ],
               ),
             ),
-
             if (unreadCount > 0)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -90,8 +84,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
                   ),
                 ),
               ),
-
-            // Notifications List
             Expanded(
               child: feedAsync.when(
                 data: (items) {
@@ -118,7 +110,6 @@ class AdminNotificationsDialog extends ConsumerWidget {
                       ),
                     );
                   }
-
                   return ListView.builder(
                     padding: const EdgeInsets.all(20),
                     itemCount: items.length,
@@ -130,18 +121,13 @@ class AdminNotificationsDialog extends ConsumerWidget {
                           notification: notification,
                           onTap: () async {
                             final route = notification.route;
-
-                            // Close the dialog immediately (before async) so we don't
-                            // rely on dialog context after awaits.
                             final rootContext = context;
                             Navigator.of(rootContext).pop();
-
                             if (!notification.isRead) {
                               await ref
                                   .read(adminNotificationsServiceProvider)
                                   .markAsRead(notification.id);
                             }
-
                             if (route != null && route.isNotEmpty) {
                               if (rootContext.mounted) rootContext.go(route);
                             }
@@ -175,22 +161,18 @@ class AdminNotificationsDialog extends ConsumerWidget {
     );
   }
 }
-
 class _NotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
-
   const _NotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
   });
-
   @override
   Widget build(BuildContext context) {
     final mapped = mapNotificationIcon(notification.type);
-
     return Container(
       decoration: BoxDecoration(
         color: notification.isRead

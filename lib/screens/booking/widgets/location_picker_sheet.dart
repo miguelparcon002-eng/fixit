@@ -1,34 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-
-/// Result returned when customer confirms their pinned location.
 class PickedLocation {
   final LatLng latLng;
   final String label; // displayed address string
-
   const PickedLocation({required this.latLng, required this.label});
 }
-
-/// Bottom sheet where the customer taps the map to pin their exact location.
-/// Centered on San Francisco, Agusan del Sur by default.
 class LocationPickerSheet extends StatefulWidget {
-  /// Pre-fill with an existing pin if the customer already set one.
   final LatLng? initialLocation;
-
   const LocationPickerSheet({super.key, this.initialLocation});
-
   @override
   State<LocationPickerSheet> createState() => _LocationPickerSheetState();
 }
-
 class _LocationPickerSheetState extends State<LocationPickerSheet> {
   static const LatLng _sfCenter = LatLng(8.5048, 125.9676);
-
   late final MapController _mapController;
   late final TextEditingController _addressController;
   LatLng? _pickedLocation;
-
   @override
   void initState() {
     super.initState();
@@ -36,17 +24,14 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
     _pickedLocation = widget.initialLocation;
     _addressController = TextEditingController();
   }
-
   @override
   void dispose() {
     _mapController.dispose();
     _addressController.dispose();
     super.dispose();
   }
-
   String _formatLatLng(LatLng loc) =>
       '${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}';
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -58,7 +43,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       child: Column(
         children: [
           const SizedBox(height: 12),
-          // Handle
           Container(
             width: 40, height: 4,
             decoration: BoxDecoration(
@@ -67,8 +51,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -94,8 +76,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Map
           Expanded(
             child: Stack(
               children: [
@@ -138,7 +118,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
                       ),
                   ],
                 ),
-                // Center crosshair hint when nothing is pinned yet
                 if (_pickedLocation == null)
                   const Center(
                     child: Column(
@@ -154,8 +133,6 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
               ],
             ),
           ),
-
-          // Bottom confirm area
           Container(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
             decoration: const BoxDecoration(
@@ -240,5 +217,4 @@ class _LocationPickerSheetState extends State<LocationPickerSheet> {
       ),
     );
   }
-
 }

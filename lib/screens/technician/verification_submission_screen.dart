@@ -10,20 +10,16 @@ import '../../providers/verification_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'tech_profile_screen.dart' show availableSpecialties;
 import 'package:go_router/go_router.dart';
-
 class VerificationSubmissionScreen extends ConsumerStatefulWidget {
   const VerificationSubmissionScreen({super.key});
-
   @override
   ConsumerState<VerificationSubmissionScreen> createState() =>
       _VerificationSubmissionScreenState();
 }
-
 class _VerificationSubmissionScreenState
     extends ConsumerState<VerificationSubmissionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _picker = ImagePicker();
-
   final _fullNameController = TextEditingController();
   final _contactNumberController = TextEditingController();
   final _addressController = TextEditingController();
@@ -31,7 +27,6 @@ class _VerificationSubmissionScreenState
   int _expMonths = 0;
   final _shopNameController = TextEditingController();
   final _bioController = TextEditingController();
-
   final Map<String, Uint8List?> _documents = {
     'Government ID (Front)': null,
     'Government ID (Back)': null,
@@ -39,23 +34,17 @@ class _VerificationSubmissionScreenState
     'Business Permit (Optional)': null,
     'Proof of Technical Training': null,
   };
-
   final Set<String> _selectedSpecialties = {};
   bool _isSubmitting = false;
   bool _isLeavingDialogOpen = false;
   bool _isEditingPending = false;
   LatLng? _pinnedLocation;
-
-  // Step tracking: 0 = Personal, 1 = Professional, 2 = Documents
   int _currentStep = 0;
-
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
   }
-
   Future<void> _loadUserData() async {
     final user = await ref.read(currentUserProvider.future);
     if (user != null) {
@@ -63,8 +52,6 @@ class _VerificationSubmissionScreenState
       _contactNumberController.text = user.contactNumber ?? '';
       _addressController.text = user.address ?? '';
     }
-
-    // Also pre-fill from existing verification request if available
     final verificationReq = await ref.read(userVerificationRequestProvider.future);
     if (verificationReq != null && mounted) {
       setState(() {
@@ -95,7 +82,6 @@ class _VerificationSubmissionScreenState
       });
     }
   }
-
   @override
   void dispose() {
     _fullNameController.dispose();
@@ -105,7 +91,6 @@ class _VerificationSubmissionScreenState
     _bioController.dispose();
     super.dispose();
   }
-
   Future<void> _pickDocument(String documentType) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -126,17 +111,14 @@ class _VerificationSubmissionScreenState
       }
     }
   }
-
   Future<void> _submitVerification() async {
     if (!_formKey.currentState!.validate()) return;
-
     final requiredDocs = [
       'Government ID (Front)',
       'Government ID (Back)',
       'Professional License/Certification',
       'Proof of Technical Training',
     ];
-
     for (final doc in requiredDocs) {
       if (_documents[doc] == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -148,7 +130,6 @@ class _VerificationSubmissionScreenState
         return;
       }
     }
-
     if (_expYears == 0 && _expMonths == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -158,7 +139,6 @@ class _VerificationSubmissionScreenState
       );
       return;
     }
-
     if (_selectedSpecialties.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -168,16 +148,12 @@ class _VerificationSubmissionScreenState
       );
       return;
     }
-
     setState(() => _isSubmitting = true);
-
     try {
       final user = await ref.read(currentUserProvider.future);
       if (user == null) throw Exception('User not found');
-
       final verificationService = ref.read(verificationServiceProvider);
       final documentUrls = <String>[];
-
       for (final entry in _documents.entries) {
         if (entry.value != null) {
           final url = await verificationService.uploadDocument(
@@ -188,7 +164,6 @@ class _VerificationSubmissionScreenState
           documentUrls.add(url);
         }
       }
-
       await verificationService.submitVerificationRequest(
         userId: user.id,
         documentUrls: documentUrls,
@@ -201,7 +176,6 @@ class _VerificationSubmissionScreenState
         bio: _bioController.text,
         specialties: _selectedSpecialties.toList(),
       );
-
       if (mounted) {
         await showDialog(
           context: context,
@@ -290,8 +264,6 @@ class _VerificationSubmissionScreenState
             ),
           ),
         );
-
-        // Refresh verification state so the banner updates immediately
         ref.invalidate(userVerificationRequestProvider);
         if (mounted) context.go('/tech-home');
       }
@@ -308,7 +280,6 @@ class _VerificationSubmissionScreenState
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
-
   Future<void> _onBackPressed() async {
     if (_isLeavingDialogOpen) return;
     _isLeavingDialogOpen = true;
@@ -341,14 +312,12 @@ class _VerificationSubmissionScreenState
       context.pop();
     }
   }
-
   int get _uploadedRequiredCount => [
         'Government ID (Front)',
         'Government ID (Back)',
         'Professional License/Certification',
         'Proof of Technical Training',
       ].where((d) => _documents[d] != null).length;
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -362,7 +331,6 @@ class _VerificationSubmissionScreenState
           key: _formKey,
           child: CustomScrollView(
             slivers: [
-              // ── Gradient App Bar ──────────────────────────────────────
               SliverAppBar(
                 expandedHeight: 160,
                 pinned: true,
@@ -427,38 +395,27 @@ class _VerificationSubmissionScreenState
                   ),
                 ),
               ),
-
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Step Progress Bar ─────────────────────────────
                       _StepProgressBar(currentStep: _currentStep),
                       const SizedBox(height: 20),
-
-                      // ── Step 0: Personal Info ─────────────────────────
                       _AnimatedStep(
                         visible: _currentStep == 0,
                         child: _buildPersonalInfoStep(),
                       ),
-
-                      // ── Step 1: Professional Info ─────────────────────
                       _AnimatedStep(
                         visible: _currentStep == 1,
                         child: _buildProfessionalInfoStep(),
                       ),
-
-                      // ── Step 2: Documents ─────────────────────────────
                       _AnimatedStep(
                         visible: _currentStep == 2,
                         child: _buildDocumentsStep(),
                       ),
-
                       const SizedBox(height: 24),
-
-                      // ── Navigation Buttons ────────────────────────────
                       _buildNavButtons(),
                       const SizedBox(height: 32),
                     ],
@@ -471,8 +428,6 @@ class _VerificationSubmissionScreenState
       ),
     );
   }
-
-  // ── Step 0: Personal Info ────────────────────────────────────────────────
   Widget _buildPersonalInfoStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,18 +469,14 @@ class _VerificationSubmissionScreenState
       ],
     );
   }
-
   void _showMapPicker() {
-    // San Francisco, Agusan del Sur
     const sanFrancisco = LatLng(8.5069, 125.9728);
-    // Bounds roughly enclosing San Francisco municipality
     final sfBounds = LatLngBounds(
       const LatLng(8.3500, 125.8000), // SW
       const LatLng(8.6500, 126.1500), // NE
     );
     LatLng currentPin = _pinnedLocation ?? sanFrancisco;
     final mapController = MapController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -539,7 +490,6 @@ class _VerificationSubmissionScreenState
           ),
           child: Column(
             children: [
-              // Handle
               Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
                 width: 40,
@@ -549,7 +499,6 @@ class _VerificationSubmissionScreenState
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
@@ -582,7 +531,6 @@ class _VerificationSubmissionScreenState
                   ],
                 ),
               ),
-              // Map
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(0),
@@ -621,7 +569,6 @@ class _VerificationSubmissionScreenState
                   ),
                 ),
               ),
-              // Coordinates display
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Container(
@@ -647,7 +594,6 @@ class _VerificationSubmissionScreenState
                   ),
                 ),
               ),
-              // Confirm button
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                 child: SizedBox(
@@ -677,8 +623,6 @@ class _VerificationSubmissionScreenState
       ),
     );
   }
-
-  // ── Step 1: Professional Info ────────────────────────────────────────────
   Widget _buildProfessionalInfoStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -689,7 +633,6 @@ class _VerificationSubmissionScreenState
           subtitle: 'Tell us about your expertise',
         ),
         const SizedBox(height: 16),
-        // Experience picker — years + months
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -725,7 +668,6 @@ class _VerificationSubmissionScreenState
               const SizedBox(height: 12),
               Row(
                 children: [
-                  // Years dropdown
                   Expanded(
                     child: DropdownButtonFormField<int>(
                       initialValue: _expYears,
@@ -756,7 +698,6 @@ class _VerificationSubmissionScreenState
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // Months dropdown
                   Expanded(
                     child: DropdownButtonFormField<int>(
                       initialValue: _expMonths,
@@ -826,8 +767,6 @@ class _VerificationSubmissionScreenState
       ],
     );
   }
-
-  // ── Step 2: Documents ────────────────────────────────────────────────────
   Widget _buildDocumentsStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,7 +777,6 @@ class _VerificationSubmissionScreenState
           subtitle: 'Upload clear photos of each document',
         ),
         const SizedBox(height: 8),
-        // Upload progress indicator
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -877,8 +815,6 @@ class _VerificationSubmissionScreenState
       ],
     );
   }
-
-  // ── Specialties Section ──────────────────────────────────────────────────
   Widget _buildSpecialtiesSection() {
     return Wrap(
       spacing: 8,
@@ -942,12 +878,9 @@ class _VerificationSubmissionScreenState
       }).toList(),
     );
   }
-
-  // ── Navigation Buttons ───────────────────────────────────────────────────
   Widget _buildNavButtons() {
     final isLast = _currentStep == 2;
     final isFirst = _currentStep == 0;
-
     return Row(
       children: [
         if (!isFirst)
@@ -1019,12 +952,9 @@ class _VerificationSubmissionScreenState
     );
   }
 }
-
-// ── Step Progress Bar ────────────────────────────────────────────────────────
 class _StepProgressBar extends StatelessWidget {
   final int currentStep;
   const _StepProgressBar({required this.currentStep});
-
   @override
   Widget build(BuildContext context) {
     final steps = ['Personal', 'Professional', 'Documents'];
@@ -1108,15 +1038,12 @@ class _StepProgressBar extends StatelessWidget {
     );
   }
 }
-
-// ── Section Header ───────────────────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   const _SectionHeader(
       {required this.icon, required this.title, required this.subtitle});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1147,8 +1074,6 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 }
-
-// ── Modern Text Field ────────────────────────────────────────────────────────
 class _ModernField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -1157,7 +1082,6 @@ class _ModernField extends StatelessWidget {
   final int maxLines;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
-
   const _ModernField({
     required this.controller,
     required this.label,
@@ -1167,7 +1091,6 @@ class _ModernField extends StatelessWidget {
     this.keyboardType,
     this.validator,
   });
-
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -1213,21 +1136,17 @@ class _ModernField extends StatelessWidget {
     );
   }
 }
-
-// ── Document Upload Card ─────────────────────────────────────────────────────
 class _DocumentCard extends StatelessWidget {
   final String documentType;
   final Uint8List? imageBytes;
   final bool isRequired;
   final VoidCallback onTap;
-
   const _DocumentCard({
     required this.documentType,
     required this.imageBytes,
     required this.isRequired,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     final isUploaded = imageBytes != null;
@@ -1257,7 +1176,6 @@ class _DocumentCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Thumbnail or icon
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: isUploaded
@@ -1349,19 +1267,15 @@ class _DocumentCard extends StatelessWidget {
     );
   }
 }
-
-// ── Pin Location Card ────────────────────────────────────────────────────────
 class _PinLocationCard extends StatelessWidget {
   final LatLng? pinnedLocation;
   final VoidCallback onTap;
   final VoidCallback onClear;
-
   const _PinLocationCard({
     required this.pinnedLocation,
     required this.onTap,
     required this.onClear,
   });
-
   @override
   Widget build(BuildContext context) {
     final isPinned = pinnedLocation != null;
@@ -1463,13 +1377,10 @@ class _PinLocationCard extends StatelessWidget {
     );
   }
 }
-
-// ── Animated Step Wrapper ────────────────────────────────────────────────────
 class _AnimatedStep extends StatelessWidget {
   final bool visible;
   final Widget child;
   const _AnimatedStep({required this.visible, required this.child});
-
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(

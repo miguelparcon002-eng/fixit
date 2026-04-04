@@ -4,16 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../models/booking_model.dart';
 import '../../models/job_request_model.dart';
 import '../../providers/booking_provider.dart';
 import '../../providers/job_request_provider.dart';
-
-// ── Status helpers (shared across the whole screen) ──────────────────────────
-
 String _statusLabel(String status) => switch (status) {
       'open' || 'pending_customer_approval' => 'Requesting',
       'accepted' => 'Active',
@@ -21,7 +17,6 @@ String _statusLabel(String status) => switch (status) {
       'cancelled' => 'Cancelled',
       _ => status,
     };
-
 Color _statusColor(String status) => switch (status) {
       'open' || 'pending_customer_approval' => AppTheme.warningColor,
       'accepted' => AppTheme.lightBlue,
@@ -29,7 +24,6 @@ Color _statusColor(String status) => switch (status) {
       'cancelled' => AppTheme.textSecondaryColor,
       _ => Colors.purple,
     };
-
 IconData _statusIcon(String status) => switch (status) {
       'open' || 'pending_customer_approval' => Icons.search_rounded,
       'accepted' => Icons.build_rounded,
@@ -37,8 +31,6 @@ IconData _statusIcon(String status) => switch (status) {
       'cancelled' => Icons.cancel_rounded,
       _ => Icons.help_outline,
     };
-
-// Normalise to the 4 display buckets (raw status only — no booking join)
 String _bucket(String status) => switch (status) {
       'open' || 'pending_customer_approval' => 'requesting',
       'accepted' => 'active',
@@ -46,76 +38,53 @@ String _bucket(String status) => switch (status) {
       'cancelled' => 'cancelled',
       _ => 'other',
     };
-
-/// Derives the accurate display bucket for a job_request by cross-checking
-/// the most-recent post_problem booking for the same customer+tech pair.
-/// For non-accepted statuses the raw bucket is used unchanged.
 String _derivedBucket(JobRequestModel jr, List<BookingModel> bookings) {
   if (jr.status != 'accepted') return _bucket(jr.status);
-
-  // Find the most recent post_problem booking for this customer+technician pair
   final relevant = bookings
       .where((b) => b.customerId == jr.customerId && b.technicianId == jr.technicianId)
       .toList()
     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
   if (relevant.isEmpty) return 'active'; // booking not yet created — just accepted
-
   final latestStatus = relevant.first.status;
-
   const activeStatuses = {'accepted', 'scheduled', 'en_route', 'arrived', 'in_progress'};
   if (activeStatuses.contains(latestStatus)) return 'active';
-
   const doneStatuses = {'completed', 'paid', 'closed'};
   if (doneStatuses.contains(latestStatus)) return 'completed';
-
   return 'cancelled'; // cancelled / cancellation_pending
 }
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
 class AdminJobRequestsScreen extends ConsumerStatefulWidget {
   const AdminJobRequestsScreen({super.key});
-
   @override
   ConsumerState<AdminJobRequestsScreen> createState() =>
       _AdminJobRequestsScreenState();
 }
-
 class _AdminJobRequestsScreenState
     extends ConsumerState<AdminJobRequestsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   String? _filter; // null = all
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Fix any job_requests that are stuck at 'accepted' due to bookings that
-    // were completed/cancelled before the forward-sync was in place.
     Future.microtask(
       () => ref.read(jobRequestServiceProvider).syncStaleStatuses(),
     );
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   List<JobRequestModel> _filtered(
       List<JobRequestModel> all, List<BookingModel> bookings) {
     if (_filter == null) return all;
     return all.where((r) => _derivedBucket(r, bookings) == _filter).toList();
   }
-
   @override
   Widget build(BuildContext context) {
     final requestsAsync = ref.watch(allJobRequestsProvider);
     final bookings = ref.watch(allPostProblemBookingsProvider).valueOrNull ?? [];
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -176,20 +145,14 @@ class _AdminJobRequestsScreenState
             cancelled:  all.where((r) => _derivedBucket(r, bookings) == 'cancelled').length,
           );
           final filtered = _filtered(all, bookings);
-
           return Column(
             children: [
-              // ── Stats bar ─────────────────────────────────────────────────
               _StatsBar(stats: stats),
-
-              // ── Filter chips ──────────────────────────────────────────────
               _FilterRow(
                 selected: _filter,
                 stats: stats,
                 onChanged: (v) => setState(() => _filter = v),
               ),
-
-              // ── Tabs ──────────────────────────────────────────────────────
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -206,9 +169,6 @@ class _AdminJobRequestsScreenState
     );
   }
 }
-
-// ── Stats model ───────────────────────────────────────────────────────────────
-
 class _Stats {
   final int requesting, active, completed, cancelled;
   const _Stats(
@@ -218,13 +178,9 @@ class _Stats {
       required this.cancelled});
   int get total => requesting + active + completed + cancelled;
 }
-
-// ── Stats bar ─────────────────────────────────────────────────────────────────
-
 class _StatsBar extends StatelessWidget {
   final _Stats stats;
   const _StatsBar({required this.stats});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -244,13 +200,11 @@ class _StatsBar extends StatelessWidget {
     );
   }
 }
-
 class _StatPill extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
   const _StatPill({required this.label, required this.value, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -281,16 +235,12 @@ class _StatPill extends StatelessWidget {
     );
   }
 }
-
-// ── Filter chips ──────────────────────────────────────────────────────────────
-
 class _FilterRow extends StatelessWidget {
   final String? selected;
   final _Stats stats;
   final ValueChanged<String?> onChanged;
   const _FilterRow(
       {required this.selected, required this.stats, required this.onChanged});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -340,7 +290,6 @@ class _FilterRow extends StatelessWidget {
     );
   }
 }
-
 class _Chip extends StatelessWidget {
   final String label;
   final int count;
@@ -353,7 +302,6 @@ class _Chip extends StatelessWidget {
       required this.color,
       required this.selected,
       required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -400,19 +348,14 @@ class _Chip extends StatelessWidget {
     );
   }
 }
-
-// ── Map tab ───────────────────────────────────────────────────────────────────
-
 class _MapTab extends StatelessWidget {
   final List<JobRequestModel> requests;
   const _MapTab({required this.requests});
-
   @override
   Widget build(BuildContext context) {
     final center = requests.isNotEmpty
         ? LatLng(requests.first.latitude, requests.first.longitude)
         : const LatLng(8.5048, 125.9676);
-
     return Stack(
       children: [
         FlutterMap(
@@ -437,8 +380,6 @@ class _MapTab extends StatelessWidget {
             ),
           ],
         ),
-
-        // Empty state overlay
         if (requests.isEmpty)
           Center(
             child: Container(
@@ -466,15 +407,11 @@ class _MapTab extends StatelessWidget {
               ),
             ),
           ),
-
-        // Legend
         Positioned(
           bottom: 20,
           right: 14,
           child: _MapLegend(),
         ),
-
-        // Tap-hint
         if (requests.isNotEmpty)
           Positioned(
             top: 12,
@@ -501,7 +438,6 @@ class _MapTab extends StatelessWidget {
       ],
     );
   }
-
   void _showDetail(BuildContext context, JobRequestModel r) {
     showModalBottomSheet(
       context: context,
@@ -511,16 +447,13 @@ class _MapTab extends StatelessWidget {
     );
   }
 }
-
 class _MapPin extends StatelessWidget {
   final String status;
   const _MapPin({required this.status});
-
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
     final icon = _statusIcon(status);
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -557,10 +490,8 @@ class _MapPin extends StatelessWidget {
     );
   }
 }
-
 class _MapLegend extends StatelessWidget {
   const _MapLegend();
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -598,13 +529,11 @@ class _MapLegend extends StatelessWidget {
     );
   }
 }
-
 class _LegendRow extends StatelessWidget {
   final Color color;
   final IconData icon;
   final String label;
   const _LegendRow({required this.color, required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -623,13 +552,9 @@ class _LegendRow extends StatelessWidget {
     );
   }
 }
-
-// ── List tab ──────────────────────────────────────────────────────────────────
-
 class _ListTab extends StatelessWidget {
   final List<JobRequestModel> requests;
   const _ListTab({required this.requests});
-
   @override
   Widget build(BuildContext context) {
     if (requests.isEmpty) {
@@ -648,7 +573,6 @@ class _ListTab extends StatelessWidget {
         ),
       );
     }
-
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       itemCount: requests.length,
@@ -657,18 +581,15 @@ class _ListTab extends StatelessWidget {
     );
   }
 }
-
 class _ListCard extends ConsumerWidget {
   final JobRequestModel request;
   const _ListCard({required this.request});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _statusColor(request.status);
     final label = _statusLabel(request.status);
     final icon = _statusIcon(request.status);
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
-
     return GestureDetector(
       onTap: () => showModalBottomSheet(
         context: context,
@@ -689,7 +610,6 @@ class _ListCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // Colored left bar
             Container(
               width: 5,
               height: double.infinity,
@@ -700,8 +620,6 @@ class _ListCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-
-            // Status icon
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -711,8 +629,6 @@ class _ListCard extends ConsumerWidget {
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 12),
-
-            // Content
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -797,13 +713,9 @@ class _ListCard extends ConsumerWidget {
     );
   }
 }
-
-// ── Detail sheet ──────────────────────────────────────────────────────────────
-
 class _DetailSheet extends ConsumerWidget {
   final JobRequestModel request;
   const _DetailSheet({required this.request});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _statusColor(request.status);
@@ -813,7 +725,6 @@ class _DetailSheet extends ConsumerWidget {
     final timeFmt = DateFormat('h:mm a');
     final isActionable =
         request.status == 'open' || request.status == 'pending_customer_approval' || request.status == 'accepted';
-
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,
@@ -828,7 +739,6 @@ class _DetailSheet extends ConsumerWidget {
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
-            // Drag handle
             Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
@@ -839,8 +749,6 @@ class _DetailSheet extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(2)),
               ),
             ),
-
-            // ── Header ────────────────────────────────────────────────────
             Row(
               children: [
                 Container(
@@ -895,12 +803,9 @@ class _DetailSheet extends ConsumerWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
             Divider(color: Colors.grey.shade100, height: 1),
             const SizedBox(height: 20),
-
-            // ── Problem ───────────────────────────────────────────────────
             _SheetSection(
               title: 'Problem Description',
               icon: Icons.report_problem_outlined,
@@ -912,8 +817,6 @@ class _DetailSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-
-            // ── Location ──────────────────────────────────────────────────
             _SheetSection(
               title: 'Location',
               icon: Icons.location_on_outlined,
@@ -936,8 +839,6 @@ class _DetailSheet extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-
-            // ── People ────────────────────────────────────────────────────
             _SheetSection(
               title: 'People',
               icon: Icons.people_outline,
@@ -986,8 +887,6 @@ class _DetailSheet extends ConsumerWidget {
                 ],
               ),
             ),
-
-            // ── Status note ───────────────────────────────────────────────
             if (request.status == 'pending_customer_approval') ...[
               const SizedBox(height: 16),
               Container(
@@ -1015,8 +914,6 @@ class _DetailSheet extends ConsumerWidget {
                 ),
               ),
             ],
-
-            // ── Admin action ──────────────────────────────────────────────
             if (isActionable) ...[
               const SizedBox(height: 24),
               SizedBox(
@@ -1041,7 +938,6 @@ class _DetailSheet extends ConsumerWidget {
       ),
     );
   }
-
   Future<void> _confirmCancel(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1077,7 +973,6 @@ class _DetailSheet extends ConsumerWidget {
     }
   }
 }
-
 class _SheetSection extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -1088,7 +983,6 @@ class _SheetSection extends StatelessWidget {
       required this.icon,
       required this.color,
       required this.child});
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1121,7 +1015,6 @@ class _SheetSection extends StatelessWidget {
     );
   }
 }
-
 class _PersonRow extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -1132,7 +1025,6 @@ class _PersonRow extends StatelessWidget {
       required this.icon,
       required this.id,
       required this.color});
-
   @override
   Widget build(BuildContext context) {
     final shortId = id.length > 16 ? '${id.substring(0, 16)}…' : id;

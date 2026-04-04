@@ -1,34 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../services/distance_fee_service.dart';
-
 class AdminDistanceFeeScreen extends StatefulWidget {
   const AdminDistanceFeeScreen({super.key});
-
   @override
   State<AdminDistanceFeeScreen> createState() => _AdminDistanceFeeScreenState();
 }
-
 class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
   final _controller = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   double _currentRate = 5.0;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   Future<void> _load() async {
     final rate = await DistanceFeeService.getRate();
     if (!mounted) return;
@@ -38,7 +31,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
       _loading = false;
     });
   }
-
   Future<void> _save() async {
     final input = double.tryParse(_controller.text.trim());
     if (input == null || input <= 0) {
@@ -50,7 +42,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
       );
       return;
     }
-
     setState(() => _saving = true);
     try {
       await DistanceFeeService.setRate(input);
@@ -73,7 +64,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,7 +91,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Info banner
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -125,8 +114,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Current rate card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -195,8 +182,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
                     ),
                   ),
                   const SizedBox(height: 28),
-
-                  // Edit section
                   const Text(
                     'Set New Rate',
                     style: TextStyle(
@@ -233,7 +218,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
                           onChanged: (_) => setState(() {}),
                         ),
                         const SizedBox(height: 12),
-                        // Live preview
                         if (_controller.text.isNotEmpty)
                           Builder(builder: (context) {
                             final preview = double.tryParse(_controller.text.trim());
@@ -269,8 +253,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Quick preset buttons
                   const Text(
                     'Quick Presets',
                     style: TextStyle(
@@ -313,8 +295,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 32),
-
-                  // Save button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -350,7 +330,6 @@ class _AdminDistanceFeeScreenState extends State<AdminDistanceFeeScreen> {
             ),
     );
   }
-
   Widget _previewRow(String label, double fee) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),

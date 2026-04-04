@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -20,25 +19,19 @@ import '../../models/redeemed_voucher.dart';
 import '../../providers/rewards_provider.dart';
 import '../../widgets/job_status_tracker.dart';
 import '../../core/utils/booking_notes_parser.dart';
-
-// ─── Filter model ─────────────────────────────────────────────────────────────
-
 class _BookingFilter {
   final Set<String> statuses; // empty = all
   final DateTime? fromDate;
   final DateTime? toDate;
   final _SortOrder sort;
-
   const _BookingFilter({
     this.statuses = const {},
     this.fromDate,
     this.toDate,
     this.sort = _SortOrder.newest,
   });
-
   bool get isActive =>
       statuses.isNotEmpty || fromDate != null || toDate != null;
-
   _BookingFilter copyWith({
     Set<String>? statuses,
     DateTime? fromDate,
@@ -55,24 +48,16 @@ class _BookingFilter {
     );
   }
 }
-
 enum _SortOrder { newest, oldest }
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
-
 class BookingListScreen extends ConsumerStatefulWidget {
   const BookingListScreen({super.key});
-
   @override
   ConsumerState<BookingListScreen> createState() => _BookingListScreenState();
 }
-
 enum _CustomerBookingsTab { upcoming, active, complete, all }
-
 class _BookingListScreenState extends ConsumerState<BookingListScreen> {
   _CustomerBookingsTab _selectedTab = _CustomerBookingsTab.upcoming;
   _BookingFilter _filter = const _BookingFilter();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,7 +123,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Widget _buildActiveFilterBanner() {
     final parts = <String>[];
     if (_filter.statuses.isNotEmpty) {
@@ -150,7 +134,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
     if (_filter.toDate != null) {
       parts.add('To ${DateFormat('MMM d').format(_filter.toDate!)}');
     }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Row(
@@ -184,7 +167,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Widget _buildTabs() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -223,10 +205,8 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Widget _buildBookingsList() {
     final bookingsAsync = ref.watch(customerBookingsProvider);
-
     if (_selectedTab == _CustomerBookingsTab.upcoming) {
       final user = ref.watch(currentUserProvider).valueOrNull;
       final requestsAsync = user != null
@@ -245,7 +225,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         ),
       );
     }
-
     return RefreshIndicator(
       color: AppTheme.deepBlue,
       onRefresh: () async {
@@ -259,13 +238,11 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Widget _buildUpcomingContent(List<BookingModel> allBookings, List<JobRequestModel> requests) {
     final upcomingBookings = allBookings.where((b) => b.status == 'requested').toList();
     final activeRequests = requests
         .where((r) => r.status == 'open' || r.status == 'pending_customer_approval')
         .toList();
-
     if (upcomingBookings.isEmpty && activeRequests.isEmpty) {
       return _buildEmptyState(
         Icons.calendar_today_outlined,
@@ -273,9 +250,7 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         null,
       );
     }
-
     final hasBoth = activeRequests.isNotEmpty && upcomingBookings.isNotEmpty;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
@@ -297,7 +272,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ],
     );
   }
-
   Widget _buildListSectionLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 4),
@@ -312,7 +286,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   void _showRequestSheet(JobRequestModel request) {
     showModalBottomSheet(
       context: context,
@@ -321,7 +294,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       builder: (_) => _JobRequestDetailSheet(request: request),
     );
   }
-
   Widget _buildError(String error) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
@@ -362,13 +334,10 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ],
     );
   }
-
   Widget _buildBookingsContent(List<BookingModel> allBookings) {
-    // 1. Tab filter
     List<BookingModel> filteredBookings;
     String emptyMessage;
     IconData emptyIcon;
-
     switch (_selectedTab) {
       case _CustomerBookingsTab.upcoming:
         filteredBookings = allBookings.where((b) => b.status == 'requested').toList();
@@ -394,8 +363,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         emptyIcon = Icons.inbox_outlined;
         break;
     }
-
-    // 2. Advanced filter
     if (_filter.statuses.isNotEmpty) {
       filteredBookings = filteredBookings.where((b) => _filter.statuses.contains(b.status)).toList();
     }
@@ -413,8 +380,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         return !d.isAfter(to);
       }).toList();
     }
-
-    // 3. Sort
     filteredBookings.sort((a, b) {
       final aDate = a.scheduledDate ?? a.createdAt;
       final bDate = b.scheduledDate ?? b.createdAt;
@@ -423,7 +388,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       }
       return bDate.compareTo(aDate);
     });
-
     if (filteredBookings.isEmpty) {
       final hasFilter = _filter.isActive;
       return _buildEmptyState(
@@ -432,7 +396,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         hasFilter ? 'Try adjusting or clearing your filter.' : null,
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: filteredBookings.length,
@@ -442,7 +405,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Widget _buildEmptyState(IconData icon, String message, [String? subtitle]) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
@@ -485,14 +447,12 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ],
     );
   }
-
   Widget _buildBookingCard(BookingModel booking) {
     final (statusColor, displayStatus) = _getBookingStatus(booking.status);
     final isCompleted = booking.status == 'paid' || booking.status == 'closed';
     final points = isCompleted ? ((booking.finalCost ?? booking.estimatedCost ?? 0.0) / 50).floor() : null;
     final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
     final currentUser = ref.watch(currentUserProvider).value;
-
     return _BookingCard(
       bookingId: booking.id,
       technicianId: booking.technicianId,
@@ -514,19 +474,13 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       onUseVoucher: () => _showVoucherDialog(context, booking),
     );
   }
-
   void _showBookingSheet(BuildContext context, BookingModel booking) {
     final (statusColor, displayStatus) = _getBookingStatus(booking.status);
-    // isActive = show pay button (status 'completed' = job done, awaiting payment)
     final isActive = booking.status == 'completed';
-    // isCompleted = show rate/book-again actions (payment confirmed or job closed)
     final isCompleted = booking.status == 'paid' || booking.status == 'closed';
-    // Use finalCost (technician-adjusted price) if set, otherwise use estimate.
-    // This ensures the customer pays the correct adjusted amount.
     final amount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
     final points = isCompleted ? (amount / 50).floor() : null;
     final currentUser = ref.read(currentUserProvider).value;
-
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -559,12 +513,9 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Future<void> _showVoucherDialog(BuildContext context, BookingModel booking) async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
-
-    // Check if a voucher has already been applied to this booking
     final existing = await SupabaseConfig.client
         .from('user_redeemed_vouchers')
         .select('id')
@@ -580,19 +531,15 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       );
       return;
     }
-
     final voucherService = ref.read(redeemedVoucherServiceProvider);
     final vouchers = await voucherService.getUnusedVouchers(user.id);
-
     if (!context.mounted) return;
-
     if (vouchers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You have no available vouchers.')),
       );
       return;
     }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -631,8 +578,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
               voucher: voucher,
               onApply: () async {
                 Navigator.pop(context);
-
-                // Calculate discounted price
                 final currentAmount = booking.finalCost ?? booking.estimatedCost ?? 0.0;
                 final double newAmount;
                 if (voucher.discountType == 'percentage') {
@@ -640,13 +585,10 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                 } else {
                   newAmount = (currentAmount - voucher.discountAmount).clamp(0, double.infinity);
                 }
-
-                // Apply discount to booking in Supabase
                 await SupabaseConfig.client
                     .from('bookings')
                     .update({'final_cost': newAmount})
                     .eq('id', booking.id);
-
                 await voucherService.markVoucherAsUsed(voucherId: voucher.id, bookingId: booking.id);
                 ref.invalidate(redeemedVouchersProvider);
                 ref.invalidate(customerBookingsProvider);
@@ -665,12 +607,9 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   Future<void> _showRatingDialogFor(BuildContext context, BookingModel booking, String customerName) async {
     int rating = 0;
     final reviewController = TextEditingController();
-
-    // Fetch technician name directly from Supabase to guarantee it's loaded
     String technicianName = 'Technician';
     try {
       final row = await SupabaseConfig.client
@@ -680,12 +619,9 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
           .single();
       technicianName = row['full_name'] as String? ?? 'Technician';
     } catch (_) {
-      // Fallback to cached provider value if Supabase fetch fails
       technicianName = ref.read(userByIdProvider(booking.technicianId)).value?.fullName ?? 'Technician';
     }
-
     if (!context.mounted) return;
-
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -748,7 +684,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                   device: 'Device',
                   bookingId: booking.id,
                 );
-                // Save rating with technician_id so Supabase trigger auto-updates stats
                 try {
                   await SupabaseConfig.client.from('app_ratings').insert({
                     'customer_name': customerName,
@@ -761,11 +696,8 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                     'device': 'Device',
                   });
                 } catch (_) {
-                  // Fallback: insert without technician_id if column doesn't exist yet
                   await ref.read(ratingsProvider.notifier).addRating(newRating);
                 }
-
-                // Also write rating directly on the booking row
                 try {
                   await SupabaseConfig.client
                       .from('bookings')
@@ -774,8 +706,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                 } catch (e) {
                   debugPrint('Failed to update booking rating: $e');
                 }
-
-                // Recalculate and persist technician average from app_ratings (same source as ratings screen)
                 try {
                   final rows = await SupabaseConfig.client
                       .from('app_ratings')
@@ -796,7 +726,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
                 } catch (e) {
                   debugPrint('Failed to update technician stats: $e');
                 }
-
                 if (!dialogContext.mounted) return;
                 Navigator.pop(dialogContext);
                 if (!context.mounted) return;
@@ -816,7 +745,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       ),
     );
   }
-
   (Color, String) _getBookingStatus(String status) {
     return switch (status) {
       'requested'            => (const Color(0xFFFF9800), 'Requested'),
@@ -832,17 +760,14 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
       _                      => (Colors.grey, status),
     };
   }
-
   String _formatDate(DateTime? date) {
     if (date == null) return 'TBD';
     return DateFormat('MM/dd/yyyy').format(date);
   }
-
   String _formatTime(DateTime? date) {
     if (date == null) return 'TBD';
     return DateFormat('h:mm a').format(date);
   }
-
   String _displayStatus(String s) => switch (s) {
         'requested'   => 'Requested',
         'accepted'    => 'Accepted',
@@ -854,9 +779,6 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
         'cancelled'   => 'Cancelled',
         _ => s,
       };
-
-  // ─── Filter bottom sheet ───────────────────────────────────────────────────
-
   Future<void> _openFilterSheet() async {
     final result = await showModalBottomSheet<_BookingFilter>(
       context: context,
@@ -869,44 +791,35 @@ class _BookingListScreenState extends ConsumerState<BookingListScreen> {
     }
   }
 }
-
-// ─── Filter sheet ─────────────────────────────────────────────────────────────
-
 class _CustomerFilterSheet extends StatefulWidget {
   final _BookingFilter current;
   const _CustomerFilterSheet({required this.current});
-
   @override
   State<_CustomerFilterSheet> createState() => _CustomerFilterSheetState();
 }
-
 class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
   late Set<String> _statuses;
   late DateTime? _from;
   late DateTime? _to;
   late _SortOrder _sort;
-
   static const _allStatuses = [
     'requested',
     'in_progress',
     'completed',
     'cancelled',
   ];
-
   static const _statusLabels = {
     'requested': 'Requested',
     'in_progress': 'Active',
     'completed': 'Completed',
     'cancelled': 'Cancelled',
   };
-
   static const _statusColors = {
     'requested': Color(0xFFFF9800),
     'in_progress': AppTheme.accentPurple,
     'completed': Colors.green,
     'cancelled': Colors.red,
   };
-
   @override
   void initState() {
     super.initState();
@@ -915,7 +828,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
     _to = widget.current.toDate;
     _sort = widget.current.sort;
   }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -934,7 +846,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
                       width: 40, height: 4,
@@ -942,8 +853,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Header
                   Row(
                     children: [
                       const Expanded(
@@ -962,8 +871,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Status
                   _SectionLabel(label: 'Status', icon: Icons.label_outline),
                   const SizedBox(height: 10),
                   Wrap(
@@ -1004,8 +911,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                     }).toList(),
                   ),
                   const SizedBox(height: 20),
-
-                  // Date range
                   _SectionLabel(label: 'Date Range', icon: Icons.calendar_today_outlined),
                   const SizedBox(height: 10),
                   Row(
@@ -1046,8 +951,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // Sort
                   _SectionLabel(label: 'Sort Order', icon: Icons.sort),
                   const SizedBox(height: 10),
                   Row(
@@ -1072,8 +975,6 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
-                  // Apply
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -1105,14 +1006,10 @@ class _CustomerFilterSheetState extends State<_CustomerFilterSheet> {
     );
   }
 }
-
-// ─── Shared small widgets ─────────────────────────────────────────────────────
-
 class _SectionLabel extends StatelessWidget {
   final String label;
   final IconData icon;
   const _SectionLabel({required this.label, required this.icon});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1129,20 +1026,17 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
 class _DateButton extends StatelessWidget {
   final String label;
   final bool hasValue;
   final VoidCallback onTap;
   final VoidCallback? onClear;
-
   const _DateButton({
     required this.label,
     required this.hasValue,
     required this.onTap,
     this.onClear,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1184,20 +1078,17 @@ class _DateButton extends StatelessWidget {
     );
   }
 }
-
 class _SortChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-
   const _SortChip({
     required this.label,
     required this.icon,
     required this.selected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1232,9 +1123,6 @@ class _SortChip extends StatelessWidget {
     );
   }
 }
-
-// ─── Booking card (slim) ──────────────────────────────────────────────────────
-
 class _BookingCard extends StatelessWidget {
   final String bookingId;
   final String technicianId;
@@ -1254,7 +1142,6 @@ class _BookingCard extends StatelessWidget {
   final String? paymentStatus;
   final VoidCallback onCardTap;
   final VoidCallback? onUseVoucher;
-
   const _BookingCard({
     required this.bookingId,
     required this.technicianId,
@@ -1275,7 +1162,6 @@ class _BookingCard extends StatelessWidget {
     required this.onCardTap,
     this.onUseVoucher,
   });
-
   @override
   Widget build(BuildContext context) {
     final icon = switch (rawStatus) {
@@ -1290,7 +1176,6 @@ class _BookingCard extends StatelessWidget {
       'cancelled'            => Icons.cancel_outlined,
       _                      => Icons.info_outline,
     };
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -1305,7 +1190,6 @@ class _BookingCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // ── Header row ──────────────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1359,8 +1243,6 @@ class _BookingCard extends StatelessWidget {
                   ),
                 ],
               ),
-
-              // ── Job progress tracker ─────────────────────────────────
               if (['accepted', 'en_route', 'arrived', 'in_progress', 'completed'].contains(rawStatus)) ...[
                 const SizedBox(height: 12),
                 Divider(height: 1, color: Colors.grey.shade200),
@@ -1378,8 +1260,6 @@ class _BookingCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 JobStatusTracker(currentStatus: rawStatus),
               ],
-
-              // ── Amount row ──────────────────────────────────────────
               const SizedBox(height: 12),
               Divider(height: 1, color: Colors.grey.shade200),
               const SizedBox(height: 10),
@@ -1398,8 +1278,6 @@ class _BookingCard extends StatelessWidget {
                   const Icon(Icons.chevron_right, color: AppTheme.textSecondaryColor),
                 ],
               ),
-
-              // ── Pay / voucher buttons ───────────────────────────────
               if (showPayButton) ...[
                 const SizedBox(height: 12),
                 if (paymentStatus == 'completed')
@@ -1476,9 +1354,6 @@ class _BookingCard extends StatelessWidget {
     );
   }
 }
-
-// ─── Booking detail bottom sheet ─────────────────────────────────────────────
-
 class _BookingDetailSheet extends StatefulWidget {
   final BookingModel booking;
   final String displayStatus;
@@ -1491,7 +1366,6 @@ class _BookingDetailSheet extends StatefulWidget {
   final VoidCallback onOpenFull;
   final void Function(BuildContext) onRate;
   final VoidCallback onUseVoucher;
-
   const _BookingDetailSheet({
     required this.booking,
     required this.displayStatus,
@@ -1505,34 +1379,26 @@ class _BookingDetailSheet extends StatefulWidget {
     required this.onRate,
     required this.onUseVoucher,
   });
-
   @override
   State<_BookingDetailSheet> createState() => _BookingDetailSheetState();
 }
-
 class _BookingDetailSheetState extends State<_BookingDetailSheet> {
-
   String _fmt(DateTime? dt) {
     if (dt == null) return 'TBD';
     return DateFormat('MMM d, y · h:mm a').format(dt);
   }
-
   String _shortCode() {
     final compact = widget.booking.id.replaceAll('-', '');
     return compact.substring(0, 6).toUpperCase();
   }
-
   @override
   Widget build(BuildContext context) {
     final booking = widget.booking;
-
-    // ── Parse customer booking details ──────────────────────────────
     final parsedNotes = parseBookingNotes(booking.diagnosticNotes);
     final hasBookingDetails = parsedNotes.device != null ||
         parsedNotes.model != null ||
         parsedNotes.problem != null ||
         (parsedNotes.details != null && parsedNotes.details!.trim().isNotEmpty);
-
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.62,
@@ -1545,7 +1411,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header ────────────────────────────────────────────
               Row(
                 children: [
                   Container(
@@ -1576,8 +1441,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // ── Summary ───────────────────────────────────────────
               _SheetSection(
                 children: [
                   _SheetRow(icon: Icons.calendar_today, label: 'Scheduled', value: _fmt(booking.scheduledDate)),
@@ -1594,7 +1457,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ),
                 ],
               ),
-              // ── Booking Details (Customer Notes) ──────────────────
               if (hasBookingDetails) ...[
                 const SizedBox(height: 16),
                 Row(
@@ -1629,8 +1491,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ),
                 ),
               ],
-
-              // ── Points earned ─────────────────────────────────────
               if (widget.pointsEarned != null && widget.pointsEarned! > 0) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -1652,10 +1512,7 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 20),
-
-              // ── Action buttons ────────────────────────────────────
               if (widget.isActive) ...[
                 _PayButton(booking: booking, amount: widget.amount),
                 const SizedBox(height: 10),
@@ -1731,13 +1588,10 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
     );
   }
 }
-
 class _PayButton extends StatelessWidget {
   final BookingModel booking;
   final double amount;
-
   const _PayButton({required this.booking, required this.amount});
-
   @override
   Widget build(BuildContext context) {
     final (label, icon, bgColor) = switch (booking.paymentStatus) {
@@ -1745,9 +1599,7 @@ class _PayButton extends StatelessWidget {
       'submitted' => ('Waiting for Verification', Icons.hourglass_top, Colors.orange),
       _ => ('Pay Now', Icons.payment, AppTheme.deepBlue),
     };
-
     final isDone = booking.paymentStatus == 'completed';
-
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -1769,14 +1621,9 @@ class _PayButton extends StatelessWidget {
     );
   }
 }
-
-// ─── Sheet helper widgets ─────────────────────────────────────────────────────
-
 class _SheetSection extends StatelessWidget {
   final List<Widget> children;
-
   const _SheetSection({required this.children});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1793,20 +1640,17 @@ class _SheetSection extends StatelessWidget {
     );
   }
 }
-
 class _SheetRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final TextStyle? valueStyle;
-
   const _SheetRow({
     required this.icon,
     required this.label,
     required this.value,
     this.valueStyle,
   });
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1843,34 +1687,26 @@ class _SheetRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Payment breakdown sheet ──────────────────────────────────────────────────
-
 class _PaymentBreakdownSheet extends StatefulWidget {
   final BookingModel booking;
   final double amount;
   final ScrollController scrollController;
-
   const _PaymentBreakdownSheet({
     required this.booking,
     required this.amount,
     required this.scrollController,
   });
-
   @override
   State<_PaymentBreakdownSheet> createState() => _PaymentBreakdownSheetState();
 }
-
 class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
   RedeemedVoucher? _voucher;
   bool _loading = true;
-
   @override
   void initState() {
     super.initState();
     _load();
   }
-
   Future<void> _load() async {
     try {
       final rows = await SupabaseConfig.client
@@ -1885,18 +1721,14 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
   }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
     }
-
     final booking = widget.booking;
     final estimatedCost = booking.estimatedCost ?? 0.0;
     final voucher = _voucher;
-
-    // Reconstruct pre-voucher total
     double preVoucherTotal;
     double voucherDiscount = 0;
     if (voucher != null) {
@@ -1911,17 +1743,10 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
     } else {
       preVoucherTotal = widget.amount;
     }
-
-    // Tech additional charges above the initial estimate
     final techAdditional = (preVoucherTotal - estimatedCost).clamp(0.0, double.infinity);
-
-    // Parsed breakdown (stored for new bookings)
     final storedServiceFee = booking.parsedServiceFee;
     final storedDistanceFee = booking.parsedDistanceFee;
-
     final parts = booking.partsList;
-
-    // Parse individual price adjustments from technician notes
     final adjRegex = RegExp(r'Price (increased|decreased) by ₱([\d.]+)(?:\s*—\s*Reason:\s*(.*))?');
     final techNotes = booking.technicianNotes;
     final adjustments = <(bool, double, String?)>[];
@@ -1936,7 +1761,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
         }
       }
     }
-
     return SingleChildScrollView(
       controller: widget.scrollController,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
@@ -1950,8 +1774,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
               decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
             ),
           ),
-
-          // Title
           Row(
             children: [
               Container(
@@ -1975,8 +1797,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
             ],
           ),
           const SizedBox(height: 20),
-
-          // ── BASE CHARGES ─────────────────────────────────────────
           _BdSectionHeader(title: 'Base Charges', icon: Icons.home_repair_service_rounded, color: AppTheme.deepBlue),
           const SizedBox(height: 8),
           Container(
@@ -2000,8 +1820,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
               ],
             ),
           ),
-
-          // ── TECHNICIAN ADDITIONS ──────────────────────────────────
           if ((storedServiceFee != null && storedServiceFee > 0) ||
               adjustments.isNotEmpty ||
               parts.isNotEmpty ||
@@ -2019,10 +1837,8 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Service Fee (from assess & price)
                   if (storedServiceFee != null && storedServiceFee > 0)
                     _BdRow('Service Fee', storedServiceFee, color: Colors.orange.shade800),
-                  // Individual price adjustments with reasons
                   for (final (isIncrease, amt, reason) in adjustments) ...[
                     _BdRow(
                       isIncrease ? 'Price Increase' : 'Price Decrease',
@@ -2046,10 +1862,8 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
                         ),
                       ),
                   ],
-                  // Fallback for legacy bookings without parsed breakdown
                   if (storedServiceFee == null && adjustments.isEmpty && techAdditional > 0)
                     _BdRow('Service & Additional Charges', techAdditional, color: Colors.orange.shade800),
-                  // Parts Used
                   if (parts.isNotEmpty) ...[
                     if (storedServiceFee != null || adjustments.isNotEmpty || techAdditional > 0)
                       const SizedBox(height: 8),
@@ -2071,8 +1885,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
               ),
             ),
           ],
-
-          // ── VOUCHER DISCOUNT ──────────────────────────────────────
           if (voucher != null) ...[
             const SizedBox(height: 16),
             _BdSectionHeader(title: 'Discount Applied', icon: Icons.local_offer_rounded, color: Colors.green.shade700),
@@ -2109,8 +1921,6 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
               ),
             ),
           ],
-
-          // ── TOTAL ─────────────────────────────────────────────────
           const SizedBox(height: 20),
           Container(height: 1, color: Colors.grey.shade200),
           const SizedBox(height: 16),
@@ -2129,21 +1939,17 @@ class _PaymentBreakdownSheetState extends State<_PaymentBreakdownSheet> {
       ),
     );
   }
-
   String _distanceNote(BookingModel booking) {
     if (booking.diagnosticNotes == null) return '';
     final m = RegExp(r'Distance: ([\d.]+)\s*km').firstMatch(booking.diagnosticNotes!);
     return m != null ? ' (${m.group(1)} km)' : '';
   }
 }
-
 class _BdSectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
-
   const _BdSectionHeader({required this.title, required this.icon, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -2155,14 +1961,11 @@ class _BdSectionHeader extends StatelessWidget {
     );
   }
 }
-
 class _BdRow extends StatelessWidget {
   final String label;
   final double amount;
   final Color? color;
-
   const _BdRow(this.label, this.amount, {this.color});
-
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppTheme.textPrimaryColor;
@@ -2179,21 +1982,15 @@ class _BdRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Voucher tile for the voucher selection sheet ─────────────────────────────
-
 class _VoucherTile extends StatelessWidget {
   final RedeemedVoucher voucher;
   final VoidCallback onApply;
-
   const _VoucherTile({super.key, required this.voucher, required this.onApply});
-
   @override
   Widget build(BuildContext context) {
     final discount = voucher.discountType == 'percentage'
         ? '${voucher.discountAmount.toStringAsFixed(0)}% off'
         : '₱${voucher.discountAmount.toStringAsFixed(0)} off';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -2234,14 +2031,10 @@ class _VoucherTile extends StatelessWidget {
     );
   }
 }
-
-// ── Job Request Card ──────────────────────────────────────────────────────────
-
 class _JobRequestCard extends StatelessWidget {
   final JobRequestModel request;
   final VoidCallback onTap;
   const _JobRequestCard({required this.request, required this.onTap});
-
   (Color, IconData, String) get _statusStyle => switch (request.status) {
         'open' => (Colors.orange, Icons.hourglass_top_rounded, 'Open'),
         'pending_customer_approval' => (
@@ -2262,12 +2055,10 @@ class _JobRequestCard extends StatelessWidget {
         'cancelled' => (Colors.red, Icons.cancel_rounded, 'Cancelled'),
         _ => (Colors.grey, Icons.circle, request.status),
       };
-
   @override
   Widget build(BuildContext context) {
     final (color, statusIcon, label) = _statusStyle;
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
-
     String? parsedBrand;
     String? parsedModel;
     String? parsedIssues;
@@ -2276,14 +2067,12 @@ class _JobRequestCard extends StatelessWidget {
       if (line.startsWith('Model: ')) parsedModel = line.substring(7).trim();
       if (line.startsWith('Issues: ')) parsedIssues = line.substring(8).trim();
     }
-
     final deviceIcon = request.deviceType == 'Laptop'
         ? Icons.laptop_rounded
         : Icons.smartphone_rounded;
     final deviceLabel = [request.deviceType, parsedBrand, parsedModel]
         .whereType<String>()
         .join(' · ');
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -2375,23 +2164,17 @@ class _JobRequestCard extends StatelessWidget {
     );
   }
 }
-
-// ── Job Request Detail Sheet ──────────────────────────────────────────────────
-
 class _JobRequestDetailSheet extends ConsumerStatefulWidget {
   final JobRequestModel request;
   const _JobRequestDetailSheet({required this.request});
-
   @override
   ConsumerState<_JobRequestDetailSheet> createState() =>
       _JobRequestDetailSheetState();
 }
-
 class _JobRequestDetailSheetState
     extends ConsumerState<_JobRequestDetailSheet> {
   bool _accepting = false;
   bool _declining = false;
-
   (Color, IconData, String) get _statusStyle =>
       switch (widget.request.status) {
         'open' => (Colors.orange, Icons.hourglass_top_rounded, 'Open'),
@@ -2413,7 +2196,6 @@ class _JobRequestDetailSheetState
         'cancelled' => (Colors.red, Icons.cancel_rounded, 'Cancelled'),
         _ => (Colors.grey, Icons.circle, widget.request.status),
       };
-
   static double _haversineKm(
       double lat1, double lng1, double lat2, double lng2) {
     const toRad = pi / 180;
@@ -2421,7 +2203,6 @@ class _JobRequestDetailSheetState
     final dLng = (lng2 - lng1) * 111.0 * cos((lat1 + lat2) / 2 * toRad);
     return sqrt(dLat * dLat + dLng * dLng);
   }
-
   Future<void> _accept() async {
     setState(() => _accepting = true);
     try {
@@ -2429,7 +2210,6 @@ class _JobRequestDetailSheetState
       if (user == null) throw Exception('Not logged in');
       final supabase = SupabaseConfig.client;
       final techId = widget.request.technicianId!;
-
       var svcRow = await supabase
           .from('services')
           .select('id')
@@ -2443,7 +2223,6 @@ class _JobRequestDetailSheetState
           .maybeSingle();
       if (svcRow == null) throw Exception('No services available.');
       final serviceId = svcRow['id'] as String;
-
       final techRow = await supabase
           .from('users')
           .select('latitude, longitude')
@@ -2460,7 +2239,6 @@ class _JobRequestDetailSheetState
         final rate = await DistanceFeeService.getRate();
         distFee = (distKm * 10).round() * rate;
       }
-
       final scheduledAt = DateTime.now().add(const Duration(minutes: 15));
       final booking = await ref.read(bookingServiceProvider).createBooking(
             customerId: user.id,
@@ -2475,7 +2253,6 @@ class _JobRequestDetailSheetState
             paymentMethod: 'gcash',
             bookingSource: 'post_problem',
           );
-
       final distanceNoteLine = (distFee != null && distFee > 0)
           ? '\nDistance Fee: ₱${distFee.toStringAsFixed(2)}'
           : '';
@@ -2483,12 +2260,9 @@ class _JobRequestDetailSheetState
         'diagnostic_notes':
             '[POST_PROBLEM]\n${widget.request.problemDescription}$distanceNoteLine',
       }).eq('id', booking.id);
-
       await ref
           .read(jobRequestServiceProvider)
           .acceptRequest(widget.request.id, techId);
-
-      // Notify the technician their proposal was accepted
       await NotificationService().sendNotification(
         userId: techId,
         type: 'job_request_accepted',
@@ -2496,7 +2270,6 @@ class _JobRequestDetailSheetState
         message: 'The customer accepted your proposal for ${widget.request.deviceType} repair. Check your jobs.',
         data: {'route': '/tech-jobs'},
       );
-
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2514,17 +2287,13 @@ class _JobRequestDetailSheetState
       setState(() => _accepting = false);
     }
   }
-
   Future<void> _decline() async {
     setState(() => _declining = true);
-    // Save before customerDeclineRequest clears it in the DB
     final declinedTechId = widget.request.technicianId;
     try {
       await ref
           .read(jobRequestServiceProvider)
           .customerDeclineRequest(widget.request.id);
-
-      // Notify the technician their proposal was declined
       if (declinedTechId != null) {
         await NotificationService().sendNotification(
           userId: declinedTechId,
@@ -2534,7 +2303,6 @@ class _JobRequestDetailSheetState
           data: {'route': '/tech-job-map'},
         );
       }
-
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2551,13 +2319,10 @@ class _JobRequestDetailSheetState
       setState(() => _declining = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final (color, icon, label) = _statusStyle;
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
-
-    // Parse fields
     String? parsedBrand;
     String? parsedModel;
     String? parsedIssues;
@@ -2572,7 +2337,6 @@ class _JobRequestDetailSheetState
       parsedNotes =
           widget.request.problemDescription.substring(sepIdx + 4).trim();
     }
-
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
       minChildSize: 0.4,
@@ -2587,7 +2351,6 @@ class _JobRequestDetailSheetState
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
-            // Handle
             Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
@@ -2598,8 +2361,6 @@ class _JobRequestDetailSheetState
                     borderRadius: BorderRadius.circular(2)),
               ),
             ),
-
-            // Header
             Row(
               children: [
                 Container(
@@ -2637,7 +2398,6 @@ class _JobRequestDetailSheetState
                     ],
                   ),
                 ),
-                // Status chip
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 6),
@@ -2661,8 +2421,6 @@ class _JobRequestDetailSheetState
               ],
             ),
             const SizedBox(height: 20),
-
-            // Details card
             Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFF9FAFB),
@@ -2703,8 +2461,6 @@ class _JobRequestDetailSheetState
               ),
             ),
             const SizedBox(height: 16),
-
-            // Accept / Decline buttons (pending_customer_approval only)
             if (widget.request.status == 'pending_customer_approval' &&
                 widget.request.technicianId != null) ...[
               Row(
@@ -2756,8 +2512,6 @@ class _JobRequestDetailSheetState
                 ],
               ),
             ],
-
-            // Cancel button (open requests only)
             if (widget.request.status == 'open')
               SizedBox(
                 width: double.infinity,
@@ -2809,14 +2563,12 @@ class _JobRequestDetailSheetState
     );
   }
 }
-
 class _DetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   const _DetailRow(
       {required this.icon, required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -2849,14 +2601,10 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
-// ─── Shared card helper widgets ───────────────────────────────────────────────
-
 class _StatusChip extends StatelessWidget {
   final String label;
   final Color color;
   const _StatusChip({required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2873,12 +2621,10 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
-
 class _MetaPill extends StatelessWidget {
   final IconData icon;
   final String label;
   const _MetaPill({required this.icon, required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2902,12 +2648,10 @@ class _MetaPill extends StatelessWidget {
     );
   }
 }
-
 class _MetaLine extends StatelessWidget {
   final IconData icon;
   final String text;
   const _MetaLine({required this.icon, required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -2926,4 +2670,3 @@ class _MetaLine extends StatelessWidget {
     );
   }
 }
-

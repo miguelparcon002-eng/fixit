@@ -1,36 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../models/admin_customer_user.dart';
 import '../../providers/admin_customers_provider.dart';
 import 'widgets/admin_customer_details_sheet.dart';
-
 class AdminCustomersScreen extends ConsumerStatefulWidget {
   const AdminCustomersScreen({super.key});
-
   @override
   ConsumerState<AdminCustomersScreen> createState() =>
       _AdminCustomersScreenState();
 }
-
 class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, active, inactive
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final customersAsync = ref.watch(adminCustomersProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -77,7 +70,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
       ),
       body: Column(
         children: [
-          // Search and Filter Section
           Container(
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             padding: const EdgeInsets.all(14),
@@ -98,7 +90,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Search Bar
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -137,7 +128,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                   },
                 ),
                 const SizedBox(height: 12),
-                // Filter Chips
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -178,7 +168,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
               ],
             ),
           ),
-          // Stats Summary
           customersAsync.when(
             data: (customers) {
               final activeCount = customers.where((c) => c.isActive && !c.isSuspended).length;
@@ -221,14 +210,10 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
           ),
-          // Customer List
           Expanded(
             child: customersAsync.when(
               data: (customers) {
-                // Apply filters
                 var filteredCustomers = customers;
-
-                // Search filter
                 if (_searchQuery.isNotEmpty) {
                   final query = _searchQuery.toLowerCase();
                   filteredCustomers = filteredCustomers
@@ -240,8 +225,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                       )
                       .toList();
                 }
-
-                // Status filter
                 if (_selectedFilter == 'active') {
                   filteredCustomers = filteredCustomers
                       .where((c) => c.isActive && !c.isSuspended)
@@ -254,11 +237,9 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
                   filteredCustomers =
                       filteredCustomers.where((c) => c.isSuspended).toList();
                 }
-
                 if (filteredCustomers.isEmpty) {
                   return _buildEmptyState();
                 }
-
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: filteredCustomers.length,
@@ -305,7 +286,6 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
       ),
     );
   }
-
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -336,20 +316,17 @@ class _AdminCustomersScreenState extends ConsumerState<AdminCustomersScreen> {
     );
   }
 }
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onSelected;
   final Color? color;
-
   const _FilterChip({
     required this.label,
     required this.isSelected,
     required this.onSelected,
     this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -371,18 +348,15 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-
   const _StatCard({
     required this.label,
     required this.value,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -420,13 +394,10 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _CustomerCard extends StatelessWidget {
   final AdminCustomerUser customer;
   final VoidCallback onTap;
-
   const _CustomerCard({required this.customer, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -447,7 +418,6 @@ class _CustomerCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Avatar
             Stack(
               children: [
                 CircleAvatar(
@@ -469,7 +439,6 @@ class _CustomerCard extends StatelessWidget {
                         )
                       : null,
                 ),
-                // Activity indicator
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -488,7 +457,6 @@ class _CustomerCard extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 16),
-            // Customer Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,14 +563,11 @@ class _CustomerCard extends StatelessWidget {
     );
   }
 }
-
 class _InfoBadge extends StatelessWidget {
   final IconData icon;
   final String text;
   final Color? color;
-
   const _InfoBadge({required this.icon, required this.text, this.color});
-
   @override
   Widget build(BuildContext context) {
     final badgeColor = color ?? Colors.grey[600]!;

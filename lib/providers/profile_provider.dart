@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/profile_service.dart';
 import '../core/utils/app_logger.dart';
-
 final profileServiceProvider = Provider((ref) => ProfileService());
-
 class ProfileData {
   final String email;
   final String phone;
@@ -12,7 +10,6 @@ class ProfileData {
   final List<String> specialties;
   final String? profileImagePath;
   final String? bio;
-
   ProfileData({
     required this.email,
     required this.phone,
@@ -22,7 +19,6 @@ class ProfileData {
     this.profileImagePath,
     this.bio,
   }) : specialties = specialties ?? const [];
-
   ProfileData copyWith({
     String? email,
     String? phone,
@@ -43,14 +39,11 @@ class ProfileData {
     );
   }
 }
-
 class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
   final ProfileService _profileService;
-
   ProfileNotifier(this._profileService) : super(const AsyncValue.loading()) {
     _loadProfile();
   }
-
   Future<void> _loadProfile() async {
     try {
       final data = await _profileService.loadProfileData();
@@ -69,11 +62,9 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.error(e, stack);
     }
   }
-
   Future<void> updateEmail(String email) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateEmail(email);
       state = AsyncValue.data(currentData.copyWith(email: email));
@@ -81,11 +72,9 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.error(e, stack);
     }
   }
-
   Future<void> updatePhone(String phone) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updatePhone(phone);
       state = AsyncValue.data(currentData.copyWith(phone: phone));
@@ -93,11 +82,9 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.error(e, stack);
     }
   }
-
   Future<void> updateLocation(String location) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateLocation(location);
       state = AsyncValue.data(currentData.copyWith(location: location));
@@ -105,7 +92,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.error(e, stack);
     }
   }
-
   Future<void> updateLocationWithCoords({
     required String address,
     required double latitude,
@@ -113,7 +99,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
   }) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateLocationWithCoords(
         address: address,
@@ -125,47 +110,35 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
       state = AsyncValue.error(e, stack);
     }
   }
-
   Future<void> updateBio(String bio) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateBio(bio);
       state = AsyncValue.data(currentData.copyWith(bio: bio));
     } catch (e) {
-      // Keep existing data state, just rethrow so the UI can show a snackbar
       rethrow;
     }
   }
-
   Future<void> updateSpecialties(List<String> specialties) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateSpecialties(specialties);
-
-      // Reload specialties from Supabase to ensure they persist
       final reloadedSpecialties = await _profileService.loadSpecialties();
       state = AsyncValue.data(currentData.copyWith(specialties: reloadedSpecialties));
-
       AppLogger.p('ProfileNotifier: Specialties updated and reloaded from Supabase: $reloadedSpecialties');
     } catch (e, stack) {
       AppLogger.p('ProfileNotifier: Error updating specialties - $e');
       state = AsyncValue.error(e, stack);
     }
   }
-
-  // Add reload method to force refresh from Supabase
   Future<void> reload() async {
     await _loadProfile();
   }
-
   Future<void> updateProfileImage(String imageUrl) async {
     final currentData = state.value;
     if (currentData == null) return;
-
     try {
       await _profileService.updateProfileImageUrl(imageUrl);
       state = AsyncValue.data(currentData.copyWith(profileImagePath: imageUrl));
@@ -174,7 +147,6 @@ class ProfileNotifier extends StateNotifier<AsyncValue<ProfileData>> {
     }
   }
 }
-
 final profileProvider = StateNotifierProvider<ProfileNotifier, AsyncValue<ProfileData>>((ref) {
   final profileService = ref.watch(profileServiceProvider);
   return ProfileNotifier(profileService);

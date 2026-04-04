@@ -21,11 +21,7 @@ class TechnicianProfileModel {
   final int? averageResponseTime;
   final DateTime createdAt;
   final DateTime? updatedAt;
-  // Weekly schedule: keys are day names ("Monday"…"Sunday"),
-  // values are {"enabled": bool, "start": "HH:mm", "end": "HH:mm"}
-  // Stored in weekly_schedule JSONB column in technician_profiles.
   final Map<String, Map<String, dynamic>>? weeklySchedule;
-
   TechnicianProfileModel({
     required this.id,
     required this.userId,
@@ -51,7 +47,6 @@ class TechnicianProfileModel {
     this.updatedAt,
     this.weeklySchedule,
   });
-
   factory TechnicianProfileModel.fromJson(Map<String, dynamic> json) {
     return TechnicianProfileModel(
       id: json['id'] as String,
@@ -91,7 +86,6 @@ class TechnicianProfileModel {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -119,9 +113,6 @@ class TechnicianProfileModel {
       'weekly_schedule': weeklySchedule,
     };
   }
-
-  /// Returns true if the current time falls within today's scheduled hours.
-  /// Falls back to [isAvailable] when no schedule is set.
   bool get isScheduledOnlineNow {
     if (weeklySchedule == null || weeklySchedule!.isEmpty) return isAvailable;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];

@@ -5,14 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_session_service.dart';
 import '../../core/utils/app_logger.dart';
-
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
-
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
@@ -22,7 +19,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
-
   @override
   void initState() {
     super.initState();
@@ -39,7 +35,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
     _animController.forward();
   }
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -47,23 +42,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _animController.dispose();
     super.dispose();
   }
-
   Future<void> _loginWithGoogle() async {
-    // Show role picker first
     final role = await _showRolePicker();
     if (role == null) return; // User dismissed
-
     setState(() => _isLoading = true);
     try {
       final authService = ref.read(authServiceProvider);
       final userProfile = await authService.signInWithGoogle(role: role);
       if (userProfile == null) {
-        // User cancelled Google picker
         setState(() => _isLoading = false);
         return;
       }
-
-      // Block suspended accounts
       if (userProfile.isSuspended) {
         await authService.signOut();
         if (mounted) {
@@ -80,11 +69,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         }
         return;
       }
-
       if (!mounted) return;
       final sessionService = ref.read(userSessionServiceProvider);
       await sessionService.onUserLogin(userProfile.id);
-
       if (!mounted) return;
       final userRole = userProfile.role;
       if (userRole == 'technician') {
@@ -107,9 +94,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
     if (mounted) setState(() => _isLoading = false);
   }
-
-  /// Shows a bottom sheet for the user to pick their role before Google sign-in.
-  /// Returns the selected role string, or null if dismissed.
   Future<String?> _showRolePicker() async {
     return showModalBottomSheet<String>(
       context: context,
@@ -123,7 +107,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle
             Container(
               width: 40,
               height: 4,
@@ -151,7 +134,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            // Customer option
             _RoleOption(
               icon: Icons.person_rounded,
               label: 'Customer',
@@ -160,7 +142,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               onTap: () => Navigator.of(ctx).pop('customer'),
             ),
             const SizedBox(height: 12),
-            // Technician option
             _RoleOption(
               icon: Icons.build_rounded,
               label: 'Technician',
@@ -174,7 +155,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
   Future<void> _login() async {
     if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -187,26 +167,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
       return;
     }
-
     setState(() => _isLoading = true);
-
     final authService = ref.read(authServiceProvider);
-
     try {
       final response = await authService.signInWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-
       if (response.user == null) {
         throw Exception('Login failed - no user returned');
       }
-
       final userProfile = await authService.getCurrentUserProfile();
-
       AppLogger.p('Login: User ${_emailController.text} - Role: ${userProfile?.role}');
-
-      // Block suspended accounts
       if (userProfile?.isSuspended == true) {
         await authService.signOut();
         if (mounted) {
@@ -223,13 +195,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         setState(() => _isLoading = false);
         return;
       }
-
       final sessionService = ref.read(userSessionServiceProvider);
       await sessionService.onUserLogin(response.user!.id);
-
       if (mounted) {
         final role = userProfile?.role ?? 'customer';
-
         if (role == 'technician') {
           context.go('/tech-home');
         } else if (role == 'admin') {
@@ -251,10 +220,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         );
       }
     }
-
     setState(() => _isLoading = false);
   }
-
   String _friendlyLoginError(String error) {
     final lower = error.toLowerCase();
     if (lower.contains('invalid login credentials') ||
@@ -275,7 +242,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
     return 'Login failed. Please check your credentials and try again.';
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -307,22 +273,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: 24),
-                      // Back button
                       Align(
                         alignment: Alignment.centerLeft,
                         child: _buildBackButton(),
                       ),
                       const SizedBox(height: 20),
-                      // Logo
                       _buildLogo(),
                       const SizedBox(height: 32),
-                      // Form card
                       _buildFormCard(),
                       const SizedBox(height: 24),
-                      // Social login
                       _buildSocialSection(),
                       const SizedBox(height: 24),
-                      // Sign up link
                       _buildSignupLink(),
                       const SizedBox(height: 32),
                     ],
@@ -335,7 +296,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
   Widget _buildBackButton() {
     return GestureDetector(
       onTap: () => context.go('/role-selection'),
@@ -350,7 +310,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
   Widget _buildLogo() {
     return Column(
       children: [
@@ -404,7 +363,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ],
     );
   }
-
   Widget _buildFormCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -422,7 +380,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Email
           const Text(
             'Email',
             style: TextStyle(
@@ -442,7 +399,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
           const SizedBox(height: 20),
-          // Password
           const Text(
             'Password',
             style: TextStyle(
@@ -471,7 +427,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
           const SizedBox(height: 12),
-          // Forgot password
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
@@ -487,7 +442,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             ),
           ),
           const SizedBox(height: 24),
-          // Login button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -524,7 +478,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
   Widget _buildSocialSection() {
     return Column(
       children: [
@@ -565,7 +518,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Google "G" logo
                 SvgPicture.asset(
                   'assets/images/google_logo.svg',
                   width: 22,
@@ -587,7 +539,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ],
     );
   }
-
   Widget _buildSignupLink() {
     return Container(
       width: double.infinity,
@@ -625,7 +576,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-
   InputDecoration _inputDecoration({required String hint, required IconData icon}) {
     return InputDecoration(
       hintText: hint,
@@ -649,14 +599,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 }
-
 class _RoleOption extends StatelessWidget {
   final IconData icon;
   final String label;
   final String description;
   final Color color;
   final VoidCallback onTap;
-
   const _RoleOption({
     required this.icon,
     required this.label,
@@ -664,7 +612,6 @@ class _RoleOption extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

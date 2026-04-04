@@ -1,4 +1,3 @@
-/// Model for tracking earnings at the platform level
 class AdminEarningsOverview {
   final double totalEarnings;
   final double todayEarnings;
@@ -8,7 +7,6 @@ class AdminEarningsOverview {
   final int todayCompletedBookings;
   final int weekCompletedBookings;
   final int monthCompletedBookings;
-
   const AdminEarningsOverview({
     required this.totalEarnings,
     required this.todayEarnings,
@@ -20,8 +18,6 @@ class AdminEarningsOverview {
     required this.monthCompletedBookings,
   });
 }
-
-/// Model for tracking individual technician earnings
 class TechnicianEarnings {
   final String technicianId;
   final String technicianName;
@@ -39,7 +35,6 @@ class TechnicianEarnings {
   final double? averageRating;
   final String? gcashNumber;
   final String? gcashName;
-
   const TechnicianEarnings({
     required this.technicianId,
     required this.technicianName,
@@ -59,8 +54,6 @@ class TechnicianEarnings {
     this.gcashName,
   });
 }
-
-/// Model for individual transaction/booking earnings
 class EarningsTransaction {
   final String bookingId;
   final String technicianId;
@@ -73,7 +66,6 @@ class EarningsTransaction {
   final String? paymentMethod;
   final String? paymentStatus;
   final bool isEmergency;
-
   const EarningsTransaction({
     required this.bookingId,
     required this.technicianId,
@@ -88,8 +80,6 @@ class EarningsTransaction {
     required this.isEmergency,
   });
 }
-
-/// Model for customer spending analytics
 class CustomerSpending {
   final String customerId;
   final String customerName;
@@ -102,7 +92,6 @@ class CustomerSpending {
   final int totalBookings;
   final int completedBookings;
   final int cancelledBookings;
-
   const CustomerSpending({
     required this.customerId,
     required this.customerName,

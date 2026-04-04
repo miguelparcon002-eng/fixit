@@ -4,38 +4,29 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/payment_service.dart';
-
 class AdminPaymentSettingsScreen extends ConsumerStatefulWidget {
   const AdminPaymentSettingsScreen({super.key});
-
   @override
   ConsumerState<AdminPaymentSettingsScreen> createState() =>
       _AdminPaymentSettingsScreenState();
 }
-
 class _AdminPaymentSettingsScreenState
     extends ConsumerState<AdminPaymentSettingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // QR settings state
   final _gcashNameController = TextEditingController();
   final _gcashNumberController = TextEditingController();
   bool _loadingQr = true;
   bool _saving = false;
   XFile? _newQrImage;
   String? _currentQrUrl;
-
-  // Payments list state
   List<Map<String, dynamic>> _payments = [];
   bool _loadingPayments = true;
   String _filterStatus = 'all';
   String _filterCancelStatus = 'all';
-
   @override
   void initState() {
     super.initState();
@@ -43,7 +34,6 @@ class _AdminPaymentSettingsScreenState
     _loadSettings();
     _loadPayments();
   }
-
   @override
   void dispose() {
     _tabController.dispose();
@@ -51,7 +41,6 @@ class _AdminPaymentSettingsScreenState
     _gcashNumberController.dispose();
     super.dispose();
   }
-
   Future<void> _loadSettings() async {
     final settings = await PaymentService.getAdminQrSettings();
     if (!mounted) return;
@@ -64,7 +53,6 @@ class _AdminPaymentSettingsScreenState
       _loadingQr = false;
     });
   }
-
   Future<void> _loadPayments() async {
     setState(() => _loadingPayments = true);
     try {
@@ -82,7 +70,6 @@ class _AdminPaymentSettingsScreenState
       );
     }
   }
-
   Future<void> _pickQrImage() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
@@ -95,11 +82,9 @@ class _AdminPaymentSettingsScreenState
       setState(() => _newQrImage = image);
     }
   }
-
   Future<void> _saveSettings() async {
     final name = _gcashNameController.text.trim();
     final number = _gcashNumberController.text.trim();
-
     if (name.isEmpty || number.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -109,7 +94,6 @@ class _AdminPaymentSettingsScreenState
       );
       return;
     }
-
     if (_newQrImage == null && _currentQrUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -119,12 +103,9 @@ class _AdminPaymentSettingsScreenState
       );
       return;
     }
-
     setState(() => _saving = true);
-
     try {
       String qrUrl = _currentQrUrl ?? '';
-
       if (_newQrImage != null) {
         final adminId = SupabaseConfig.client.auth.currentUser?.id ?? 'admin';
         qrUrl = await PaymentService.uploadAdminQrCode(
@@ -132,19 +113,16 @@ class _AdminPaymentSettingsScreenState
           imageFile: _newQrImage!,
         );
       }
-
       await PaymentService.saveAdminQrSettings(
         qrImageUrl: qrUrl,
         gcashName: name,
         gcashNumber: number,
       );
-
       if (!mounted) return;
       setState(() {
         _currentQrUrl = qrUrl;
         _newQrImage = null;
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('GCash settings saved successfully!'),
@@ -160,41 +138,28 @@ class _AdminPaymentSettingsScreenState
       if (mounted) setState(() => _saving = false);
     }
   }
-
-  // ── Filtered helpers ──────────────────────────────────────────────────────
-
-  /// Regular booking payments (payment_type == 'booking' or null/missing).
   List<Map<String, dynamic>> get _bookingPayments => _payments.where((p) {
         final t = p['payment_type'] as String?;
         return t == null || t == '' || t == 'booking';
       }).toList();
-
-  /// Cancellation fee payments.
   List<Map<String, dynamic>> get _cancelFeePayments => _payments.where((p) {
         final t = p['payment_type'] as String?;
         return t == 'cancellation_fee';
       }).toList();
-
   List<Map<String, dynamic>> get _filteredBookingPayments {
     if (_filterStatus == 'all') return _bookingPayments;
     return _bookingPayments.where((p) => p['status'] == _filterStatus).toList();
   }
-
   List<Map<String, dynamic>> get _filteredCancelPayments {
     if (_filterCancelStatus == 'all') return _cancelFeePayments;
     return _cancelFeePayments.where((p) => p['status'] == _filterCancelStatus).toList();
   }
-
   int _pendingCount(List<Map<String, dynamic>> list) =>
       list.where((p) => p['status'] == 'pending_verification').length;
-
-  // ─────────────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final bookingPending = _pendingCount(_bookingPayments);
     final cancelPending = _pendingCount(_cancelFeePayments);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -279,9 +244,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
-  // ─── PAYMENTS / CANCEL FEES TAB ─────────────────────────────────────────
-
   Widget _buildPaymentsTab({
     required List<Map<String, dynamic>> payments,
     required List<Map<String, dynamic>> allPayments,
@@ -297,10 +259,8 @@ class _AdminPaymentSettingsScreenState
         ),
       );
     }
-
     return Column(
       children: [
-        // Filter chips
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -351,7 +311,6 @@ class _AdminPaymentSettingsScreenState
       ],
     );
   }
-
   Widget _buildFilterChip(
     String label,
     String status,
@@ -363,7 +322,6 @@ class _AdminPaymentSettingsScreenState
     final count = status == 'all'
         ? allPayments.length
         : allPayments.where((p) => p['status'] == status).length;
-
     return GestureDetector(
       onTap: () => onChange(status),
       child: Container(
@@ -386,7 +344,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
   Widget _buildPaymentCard(Map<String, dynamic> payment, {bool isCancelFee = false}) {
     final status = payment['status'] as String? ?? 'pending_verification';
     final (statusColor, statusLabel) = switch (status) {
@@ -394,13 +351,11 @@ class _AdminPaymentSettingsScreenState
       'rejected' => (Colors.red, 'Rejected'),
       _ => (Colors.orange, 'Pending'),
     };
-
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
     final createdAt = payment['created_at'] != null
         ? DateFormat('MMM dd, yyyy h:mm a')
             .format(DateTime.parse(payment['created_at']).toLocal())
         : '-';
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -418,7 +373,6 @@ class _AdminPaymentSettingsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Expanded(
@@ -469,8 +423,6 @@ class _AdminPaymentSettingsScreenState
             ],
           ),
           const SizedBox(height: 10),
-
-          // Payment details
           _buildInfoRow(Icons.person_outline, 'Sender', payment['sender_name'] ?? '-'),
           const SizedBox(height: 6),
           _buildInfoRow(Icons.receipt_long, 'Reference #', payment['reference_number'] ?? '-'),
@@ -478,13 +430,10 @@ class _AdminPaymentSettingsScreenState
           _buildInfoRow(Icons.payments_outlined, 'Amount', '₱${amount.toStringAsFixed(2)}'),
           const SizedBox(height: 6),
           _buildInfoRow(Icons.schedule, 'Submitted', createdAt),
-
           if (payment['admin_note'] != null && (payment['admin_note'] as String).isNotEmpty) ...[
             const SizedBox(height: 6),
             _buildInfoRow(Icons.note_outlined, 'Note', payment['admin_note']),
           ],
-
-          // Proof image button
           if (payment['proof_image_url'] != null) ...[
             const SizedBox(height: 10),
             SizedBox(
@@ -502,8 +451,6 @@ class _AdminPaymentSettingsScreenState
               ),
             ),
           ],
-
-          // Action buttons (only for pending)
           if (status == 'pending_verification') ...[
             const SizedBox(height: 10),
             Row(
@@ -543,7 +490,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +512,6 @@ class _AdminPaymentSettingsScreenState
       ],
     );
   }
-
   void _showProofImage(String imageUrl) {
     showDialog(
       context: context,
@@ -610,7 +555,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
   Future<void> _confirmPayment(Map<String, dynamic> payment) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -638,9 +582,7 @@ class _AdminPaymentSettingsScreenState
         ],
       ),
     );
-
     if (confirmed != true) return;
-
     try {
       await PaymentService.updatePaymentStatus(
         paymentId: payment['id'].toString(),
@@ -658,10 +600,8 @@ class _AdminPaymentSettingsScreenState
       );
     }
   }
-
   void _showRejectDialog(Map<String, dynamic> payment) {
     final noteController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -728,9 +668,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
-  // ─── QR SETTINGS TAB ────────────────────────────────────────────────────
-
   Widget _buildQrSettingsTab() {
     if (_loadingQr) {
       return const Center(
@@ -739,13 +676,11 @@ class _AdminPaymentSettingsScreenState
         ),
       );
     }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Info banner
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -767,7 +702,6 @@ class _AdminPaymentSettingsScreenState
             ),
           ),
           const SizedBox(height: 20),
-
           _buildSectionLabel('GCash QR Code'),
           const SizedBox(height: 8),
           GestureDetector(
@@ -824,7 +758,6 @@ class _AdminPaymentSettingsScreenState
             ),
           ),
           const SizedBox(height: 20),
-
           _buildSectionLabel('GCash Account Details'),
           const SizedBox(height: 8),
           Container(
@@ -866,7 +799,6 @@ class _AdminPaymentSettingsScreenState
             ),
           ),
           const SizedBox(height: 28),
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -900,7 +832,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
   Widget _buildUploadPlaceholder() {
     return Container(
       height: 200,
@@ -926,7 +857,6 @@ class _AdminPaymentSettingsScreenState
       ),
     );
   }
-
   Widget _buildSectionLabel(String text) {
     return Text(
       text,
@@ -938,13 +868,9 @@ class _AdminPaymentSettingsScreenState
     );
   }
 }
-
-// ─── Small badge widget ────────────────────────────────────────────────────
-
 class _Badge extends StatelessWidget {
   final int count;
   const _Badge({required this.count});
-
   @override
   Widget build(BuildContext context) {
     return Container(

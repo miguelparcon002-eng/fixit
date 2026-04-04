@@ -12,15 +12,12 @@ import '../../core/theme/app_theme.dart';
 import '../../services/user_session_service.dart';
 import '../../models/booking_model.dart';
 import '../../models/reward.dart';
-
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
     final profileAsync = ref.watch(profileProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: userAsync.when(
@@ -28,7 +25,6 @@ class ProfileScreen extends ConsumerWidget {
             ? const SizedBox.shrink()
             : CustomScrollView(
                 slivers: [
-                  // Modern gradient header with profile info
                   SliverToBoxAdapter(
                     child: Container(
                       decoration: BoxDecoration(
@@ -53,7 +49,6 @@ class ProfileScreen extends ConsumerWidget {
                                   profile.profileImagePath!.isNotEmpty;
                               return Column(
                                 children: [
-                                  // Profile Picture with edit button overlay
                                   Stack(
                                     children: [
                                       Container(
@@ -209,7 +204,6 @@ class ProfileScreen extends ConsumerWidget {
                                     ],
                                   ),
                                   const SizedBox(height: 20),
-                                  // Name
                                   Text(
                                     user.fullName,
                                     style: const TextStyle(
@@ -220,7 +214,6 @@ class ProfileScreen extends ConsumerWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  // Email with icon
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 18,
@@ -281,7 +274,6 @@ class ProfileScreen extends ConsumerWidget {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
-                                  // Profile Completion Bar
                                   _ProfileCompletionBar(
                                     user: user,
                                     profile: profile,
@@ -374,7 +366,6 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  // Content section with rounded top
                   SliverToBoxAdapter(
                     child: Container(
                       decoration: const BoxDecoration(
@@ -389,13 +380,10 @@ class ProfileScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Quick Stats Cards
                             _QuickStatsSection(ref: ref),
                             const SizedBox(height: 28),
-                            // Recent Activity Section
                             _RecentActivitySection(ref: ref),
                             const SizedBox(height: 32),
-                            // Account section header with modern badge
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -458,7 +446,6 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(height: 24),
-                            // Settings Options Grid
                             _ModernSettingCard(
                               icon: Icons.location_on_rounded,
                               iconColor: AppTheme.primaryCyan,
@@ -491,7 +478,6 @@ class ProfileScreen extends ConsumerWidget {
                               onTap: () => context.push('/help-support'),
                             ),
                             const SizedBox(height: 32),
-                            // Logout Button with theme colors
                             Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
@@ -515,8 +501,6 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  // Navigate first so the profile screen is
-                                  // never rendered in its logged-out state.
                                   context.go('/login');
                                   await ref
                                       .read(userSessionServiceProvider)
@@ -562,14 +546,12 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 }
-
 class _ModernSettingCard extends StatefulWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _ModernSettingCard({
     required this.icon,
     required this.iconColor,
@@ -577,14 +559,11 @@ class _ModernSettingCard extends StatefulWidget {
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   State<_ModernSettingCard> createState() => _ModernSettingCardState();
 }
-
 class _ModernSettingCardState extends State<_ModernSettingCard> {
   bool _isPressed = false;
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -699,20 +678,14 @@ class _ModernSettingCardState extends State<_ModernSettingCard> {
     );
   }
 }
-
-// Profile Completion Bar Widget
 class _ProfileCompletionBar extends ConsumerWidget {
   final dynamic user;
   final dynamic profile;
-
   const _ProfileCompletionBar({required this.user, required this.profile});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     int completedFields = 0;
     int totalFields = 5;
-
-    // Check completed fields
     if (user.fullName.isNotEmpty) completedFields++;
     if (user.email.isNotEmpty) completedFields++;
     if (user.contactNumber != null && user.contactNumber!.isNotEmpty) {
@@ -728,9 +701,7 @@ class _ProfileCompletionBar extends ConsumerWidget {
       orElse: () => false,
     );
     if (hasAddress) completedFields++;
-
     final completionPercentage = (completedFields / totalFields * 100).round();
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -831,21 +802,17 @@ class _ProfileCompletionBar extends ConsumerWidget {
     );
   }
 }
-
-// Profile Completion Detail Sheet
 class _ProfileCompletionDetailSheet extends StatelessWidget {
   final dynamic user;
   final dynamic profile;
   final int completionPercentage;
   final WidgetRef ref;
-
   const _ProfileCompletionDetailSheet({
     required this.user,
     required this.profile,
     required this.completionPercentage,
     required this.ref,
   });
-
   @override
   Widget build(BuildContext context) {
     final hasFullName = user.fullName.isNotEmpty;
@@ -860,9 +827,7 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
       data: (list) => list.isNotEmpty,
       orElse: () => false,
     );
-
     final isComplete = completionPercentage == 100;
-
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -875,7 +840,6 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40,
@@ -886,7 +850,6 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
@@ -943,7 +906,6 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Completion items
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
@@ -1000,7 +962,6 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Reward section
           if (isComplete)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1067,15 +1028,12 @@ class _ProfileCompletionDetailSheet extends StatelessWidget {
     );
   }
 }
-
-// Completion Item Widget
 class _CompletionItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final bool isComplete;
   final String? value;
   final VoidCallback? onTap;
-
   const _CompletionItem({
     required this.icon,
     required this.title,
@@ -1083,7 +1041,6 @@ class _CompletionItem extends StatelessWidget {
     this.value,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -1162,58 +1119,42 @@ class _CompletionItem extends StatelessWidget {
     );
   }
 }
-
-// Reward Claim Card Widget
 class _RewardClaimCard extends ConsumerStatefulWidget {
   final WidgetRef ref;
   final String userId;
-
   const _RewardClaimCard({required this.ref, required this.userId});
-
   @override
   ConsumerState<_RewardClaimCard> createState() => _RewardClaimCardState();
 }
-
 class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
   bool _isClaiming = false;
   bool _hasClaimed = false;
-
   @override
   void initState() {
     super.initState();
     _checkIfClaimed();
   }
-
   Future<void> _checkIfClaimed() async {
-    // Check if user has already claimed the profile completion voucher
     final voucherService = ref.read(redeemedVoucherServiceProvider);
     final vouchers = await voucherService.getUserRedeemedVouchers(
       widget.userId,
     );
-
-    // Check if there's a voucher with the profile completion reward ID
     final hasClaimed = vouchers.any(
       (v) => v.voucherId == 'voucherpr',
     );
-
     if (mounted) {
       setState(() {
         _hasClaimed = hasClaimed;
       });
     }
   }
-
   Future<void> _claimReward() async {
     if (_hasClaimed || _isClaiming) return;
-
     setState(() {
       _isClaiming = true;
     });
-
     try {
       final voucherService = ref.read(redeemedVoucherServiceProvider);
-
-      // Create the profile completion reward voucher
       final rewardVoucher = RewardVoucher(
         id: 'voucherpr',
         title: '₱100 OFF - Profile Complete',
@@ -1223,7 +1164,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
         discountAmount: 100,
         discountType: 'fixed',
       );
-
       await voucherService.redeemVoucher(
         userId: widget.userId,
         voucher: rewardVoucher,
@@ -1231,17 +1171,13 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
           const Duration(days: 365),
         ), // Valid for 1 year
       );
-
-      // Refresh the rewards provider
       ref.invalidate(rewardPointsProvider);
       ref.invalidate(redeemedVouchersProvider);
-
       if (mounted) {
         setState(() {
           _hasClaimed = true;
           _isClaiming = false;
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -1251,8 +1187,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
             duration: Duration(seconds: 3),
           ),
         );
-
-        // Close the bottom sheet after a delay
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
             Navigator.pop(context);
@@ -1264,7 +1198,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
         setState(() {
           _isClaiming = false;
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error claiming reward: $e'),
@@ -1274,7 +1207,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     if (_hasClaimed) {
@@ -1329,7 +1261,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
         ),
       );
     }
-
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -1410,8 +1341,6 @@ class _RewardClaimCardState extends ConsumerState<_RewardClaimCard> {
     );
   }
 }
-
-// Helper function to show Reward Points modal
 void _showRewardPointsModal(BuildContext context, int points, int completedBookings) {
   showModalBottomSheet(
     context: context,
@@ -1423,8 +1352,6 @@ void _showRewardPointsModal(BuildContext context, int points, int completedBooki
     ),
   );
 }
-
-// Helper function to show Member Level modal
 void _showMemberLevelModal(BuildContext context, String currentLevel, int completedBookings) {
   showModalBottomSheet(
     context: context,
@@ -1436,17 +1363,13 @@ void _showMemberLevelModal(BuildContext context, String currentLevel, int comple
     ),
   );
 }
-
-// Reward Points Modal Widget
 class _RewardPointsModal extends StatelessWidget {
   final int points;
   final int completedBookings;
-
   const _RewardPointsModal({
     required this.points,
     required this.completedBookings,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1464,7 +1387,6 @@ class _RewardPointsModal extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -1476,8 +1398,6 @@ class _RewardPointsModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Header
               Row(
                 children: [
                   Container(
@@ -1508,8 +1428,6 @@ class _RewardPointsModal extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Current Points Display
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -1548,8 +1466,6 @@ class _RewardPointsModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // How to Earn Points
               const Text(
                 'How to Earn Points',
                 style: TextStyle(
@@ -1559,7 +1475,6 @@ class _RewardPointsModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
               _PointsInfoCard(
                 icon: Icons.check_circle_rounded,
                 iconColor: AppTheme.successColor,
@@ -1576,8 +1491,6 @@ class _RewardPointsModal extends StatelessWidget {
                 example: 'Fill all profile details to claim',
               ),
               const SizedBox(height: 24),
-
-              // How to Use Points
               const Text(
                 'How to Use Points',
                 style: TextStyle(
@@ -1587,7 +1500,6 @@ class _RewardPointsModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
               _PointsInfoCard(
                 icon: Icons.card_giftcard_rounded,
                 iconColor: const Color(0xFFE91E63),
@@ -1604,8 +1516,6 @@ class _RewardPointsModal extends StatelessWidget {
                 example: 'Instant discount at checkout',
               ),
               const SizedBox(height: 24),
-
-              // Your Progress
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -1644,17 +1554,13 @@ class _RewardPointsModal extends StatelessWidget {
     );
   }
 }
-
-// Member Level Modal Widget
 class _MemberLevelModal extends StatelessWidget {
   final String currentLevel;
   final int completedBookings;
-
   const _MemberLevelModal({
     required this.currentLevel,
     required this.completedBookings,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1672,7 +1578,6 @@ class _MemberLevelModal extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -1684,8 +1589,6 @@ class _MemberLevelModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Header
               Row(
                 children: [
                   Container(
@@ -1716,8 +1619,6 @@ class _MemberLevelModal extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Current Level Display
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -1760,8 +1661,6 @@ class _MemberLevelModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Progress to Next Level
               if (currentLevel != 'Gold') ...[
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -1820,8 +1719,6 @@ class _MemberLevelModal extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
               ],
-
-              // All Member Levels
               const Text(
                 'All Member Levels',
                 style: TextStyle(
@@ -1831,7 +1728,6 @@ class _MemberLevelModal extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
               _LevelCard(
                 level: 'Bronze',
                 color: const Color(0xFFCD7F32),
@@ -1877,7 +1773,6 @@ class _MemberLevelModal extends StatelessWidget {
       ),
     );
   }
-
   List<Color> _getLevelGradient(String level) {
     switch (level) {
       case 'Gold':
@@ -1888,7 +1783,6 @@ class _MemberLevelModal extends StatelessWidget {
         return [const Color(0xFFCD7F32), const Color(0xFFB8681F)];
     }
   }
-
   int _getNextLevelRequirement(String level) {
     switch (level) {
       case 'Bronze':
@@ -1899,7 +1793,6 @@ class _MemberLevelModal extends StatelessWidget {
         return 20;
     }
   }
-
   String _getNextLevel(String level) {
     switch (level) {
       case 'Bronze':
@@ -1911,15 +1804,12 @@ class _MemberLevelModal extends StatelessWidget {
     }
   }
 }
-
-// Points Info Card Widget
 class _PointsInfoCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String description;
   final String example;
-
   const _PointsInfoCard({
     required this.icon,
     required this.iconColor,
@@ -1927,7 +1817,6 @@ class _PointsInfoCard extends StatelessWidget {
     required this.description,
     required this.example,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2001,15 +1890,12 @@ class _PointsInfoCard extends StatelessWidget {
     );
   }
 }
-
-// Level Card Widget
 class _LevelCard extends StatelessWidget {
   final String level;
   final Color color;
   final String requirement;
   final List<String> benefits;
   final bool isCurrentLevel;
-
   const _LevelCard({
     required this.level,
     required this.color,
@@ -2017,7 +1903,6 @@ class _LevelCard extends StatelessWidget {
     required this.benefits,
     required this.isCurrentLevel,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2108,18 +1993,13 @@ class _LevelCard extends StatelessWidget {
     );
   }
 }
-
-// Quick Stats Section Widget
 class _QuickStatsSection extends ConsumerWidget {
   final WidgetRef ref;
-
   const _QuickStatsSection({required this.ref});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingsAsync = ref.watch(customerBookingsProvider);
     final rewardPointsAsync = ref.watch(rewardPointsProvider);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2146,11 +2026,8 @@ class _QuickStatsSection extends ConsumerWidget {
                       b.status == 'in_progress',
                 )
                 .length;
-
-            // Calculate member level based on completed bookings
             String memberLevel = 'Bronze';
             Color levelColor = const Color(0xFFCD7F32);
-
             if (completedBookings >= 20) {
               memberLevel = 'Gold';
               levelColor = const Color(0xFFFFD700);
@@ -2158,7 +2035,6 @@ class _QuickStatsSection extends ConsumerWidget {
               memberLevel = 'Silver';
               levelColor = const Color(0xFFC0C0C0);
             }
-
             return rewardPointsAsync.when(
               data: (points) => GridView.count(
                 crossAxisCount: 2,
@@ -2223,8 +2099,6 @@ class _QuickStatsSection extends ConsumerWidget {
     );
   }
 }
-
-// Stat Card Widget
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -2232,7 +2106,6 @@ class _StatCard extends StatelessWidget {
   final String value;
   final List<Color> gradient;
   final VoidCallback? onTap;
-
   const _StatCard({
     required this.icon,
     required this.iconColor,
@@ -2241,7 +2114,6 @@ class _StatCard extends StatelessWidget {
     required this.gradient,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -2311,17 +2183,12 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
-// Recent Activity Section Widget
 class _RecentActivitySection extends ConsumerWidget {
   final WidgetRef ref;
-
   const _RecentActivitySection({required this.ref});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bookingsAsync = ref.watch(customerBookingsProvider);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2396,12 +2263,9 @@ class _RecentActivitySection extends ConsumerWidget {
                 ),
               );
             }
-
-            // Sort bookings by date and take the last 3
             final recentBookings = bookings.toList()
               ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
             final displayBookings = recentBookings.take(3).toList();
-
             return Column(
               children: displayBookings.map((booking) {
                 return Padding(
@@ -2433,13 +2297,9 @@ class _RecentActivitySection extends ConsumerWidget {
     );
   }
 }
-
-// Recent Activity Card Widget
 class _RecentActivityCard extends StatelessWidget {
   final BookingModel booking;
-
   const _RecentActivityCard({required this.booking});
-
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
@@ -2455,7 +2315,6 @@ class _RecentActivityCard extends StatelessWidget {
         return AppTheme.textSecondaryColor;
     }
   }
-
   IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
@@ -2471,7 +2330,6 @@ class _RecentActivityCard extends StatelessWidget {
         return Icons.info_rounded;
     }
   }
-
   String _formatDate(DateTime date) {
     final months = [
       'Jan',
@@ -2489,11 +2347,9 @@ class _RecentActivityCard extends StatelessWidget {
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
-
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(booking.status);
-
     return Material(
       color: Colors.transparent,
       child: InkWell(

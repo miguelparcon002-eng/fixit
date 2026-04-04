@@ -1,40 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/service_model.dart';
 import '../../providers/service_provider.dart';
 import 'package:go_router/go_router.dart';
-
 class MoreServicesScreen extends ConsumerStatefulWidget {
   const MoreServicesScreen({super.key});
-
   @override
   ConsumerState<MoreServicesScreen> createState() => _MoreServicesScreenState();
 }
-
 class _MoreServicesScreenState extends ConsumerState<MoreServicesScreen> {
   final _searchController = TextEditingController();
   String? _selectedCategory; // null = All
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim();
-
     final params = SearchServicesParams(
       query: query.isEmpty ? null : query,
       category: _selectedCategory,
     );
-
     final servicesAsync = ref.watch(searchServicesProvider(params));
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -72,7 +63,6 @@ class _MoreServicesScreenState extends ConsumerState<MoreServicesScreen> {
                         : 'No active services are available right now.',
                   );
                 }
-
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(searchServicesProvider(params));
@@ -96,25 +86,21 @@ class _MoreServicesScreenState extends ConsumerState<MoreServicesScreen> {
       ),
     );
   }
-
   void _openBookingFlow(BuildContext context) {
     context.push('/create-booking');
   }
 }
-
 class _Header extends StatelessWidget {
   final TextEditingController searchController;
   final String? selectedCategory;
   final ValueChanged<String?> onCategorySelected;
   final VoidCallback onQueryChanged;
-
   const _Header({
     required this.searchController,
     required this.selectedCategory,
     required this.onCategorySelected,
     required this.onQueryChanged,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -201,18 +187,15 @@ class _Header extends StatelessWidget {
     );
   }
 }
-
 class _CategoryChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _CategoryChip({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -239,23 +222,19 @@ class _CategoryChip extends StatelessWidget {
     );
   }
 }
-
 class _ServiceListCard extends StatelessWidget {
   final ServiceModel service;
   final VoidCallback onTap;
-
   const _ServiceListCard({
     required this.service,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     final priceText = _formatPrice(service);
     final durationText = service.estimatedDuration > 0
         ? '${service.estimatedDuration} min'
         : 'Duration varies';
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -345,22 +324,17 @@ class _ServiceListCard extends StatelessWidget {
       ),
     );
   }
-
   String _formatPrice(ServiceModel service) {
-    // Prefer base price when available; otherwise show range; otherwise fallback.
     if (service.basePrice != null) {
       return '₱${service.basePrice!.toStringAsFixed(0)}';
     }
-
     if (service.priceRangeMin != null || service.priceRangeMax != null) {
       final min = (service.priceRangeMin ?? 0).toStringAsFixed(0);
       final max = (service.priceRangeMax ?? 0).toStringAsFixed(0);
       return '₱$min - ₱$max';
     }
-
     return 'Price varies';
   }
-
   String _partsAvailabilityLabel(String value) {
     return switch (value) {
       'in_stock' => 'Parts in stock',
@@ -370,13 +344,10 @@ class _ServiceListCard extends StatelessWidget {
     };
   }
 }
-
 class _Badge extends StatelessWidget {
   final String text;
   final Color color;
-
   const _Badge({required this.text, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -396,13 +367,10 @@ class _Badge extends StatelessWidget {
     );
   }
 }
-
 class _MiniInfo extends StatelessWidget {
   final IconData icon;
   final String text;
-
   const _MiniInfo({required this.icon, required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -430,13 +398,10 @@ class _MiniInfo extends StatelessWidget {
     );
   }
 }
-
 class _EmptyState extends StatelessWidget {
   final String title;
   final String message;
-
   const _EmptyState({required this.title, required this.message});
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -468,18 +433,15 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
 class _ErrorState extends StatelessWidget {
   final String title;
   final String message;
   final VoidCallback onRetry;
-
   const _ErrorState({
     required this.title,
     required this.message,
     required this.onRetry,
   });
-
   @override
   Widget build(BuildContext context) {
     return Center(

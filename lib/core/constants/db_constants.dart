@@ -1,5 +1,4 @@
 class DBConstants {
-  // Table Names
   static const String users = 'users';
   static const String services = 'services';
   static const String bookings = 'bookings';

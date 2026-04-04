@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-
 class AppTheme {
-  // Custom FixIT colors from Figma design
   static const Color primaryCyan = Color(0xFF17A2B8);
   static const Color darkCyan = Color(0xFF0D7F94);
   static const Color deepBlue = Color(0xFF1E3A8A);
   static const Color lightBlue = Color(0xFF3B82F6);
-
   static const Color errorColor = Color(0xFFEF4444);
   static const Color warningColor = Color(0xFFF59E0B);
   static const Color successColor = Color(0xFF10B981);
@@ -14,14 +11,11 @@ class AppTheme {
   static const Color surfaceColor = Colors.white;
   static const Color textPrimaryColor = Color(0xFF111827);
   static const Color textSecondaryColor = Color(0xFF6B7280);
-
-  // Gradient Colors (keeping these for welcome screen)
   static const Color gradientStart = Color(0xFF667EEA);
   static const Color gradientEnd = Color(0xFF764BA2);
   static const Color cyanGradientStart = Color(0xFF06B6D4);
   static const Color cyanGradientEnd = Color(0xFF3B82F6);
   static const Color accentPurple = Color(0xFF8B5CF6);
-
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

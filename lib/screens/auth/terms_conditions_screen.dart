@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-
 class TermsConditionsScreen extends StatefulWidget {
   const TermsConditionsScreen({super.key});
-
   @override
   State<TermsConditionsScreen> createState() => _TermsConditionsScreenState();
 }
-
 class _TermsConditionsScreenState extends State<TermsConditionsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
@@ -14,7 +11,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
   late Animation<Offset> _slideAnim;
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
-
   @override
   void initState() {
     super.initState();
@@ -30,7 +26,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
     _animController.forward();
-
     _scrollController.addListener(() {
       final show = _scrollController.offset > 300;
       if (show != _showScrollToTop) {
@@ -38,14 +33,12 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       }
     });
   }
-
   @override
   void dispose() {
     _animController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,9 +65,7 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
               position: _slideAnim,
               child: Column(
                 children: [
-                  // Header
                   _buildHeader(),
-                  // Content
                   Expanded(
                     child: Container(
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -100,11 +91,8 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Welcome badge
                                   _buildWelcomeBadge(),
                                   const SizedBox(height: 24),
-
-                                  // Sections
                                   _buildSection(
                                     number: '01',
                                     icon: Icons.person_add_rounded,
@@ -197,20 +185,14 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
                                     color: const Color(0xFF17A2B8),
                                     paragraph: 'We may update these Terms and Conditions from time to time. We will notify you of any significant changes through the app or via email. Continued use of the app after changes constitutes acceptance of the new terms.',
                                   ),
-
                                   const SizedBox(height: 8),
-
-                                  // Contact card
                                   _buildContactCard(),
                                   const SizedBox(height: 20),
-
-                                  // Agreement footer
                                   _buildAgreementFooter(),
                                   const SizedBox(height: 16),
                                 ],
                               ),
                             ),
-                            // Scroll to top FAB
                             if (_showScrollToTop)
                               Positioned(
                                 right: 16,
@@ -243,7 +225,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
                       ),
                     ),
                   ),
-                  // Bottom button
                   _buildBottomButton(),
                 ],
               ),
@@ -253,7 +234,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -309,7 +289,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildWelcomeBadge() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -366,7 +345,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildSection({
     required String number,
     required IconData icon,
@@ -381,7 +359,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section header
           Row(
             children: [
               Container(
@@ -432,7 +409,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
             ],
           ),
           const SizedBox(height: 14),
-          // Divider line
           Container(
             height: 2,
             decoration: BoxDecoration(
@@ -443,7 +419,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
             ),
           ),
           const SizedBox(height: 14),
-          // Description if any
           if (description != null) ...[
             Text(
               description,
@@ -455,7 +430,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
             ),
             const SizedBox(height: 10),
           ],
-          // Paragraph if any
           if (paragraph != null)
             Text(
               paragraph,
@@ -465,14 +439,12 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
                 color: Color(0xFF4B5563),
               ),
             ),
-          // Bullet points
           if (content != null)
             ...content.map((text) => _buildBulletPoint(text, color)),
         ],
       ),
     );
   }
-
   Widget _buildBulletPoint(String text, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -503,7 +475,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildContactCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -546,7 +517,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildContactItem(IconData icon, String text) {
     return Row(
       children: [
@@ -563,7 +533,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ],
     );
   }
-
   Widget _buildAgreementFooter() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -604,7 +573,6 @@ class _TermsConditionsScreenState extends State<TermsConditionsScreen>
       ),
     );
   }
-
   Widget _buildBottomButton() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),

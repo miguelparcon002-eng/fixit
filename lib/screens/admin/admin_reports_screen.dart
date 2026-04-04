@@ -7,25 +7,20 @@ import '../../core/widgets/app_logo.dart';
 import '../../providers/admin_reports_provider.dart';
 import '../../services/admin_reports_service.dart';
 import 'widgets/admin_notifications_dialog.dart';
-
 class AdminReportsScreen extends ConsumerStatefulWidget {
   const AdminReportsScreen({super.key});
-
   @override
   ConsumerState<AdminReportsScreen> createState() =>
       _AdminReportsScreenState();
 }
-
 class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
   String _selectedView = 'dashboard'; // dashboard, device, areas, team
   DeviceBreakdownItem? _selectedDevice; // for drill-down into models
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final period = ref.watch(adminReportsPeriodProvider);
     final reportsAsync = ref.watch(adminReportsProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -91,7 +86,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         builder: (context, constraints) {
           final maxWidth =
               constraints.maxWidth >= 900 ? 820.0 : double.infinity;
-
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Center(
@@ -100,7 +94,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Period selector ──────────────────────────────────────
                     _SectionCard(
                       child: Row(
                         children: [
@@ -143,8 +136,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // ── Body ─────────────────────────────────────────────────
                     reportsAsync.when(
                       loading: () => const Padding(
                         padding: EdgeInsets.symmetric(vertical: 60),
@@ -165,15 +156,12 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       ),
     );
   }
-
   Future<void> _exportCSV(
       BuildContext context, AdminReportsData data, String period) async {
     final buf = StringBuffer();
-
     buf.writeln('FixIt Admin Report — Period: $period');
     buf.writeln('Generated: ${DateTime.now().toLocal()}');
     buf.writeln();
-
     buf.writeln('=== OVERVIEW ===');
     buf.writeln('Metric,Value');
     buf.writeln('Total Bookings,${data.totalBookings}');
@@ -185,7 +173,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
     buf.writeln('Total Technicians,${data.totalTechnicians}');
     buf.writeln('Active Technicians,${data.activeTechnicians}');
     buf.writeln();
-
     buf.writeln('=== DEVICE BREAKDOWN ===');
     buf.writeln('Device,Bookings,Revenue,Share');
     for (final d in data.deviceBreakdown) {
@@ -193,7 +180,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           '${d.deviceName},${d.count},₱${d.revenue.toStringAsFixed(2)},${d.percentage.toStringAsFixed(1)}%');
     }
     buf.writeln();
-
     buf.writeln('=== POPULAR AREAS ===');
     buf.writeln('Area,Bookings,Revenue');
     for (final a in data.popularAreas) {
@@ -201,14 +187,12 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
           '${a.areaName},${a.count},₱${a.revenue.toStringAsFixed(2)}');
     }
     buf.writeln();
-
     buf.writeln('=== TEAM PERFORMANCE ===');
     buf.writeln('Technician,Completed Jobs,Revenue,Avg Rating');
     for (final t in data.teamPerformance) {
       buf.writeln(
           '${t.name},${t.completedJobs},₱${t.revenue.toStringAsFixed(2)},${t.averageRating?.toStringAsFixed(1) ?? 'N/A'}');
     }
-
     try {
       final filename =
           'fixit_report_${period.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}.csv';
@@ -221,7 +205,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       }
     }
   }
-
   void _showPeriodPicker(BuildContext context, WidgetRef ref, String current) {
     showDialog(
       context: context,
@@ -279,7 +262,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       ),
     );
   }
-
   Widget _buildViewBody(AdminReportsData data, String period) {
     switch (_selectedView) {
       case 'device':
@@ -293,9 +275,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         return _buildDashboard(data, period);
     }
   }
-
-  // ── DASHBOARD ──────────────────────────────────────────────────────────────
-
   Widget _buildDashboard(AdminReportsData data, String period) {
     final bookings = period == 'Day'
         ? data.dayBookings
@@ -318,7 +297,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
             : period == 'Month'
                 ? data.monthCustomers
                 : data.totalCustomers;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -330,8 +308,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
               ),
         ),
         const SizedBox(height: 12),
-
-        // ── 4 stat cards ─────────────────────────────────────────────────────
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -384,10 +360,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
             ),
           ],
         ),
-
         const SizedBox(height: 12),
-
-        // ── Booking status breakdown ─────────────────────────────────────────
         _SectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,10 +399,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // ── Drill-down options ───────────────────────────────────────────────
         _SectionCard(
           child: Column(
             children: [
@@ -462,11 +432,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       ],
     );
   }
-
-  // ── DEVICE BREAKDOWN ──────────────────────────────────────────────────────
-
   Widget _buildDeviceView(AdminReportsData data) {
-    // Drill-down: show models for a selected category
     if (_selectedDevice != null) {
       final device = _selectedDevice!;
       final sorted = device.models.entries.toList()
@@ -542,9 +508,7 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
         ],
       );
     }
-
     final items = data.deviceBreakdown;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -584,12 +548,8 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       ],
     );
   }
-
-  // ── POPULAR AREAS ─────────────────────────────────────────────────────────
-
   Widget _buildAreasView(AdminReportsData data) {
     final items = data.popularAreas;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -625,12 +585,8 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       ],
     );
   }
-
-  // ── TEAM PERFORMANCE ──────────────────────────────────────────────────────
-
   Widget _buildTeamView(AdminReportsData data, String period) {
     final items = data.teamPerformance;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -669,11 +625,6 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPER FORMATTERS
-// ─────────────────────────────────────────────────────────────────────────────
-
 String _fmt(double v, {bool isCount = false}) {
   if (isCount) {
     final n = v.toInt();
@@ -683,23 +634,15 @@ String _fmt(double v, {bool isCount = false}) {
   }
   return v.toStringAsFixed(0);
 }
-
 String _fmtCurrency(double v) {
   if (v >= 1000000) return '₱${(v / 1000000).toStringAsFixed(2)}M';
   if (v >= 1000) return '₱${(v / 1000).toStringAsFixed(1)}K';
   return '₱${v.toStringAsFixed(0)}';
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _ErrorCard extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
-
   const _ErrorCard({required this.message, required this.onRetry});
-
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
@@ -730,11 +673,9 @@ class _ErrorCard extends StatelessWidget {
     );
   }
 }
-
 class _EmptyCard extends StatelessWidget {
   final String message;
   const _EmptyCard({required this.message});
-
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
@@ -758,7 +699,6 @@ class _EmptyCard extends StatelessWidget {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -766,7 +706,6 @@ class _StatCard extends StatelessWidget {
   final String value;
   final String label;
   final String sub;
-
   const _StatCard({
     required this.icon,
     required this.iconColor,
@@ -775,7 +714,6 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.sub,
   });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -825,14 +763,12 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _StatusRow extends StatelessWidget {
   final String label;
   final int count;
   final int total;
   final Color color;
   final IconData icon;
-
   const _StatusRow({
     required this.label,
     required this.count,
@@ -840,7 +776,6 @@ class _StatusRow extends StatelessWidget {
     required this.color,
     required this.icon,
   });
-
   @override
   Widget build(BuildContext context) {
     final pct = total > 0 ? count / total : 0.0;
@@ -883,7 +818,6 @@ class _StatusRow extends StatelessWidget {
     );
   }
 }
-
 class _DeviceBreakdownCard extends StatelessWidget {
   final int rank;
   final String deviceName;
@@ -891,7 +825,6 @@ class _DeviceBreakdownCard extends StatelessWidget {
   final double percentage;
   final double revenue;
   final VoidCallback? onTap;
-
   const _DeviceBreakdownCard({
     required this.rank,
     required this.deviceName,
@@ -900,13 +833,11 @@ class _DeviceBreakdownCard extends StatelessWidget {
     required this.revenue,
     this.onTap,
   });
-
   static const _rankColors = [
     Color(0xFFFFD700),
     Color(0xFFC0C0C0),
     Color(0xFFCD7F32),
   ];
-
   IconData get _icon {
     final lower = deviceName.toLowerCase();
     if (lower.contains('iphone')) return Icons.phone_iphone;
@@ -917,12 +848,10 @@ class _DeviceBreakdownCard extends StatelessWidget {
     if (lower.contains('desktop') || lower.contains('pc')) return Icons.desktop_windows_rounded;
     return Icons.devices_other_rounded;
   }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final rankColor = rank <= 3 ? _rankColors[rank - 1] : AppTheme.deepBlue;
-
     return _SectionCard(
       child: InkWell(
         onTap: onTap,
@@ -998,20 +927,17 @@ class _DeviceBreakdownCard extends StatelessWidget {
     );
   }
 }
-
 class _AreaCard extends StatelessWidget {
   final int rank;
   final String areaName;
   final int count;
   final double revenue;
-
   const _AreaCard({
     required this.rank,
     required this.areaName,
     required this.count,
     required this.revenue,
   });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1069,7 +995,6 @@ class _AreaCard extends StatelessWidget {
     );
   }
 }
-
 class _TechnicianCard extends StatelessWidget {
   final int rank;
   final String name;
@@ -1077,7 +1002,6 @@ class _TechnicianCard extends StatelessWidget {
   final int completedJobs;
   final double revenue;
   final double? averageRating;
-
   const _TechnicianCard({
     required this.rank,
     required this.name,
@@ -1086,7 +1010,6 @@ class _TechnicianCard extends StatelessWidget {
     required this.revenue,
     this.averageRating,
   });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1096,7 +1019,6 @@ class _TechnicianCard extends StatelessWidget {
         .take(2)
         .map((s) => s[0].toUpperCase())
         .join();
-
     return _SectionCard(
       child: Row(
         children: [
@@ -1174,20 +1096,17 @@ class _TechnicianCard extends StatelessWidget {
     );
   }
 }
-
 class _OtherReportsCard extends StatelessWidget {
   final String exclude;
   final VoidCallback onDevice;
   final VoidCallback onAreas;
   final VoidCallback onTeam;
-
   const _OtherReportsCard({
     required this.exclude,
     required this.onDevice,
     required this.onAreas,
     required this.onTeam,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1229,7 +1148,6 @@ class _OtherReportsCard extends StatelessWidget {
     );
   }
 }
-
 class _ReportOption extends StatelessWidget {
   const _ReportOption({
     required this.title,
@@ -1237,12 +1155,10 @@ class _ReportOption extends StatelessWidget {
     this.icon,
     required this.onTap,
   });
-
   final String title;
   final String? subtitle;
   final IconData? icon;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1288,11 +1204,9 @@ class _ReportOption extends StatelessWidget {
     );
   }
 }
-
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.child});
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -1311,18 +1225,15 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
-
 class _SubViewHeader extends StatelessWidget {
   const _SubViewHeader({
     required this.title,
     required this.description,
     required this.onBack,
   });
-
   final String title;
   final String description;
   final VoidCallback onBack;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1356,15 +1267,12 @@ class _SubViewHeader extends StatelessWidget {
     );
   }
 }
-
 class _PeriodOption extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _PeriodOption(
       {required this.label, required this.isSelected, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

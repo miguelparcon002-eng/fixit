@@ -10,13 +10,11 @@ class AdminCustomerUser {
   final String? profilePicture;
   final DateTime? createdAt;
   final DateTime? lastBookingAt;
-
   bool get isActive {
     final last = lastBookingAt;
     if (last == null) return false;
     return DateTime.now().difference(last).inDays < 7;
   }
-
   const AdminCustomerUser({
     required this.id,
     required this.fullName,
@@ -30,7 +28,6 @@ class AdminCustomerUser {
     required this.createdAt,
     required this.lastBookingAt,
   });
-
   factory AdminCustomerUser.fromJson(Map<String, dynamic> json) {
     return AdminCustomerUser(
       id: json['id'] as String,

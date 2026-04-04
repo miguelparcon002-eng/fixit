@@ -9,7 +9,6 @@ class ChatModel {
   final int unreadCountTechnician;
   final DateTime createdAt;
   final DateTime? updatedAt;
-
   ChatModel({
     required this.id,
     required this.customerId,
@@ -22,7 +21,6 @@ class ChatModel {
     required this.createdAt,
     this.updatedAt,
   });
-
   factory ChatModel.fromJson(Map<String, dynamic> json) {
     return ChatModel(
       id: json['id'] as String,
@@ -41,7 +39,6 @@ class ChatModel {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -57,7 +54,6 @@ class ChatModel {
     };
   }
 }
-
 class MessageModel {
   final String id;
   final String chatId;
@@ -66,7 +62,6 @@ class MessageModel {
   final String? imageUrl;
   final bool isRead;
   final DateTime createdAt;
-
   MessageModel({
     required this.id,
     required this.chatId,
@@ -76,7 +71,6 @@ class MessageModel {
     this.isRead = false,
     required this.createdAt,
   });
-
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
       id: json['id'] as String,
@@ -88,7 +82,6 @@ class MessageModel {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,

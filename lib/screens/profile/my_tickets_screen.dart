@@ -4,17 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/support_ticket_model.dart';
 import '../../providers/support_ticket_provider.dart';
-
 class MyTicketsScreen extends ConsumerStatefulWidget {
   const MyTicketsScreen({super.key});
-
   @override
   ConsumerState<MyTicketsScreen> createState() => _MyTicketsScreenState();
 }
-
 class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
   String _selectedFilter = 'all';
-
   @override
   void initState() {
     super.initState();
@@ -22,12 +18,10 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
       ref.invalidate(customerTicketsProvider);
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final ticketsAsync = ref.watch(customerTicketsProvider);
     final allTickets = ticketsAsync.valueOrNull ?? [];
-
     List<SupportTicket> filteredTickets;
     switch (_selectedFilter) {
       case 'open':
@@ -43,7 +37,6 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
         filteredTickets = allTickets;
     }
     filteredTickets.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -81,14 +74,11 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
       ),
       body: Column(
         children: [
-          // Summary bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: _TicketSummaryBar(tickets: allTickets),
           ),
           const SizedBox(height: 12),
-
-          // Filter chips
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SingleChildScrollView(
@@ -131,8 +121,6 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Ticket list
           Expanded(
             child: filteredTickets.isEmpty
                 ? _EmptyState(
@@ -163,19 +151,14 @@ class _MyTicketsScreenState extends ConsumerState<MyTicketsScreen> {
     );
   }
 }
-
-// ─── Summary Bar ────────────────────────────────────────────────────────────
-
 class _TicketSummaryBar extends StatelessWidget {
   final List<SupportTicket> tickets;
   const _TicketSummaryBar({required this.tickets});
-
   @override
   Widget build(BuildContext context) {
     final open = tickets.where((t) => t.status == 'open').length;
     final inProgress = tickets.where((t) => t.status == 'in_progress').length;
     final resolved = tickets.where((t) => t.status == 'resolved' || t.status == 'closed').length;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -203,7 +186,6 @@ class _TicketSummaryBar extends StatelessWidget {
     );
   }
 }
-
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
@@ -213,13 +195,11 @@ class _Divider extends StatelessWidget {
         color: Colors.grey.shade200,
       );
 }
-
 class _SummaryItem extends StatelessWidget {
   final int count;
   final String label;
   final Color color;
   const _SummaryItem({required this.count, required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -247,16 +227,12 @@ class _SummaryItem extends StatelessWidget {
     );
   }
 }
-
-// ─── Filter Chip ─────────────────────────────────────────────────────────────
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final int count;
   final bool isSelected;
   final Color color;
   final VoidCallback onTap;
-
   const _FilterChip({
     required this.label,
     required this.count,
@@ -264,7 +240,6 @@ class _FilterChip extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -324,14 +299,10 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
-// ─── Empty State ─────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final String filter;
   final VoidCallback onNewTicket;
   const _EmptyState({required this.filter, required this.onNewTicket});
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -395,15 +366,10 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-// ─── Ticket Card ─────────────────────────────────────────────────────────────
-
 class _TicketCard extends StatelessWidget {
   final SupportTicket ticket;
   final VoidCallback onTap;
-
   const _TicketCard({required this.ticket, required this.onTap});
-
   Color get _statusColor {
     switch (ticket.status) {
       case 'open':
@@ -418,7 +384,6 @@ class _TicketCard extends StatelessWidget {
         return Colors.grey;
     }
   }
-
   Color get _priorityColor {
     switch (ticket.priority) {
       case 'urgent':
@@ -433,7 +398,6 @@ class _TicketCard extends StatelessWidget {
         return Colors.grey;
     }
   }
-
   String get _categoryLabel {
     switch (ticket.category) {
       case 'booking_issue':
@@ -448,7 +412,6 @@ class _TicketCard extends StatelessWidget {
         return 'Other';
     }
   }
-
   IconData get _categoryIcon {
     switch (ticket.category) {
       case 'booking_issue':
@@ -463,7 +426,6 @@ class _TicketCard extends StatelessWidget {
         return Icons.help_outline_rounded;
     }
   }
-
   String get _timeAgo {
     final diff = DateTime.now().difference(ticket.createdAt);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
@@ -471,10 +433,8 @@ class _TicketCard extends StatelessWidget {
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${ticket.createdAt.day}/${ticket.createdAt.month}/${ticket.createdAt.year}';
   }
-
   int get _adminReplies =>
       ticket.messages.where((m) => m.senderRole == 'admin').length;
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -494,7 +454,6 @@ class _TicketCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Colored top accent bar
             Container(
               height: 4,
               decoration: BoxDecoration(
@@ -510,10 +469,8 @@ class _TicketCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header row
                   Row(
                     children: [
-                      // Category icon
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -549,7 +506,6 @@ class _TicketCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
@@ -567,10 +523,7 @@ class _TicketCard extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 12),
-
-                  // Description preview
                   Text(
                     ticket.description,
                     style: const TextStyle(
@@ -581,28 +534,22 @@ class _TicketCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-
                   const SizedBox(height: 14),
                   const Divider(height: 1, color: Color(0xFFF0F0F0)),
                   const SizedBox(height: 12),
-
-                  // Footer row
                   Row(
                     children: [
-                      // Category chip
                       _TagChip(
                         label: _categoryLabel,
                         color: AppTheme.deepBlue,
                       ),
                       const SizedBox(width: 8),
-                      // Priority chip
                       _TagChip(
                         label: ticket.priority.toUpperCase(),
                         color: _priorityColor,
                         filled: true,
                       ),
                       const Spacer(),
-                      // Admin reply badge
                       if (_adminReplies > 0) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -628,7 +575,6 @@ class _TicketCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      // Time
                       Text(
                         _timeAgo,
                         style: const TextStyle(
@@ -649,13 +595,11 @@ class _TicketCard extends StatelessWidget {
     );
   }
 }
-
 class _TagChip extends StatelessWidget {
   final String label;
   final Color color;
   final bool filled;
   const _TagChip({required this.label, required this.color, this.filled = false});
-
   @override
   Widget build(BuildContext context) {
     return Container(

@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
 import '../../models/admin_booking_view.dart';
 import '../../models/booking_model.dart';
 import '../../providers/admin_booking_provider.dart';
 import 'widgets/admin_notifications_dialog.dart';
-
-// ── Status helpers ─────────────────────────────────────────────────────────────
-
 String _appointmentBucket(String status) {
   switch (status.toLowerCase()) {
     case 'requested':
@@ -32,7 +28,6 @@ String _appointmentBucket(String status) {
       return 'other';
   }
 }
-
 String _appointmentStatusLabel(String status) {
   switch (status.toLowerCase()) {
     case 'requested':            return 'Requested';
@@ -49,7 +44,6 @@ String _appointmentStatusLabel(String status) {
     default:                     return status.replaceAll('_', ' ');
   }
 }
-
 Color _appointmentStatusColor(String status) {
   switch (status.toLowerCase()) {
     case 'requested':
@@ -72,62 +66,49 @@ Color _appointmentStatusColor(String status) {
       return AppTheme.textSecondaryColor;
   }
 }
-
 class AdminAppointmentsScreen extends ConsumerStatefulWidget {
   final String? initialRange; // day|week|month
   final String? initialStatus; // all|requested|in_progress|completed|cancelled
-
   const AdminAppointmentsScreen({
     super.key,
     this.initialRange,
     this.initialStatus,
   });
-
   @override
   ConsumerState<AdminAppointmentsScreen> createState() =>
       _AdminAppointmentsScreenState();
 }
-
 enum _TimeRange { all, day, week, month }
-
 class _AdminAppointmentsScreenState
     extends ConsumerState<AdminAppointmentsScreen> {
-
   bool _appliedInitialFilters = false;
-
   void _applyInitialFiltersIfNeeded() {
     if (_appliedInitialFilters) return;
-
     final r = (widget.initialRange ?? '').toLowerCase();
     final s = (widget.initialStatus ?? '').toLowerCase();
-
     if (r.isNotEmpty) {
       if (r == 'all') _timeRange = _TimeRange.all;
       if (r == 'day') _timeRange = _TimeRange.day;
       if (r == 'week') _timeRange = _TimeRange.week;
       if (r == 'month') _timeRange = _TimeRange.month;
     }
-
     if (s.isNotEmpty) {
       const allowed = {'all', 'requested', 'in_progress', 'completed', 'cancelled'};
       if (allowed.contains(s)) {
         _statusFilter = s;
       }
     }
-
     _appliedInitialFilters = true;
   }
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'all'; // all, requested, in_progress, completed, cancelled
   _TimeRange _timeRange = _TimeRange.all;
-
   String _shortBookingCode(String id) {
     final compact = id.replaceAll('-', '');
     if (compact.length <= 6) return compact.toUpperCase();
     return compact.substring(0, 6).toUpperCase();
   }
-
   bool _matchesTimeRange(DateTime createdAt) {
     final now = DateTime.now();
     switch (_timeRange) {
@@ -143,7 +124,6 @@ class _AdminAppointmentsScreenState
         return createdAt.isAfter(DateTime(now.year, now.month, 1));
     }
   }
-
   void _showBookingDetails(BuildContext context, AdminBookingView item) {
     showModalBottomSheet(
       context: context,
@@ -159,18 +139,15 @@ class _AdminAppointmentsScreenState
       ),
     );
   }
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     _applyInitialFiltersIfNeeded();
     final bookingsAsync = ref.watch(adminBookingsProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -227,7 +204,6 @@ class _AdminAppointmentsScreenState
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
               child: Column(
                 children: [
-                  // Search
                   TextField(
                     controller: _searchController,
                     onChanged: (v) => setState(() => _searchQuery = v.trim()),
@@ -252,8 +228,6 @@ class _AdminAppointmentsScreenState
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Time range filter (interactive picker like Admin Reports)
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -327,8 +301,6 @@ class _AdminAppointmentsScreenState
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Status filters
                   SizedBox(
                     height: 38,
                     child: ListView(
@@ -370,7 +342,6 @@ class _AdminAppointmentsScreenState
                 ],
               ),
             ),
-
             Expanded(
               child: bookingsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -387,16 +358,12 @@ class _AdminAppointmentsScreenState
                 data: (items) {
                   final filtered = items.where((item) {
                     final b = item.booking;
-
                     if (!_matchesTimeRange(b.createdAt)) return false;
-
                     final status = b.status.toLowerCase();
                     if (_statusFilter != 'all' && _appointmentBucket(status) != _statusFilter) {
                       return false;
                     }
-
                     if (_searchQuery.isEmpty) return true;
-
                     final q = _searchQuery.toLowerCase();
                     return b.id.toLowerCase().contains(q) ||
                         status.contains(q) ||
@@ -404,7 +371,6 @@ class _AdminAppointmentsScreenState
                         item.technicianName.toLowerCase().contains(q) ||
                         item.serviceName.toLowerCase().contains(q);
                   }).toList();
-
                   if (filtered.isEmpty) {
                     return Center(
                       child: Padding(
@@ -428,7 +394,6 @@ class _AdminAppointmentsScreenState
                       ),
                     );
                   }
-
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     itemCount: filtered.length,
@@ -451,18 +416,15 @@ class _AdminAppointmentsScreenState
     );
   }
 }
-
 class _PeriodOption extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _PeriodOption({
     required this.label,
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -507,24 +469,20 @@ class _PeriodOption extends StatelessWidget {
     );
   }
 }
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final String value;
   final String selected;
   final ValueChanged<String> onSelected;
-
   const _FilterChip({
     required this.label,
     required this.value,
     required this.selected,
     required this.onSelected,
   });
-
   @override
   Widget build(BuildContext context) {
     final isSelected = selected == value;
-
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: InkWell(
@@ -552,31 +510,25 @@ class _FilterChip extends StatelessWidget {
     );
   }
 }
-
 class _AppointmentCard extends StatelessWidget {
   final AdminBookingView item;
   final String shortCode;
   final VoidCallback onTap;
-
   const _AppointmentCard({
     required this.item,
     required this.shortCode,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     final booking = item.booking;
     final status = booking.status;
     final statusColor = _appointmentStatusColor(status);
-
     final createdAt = booking.createdAt as DateTime?;
     final dateText = createdAt == null
         ? '—'
         : '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}';
-
     final cost = booking.estimatedCost ?? booking.finalCost;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
@@ -684,13 +636,10 @@ class _AppointmentCard extends StatelessWidget {
     );
   }
 }
-
 class _DetailsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
-
   const _DetailsSection({required this.title, required this.children});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -718,18 +667,15 @@ class _DetailsSection extends StatelessWidget {
     );
   }
 }
-
 class _DetailsRow extends StatelessWidget {
   final String label;
   final String value;
   final bool multiline;
-
   const _DetailsRow({
     required this.label,
     required this.value,
     this.multiline = false,
   });
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -766,13 +712,10 @@ class _DetailsRow extends StatelessWidget {
     );
   }
 }
-
 class _InfoPill extends StatelessWidget {
   final IconData icon;
   final String text;
-
   const _InfoPill({required this.icon, required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -804,24 +747,17 @@ class _InfoPill extends StatelessWidget {
     );
   }
 }
-
-// ─── Booking Detail Bottom Sheet ────────────────────────────────────────────
-
 class _BookingDetailSheet extends StatefulWidget {
   final AdminBookingView item;
   final String shortCode;
-
   const _BookingDetailSheet({
     required this.item,
     required this.shortCode,
   });
-
   @override
   State<_BookingDetailSheet> createState() => _BookingDetailSheetState();
 }
-
 class _BookingDetailSheetState extends State<_BookingDetailSheet> {
-
   String _fmt(DateTime? dt) {
     if (dt == null) return '—';
     final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -830,12 +766,10 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
     final period = dt.hour >= 12 ? 'PM' : 'AM';
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year} • $h:$m $period';
   }
-
   List<_StageData> _getJobStages(BookingModel booking) {
     final status = booking.status.toLowerCase();
     final isCancelled =
         status == 'cancelled' || status == 'cancellation_pending';
-
     final stages = <_StageData>[
       _StageData(
         label: 'Requested',
@@ -883,7 +817,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
         timestamp: null,
       ),
     ];
-
     if (!isCancelled) {
       stages.addAll([
         _StageData(
@@ -926,10 +859,8 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
             booking.cancelledAt != null ? _fmt(booking.cancelledAt) : null,
       ));
     }
-
     return stages;
   }
-
   Widget _buildJobProgress(BookingModel booking) {
     final stages = _getJobStages(booking);
     return _DetailsSection(
@@ -940,14 +871,12 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
       ],
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final booking = widget.item.booking;
     final status = booking.status;
     final statusColor = _appointmentStatusColor(status);
     final cost = booking.finalCost ?? booking.estimatedCost;
-
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.6,
@@ -960,7 +889,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header: status + code ──────────────────────────────
               Row(
                 children: [
                   Container(
@@ -1009,8 +937,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // ── Summary ───────────────────────────────────────────
               _DetailsSection(
                 title: 'Summary',
                 children: [
@@ -1027,13 +953,8 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-
-              // ── Job Progress ───────────────────────────────────────
               _buildJobProgress(booking),
-
               const SizedBox(height: 12),
-
-              // ── Schedule ──────────────────────────────────────────
               _DetailsSection(
                 title: 'Schedule',
                 children: [
@@ -1049,8 +970,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-
-              // ── Location & Payment ────────────────────────────────
               _DetailsSection(
                 title: 'Location & Payment',
                 children: [
@@ -1073,8 +992,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                     ),
                 ],
               ),
-
-              // ── Cancellation ──────────────────────────────────────
               if (booking.cancellationReason != null) ...[
                 const SizedBox(height: 12),
                 _DetailsSection(
@@ -1088,8 +1005,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ],
                 ),
               ],
-
-              // ── Rating ────────────────────────────────────────────
               if (booking.rating != null) ...[
                 const SizedBox(height: 12),
                 _DetailsSection(
@@ -1108,7 +1023,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
                   ],
                 ),
               ],
-
               const SizedBox(height: 20),
             ],
           ),
@@ -1117,9 +1031,6 @@ class _BookingDetailSheetState extends State<_BookingDetailSheet> {
     );
   }
 }
-
-// ── Job progress data + widget ────────────────────────────────────────────────
-
 class _StageData {
   final String label;
   final IconData icon;
@@ -1127,7 +1038,6 @@ class _StageData {
   final bool done;
   final bool isCurrent;
   final String? timestamp;
-
   const _StageData({
     required this.label,
     required this.icon,
@@ -1137,20 +1047,16 @@ class _StageData {
     this.timestamp,
   });
 }
-
 class _TimelineStep extends StatelessWidget {
   final _StageData data;
   final bool isLast;
-
   const _TimelineStep({required this.data, required this.isLast});
-
   @override
   Widget build(BuildContext context) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Timeline indicator column
           Column(
             children: [
               Container(
@@ -1185,8 +1091,6 @@ class _TimelineStep extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 12),
-
-          // Label + timestamp
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 14),

@@ -1,9 +1,7 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
@@ -13,25 +11,20 @@ import '../../providers/booking_provider.dart';
 import '../../providers/job_request_provider.dart';
 import '../../services/distance_fee_service.dart';
 import '../../services/notification_service.dart';
-
 class MainNavigation extends ConsumerStatefulWidget {
   final Widget child;
   const MainNavigation({super.key, required this.child});
-
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
-
 class _MainNavigationState extends ConsumerState<MainNavigation> {
   final Set<String> _shownDialogs = {};
-
   int _locationToTabIndex(String location) {
     if (location.startsWith('/bookings') || location.startsWith('/booking/')) return 1;
     if (location.startsWith('/help-support') || location.startsWith('/live-chat')) return 2;
     if (location.startsWith('/profile') || location.startsWith('/edit-profile') || location.startsWith('/addresses')) return 3;
     return 0;
   }
-
   void _onTabSelected(int index) {
     switch (index) {
       case 0: context.go('/home'); break;
@@ -40,7 +33,6 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
       case 3: context.go('/profile'); break;
     }
   }
-
   void _handleRequests(List<JobRequestModel> requests) {
     final pending = requests
         .where((r) =>
@@ -64,19 +56,16 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _locationToTabIndex(location);
     final user = ref.watch(currentUserProvider).valueOrNull;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: Stack(
         children: [
           widget.child,
-          // Invisible listener — only mounted for customer accounts
           if (user != null && user.role == AppConstants.roleCustomer)
             _PendingRequestListener(
               customerId: user.id,
@@ -116,21 +105,15 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
     );
   }
 }
-
-// ── Invisible listener widget ─────────────────────────────────────────────────
-
 class _PendingRequestListener extends ConsumerWidget {
   final String customerId;
   final void Function(List<JobRequestModel>) onRequests;
-
   const _PendingRequestListener({
     required this.customerId,
     required this.onRequests,
   });
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch current value — triggers on initial mount and every rebuild
     final current = ref.watch(customerJobRequestsProvider(customerId));
     current.whenData((requests) {
       if (requests.any((r) => r.status == 'pending_customer_approval')) {
@@ -139,50 +122,38 @@ class _PendingRequestListener extends ConsumerWidget {
         });
       }
     });
-
-    // Listen for future stream changes
     ref.listen<AsyncValue<List<JobRequestModel>>>(
       customerJobRequestsProvider(customerId),
       (_, next) => next.whenData(onRequests),
     );
-
     return const SizedBox.shrink();
   }
 }
-
-// ── Technician approval dialog ────────────────────────────────────────────────
-
 class _TechApprovalDialog extends ConsumerStatefulWidget {
   final JobRequestModel request;
   final VoidCallback onDeclined;
-
   const _TechApprovalDialog({
     required this.request,
     required this.onDeclined,
   });
-
   @override
   ConsumerState<_TechApprovalDialog> createState() =>
       _TechApprovalDialogState();
 }
-
 class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
   bool _loading = true;
   bool _accepting = false;
   bool _declining = false;
   String? _error;
-
   String _techName = 'Technician';
   String? _techPicture;
   double? _distanceKm;
   double? _distanceFee;
-
   @override
   void initState() {
     super.initState();
     _loadData();
   }
-
   static double _haversineKm(
       double lat1, double lng1, double lat2, double lng2) {
     const toRad = pi / 180;
@@ -191,7 +162,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
         (lng2 - lng1) * 111.0 * cos((lat1 + lat2) / 2 * toRad);
     return sqrt(dLat * dLat + dLng * dLng);
   }
-
   Future<void> _loadData() async {
     try {
       final techId = widget.request.technicianId!;
@@ -200,13 +170,10 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
           .select('full_name, profile_picture, latitude, longitude')
           .eq('id', techId)
           .single();
-
       final techLat = (row['latitude'] as num?)?.toDouble();
       final techLng = (row['longitude'] as num?)?.toDouble();
-
       double? distKm;
       double? distFee;
-
       if (techLat != null && techLng != null) {
         distKm = _haversineKm(
           techLat, techLng,
@@ -216,7 +183,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
         final rate = await DistanceFeeService.getRate();
         distFee = (distKm * 10).round() * rate;
       }
-
       if (mounted) {
         setState(() {
           _techName = row['full_name'] as String? ?? 'Technician';
@@ -230,7 +196,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
-
   Future<void> _accept() async {
     setState(() => _accepting = true);
     try {
@@ -238,8 +203,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
       if (user == null) throw Exception('Not logged in');
       final supabase = SupabaseConfig.client;
       final techId = widget.request.technicianId!;
-
-      // Get service ID for this technician (same logic as create_booking_screen)
       var svcRow = await supabase
           .from('services')
           .select('id')
@@ -253,11 +216,7 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
           .maybeSingle();
       if (svcRow == null) throw Exception('No services available.');
       final serviceId = svcRow['id'] as String;
-
-      // Scheduled 15 minutes from now
       final scheduledAt = DateTime.now().add(const Duration(minutes: 15));
-
-      // Create booking directly as 'accepted' so it lands in the Active tab
       final booking = await ref.read(bookingServiceProvider).createBooking(
             customerId: user.id,
             technicianId: techId,
@@ -271,11 +230,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
             paymentMethod: 'gcash',
             bookingSource: 'post_problem',
           );
-
-      // Store the problem description as diagnostic notes.
-      // Prefix with [POST_PROBLEM] so the tech jobs screen can distinguish
-      // post-problem bookings from regular schedule bookings.
-      // Also embed the distance fee so payment breakdown shows it properly.
       final distanceNoteLine = (_distanceFee != null && _distanceFee! > 0)
           ? '\nDistance Fee: ₱${_distanceFee!.toStringAsFixed(2)}'
           : '';
@@ -283,12 +237,8 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
         'diagnostic_notes':
             '[POST_PROBLEM]\n${widget.request.problemDescription}$distanceNoteLine',
       }).eq('id', booking.id);
-
-      // Mark job request as accepted
       await ref.read(jobRequestServiceProvider).acceptRequest(
             widget.request.id, techId);
-
-      // Notify the technician their proposal was accepted
       await NotificationService().sendNotification(
         userId: techId,
         type: 'job_request_accepted',
@@ -296,7 +246,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
         message: 'The customer accepted your proposal for ${widget.request.deviceType} repair. Check your jobs.',
         data: {'route': '/tech-jobs'},
       );
-
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -314,17 +263,13 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
       setState(() => _accepting = false);
     }
   }
-
   Future<void> _decline() async {
     setState(() => _declining = true);
-    // Save before customerDeclineRequest clears it in the DB
     final declinedTechId = widget.request.technicianId;
     try {
       await ref
           .read(jobRequestServiceProvider)
           .customerDeclineRequest(widget.request.id);
-
-      // Notify the technician their proposal was declined
       if (declinedTechId != null) {
         await NotificationService().sendNotification(
           userId: declinedTechId,
@@ -334,7 +279,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
           data: {'route': '/tech-job-map'},
         );
       }
-
       if (!mounted) return;
       widget.onDeclined();
       Navigator.of(context).pop();
@@ -352,7 +296,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
       setState(() => _declining = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -361,7 +304,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Gradient header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
@@ -407,8 +349,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
               ],
             ),
           ),
-
-          // Content
           Padding(
             padding: const EdgeInsets.all(20),
             child: _loading
@@ -427,7 +367,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
                         address: widget.request.address,
                       ),
           ),
-
           if (!_loading && _error == null) ...[
             const Divider(height: 1),
             Padding(
@@ -487,7 +426,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
               ),
             ),
           ],
-
           if (_error != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -504,9 +442,6 @@ class _TechApprovalDialogState extends ConsumerState<_TechApprovalDialog> {
     );
   }
 }
-
-// ── Dialog sub-widgets ────────────────────────────────────────────────────────
-
 class _LoadedBody extends StatelessWidget {
   final String techName;
   final String? techPicture;
@@ -514,7 +449,6 @@ class _LoadedBody extends StatelessWidget {
   final double? distanceFee;
   final String deviceType;
   final String address;
-
   const _LoadedBody({
     required this.techName,
     required this.techPicture,
@@ -523,12 +457,10 @@ class _LoadedBody extends StatelessWidget {
     required this.deviceType,
     required this.address,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Technician info
         Row(
           children: [
             CircleAvatar(
@@ -571,8 +503,6 @@ class _LoadedBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Info cards
         Container(
           decoration: BoxDecoration(
             color: const Color(0xFFF9FAFB),
@@ -616,7 +546,6 @@ class _LoadedBody extends StatelessWidget {
             ],
           ),
         ),
-
         if (distanceFee == null)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -638,7 +567,6 @@ class _LoadedBody extends StatelessWidget {
     );
   }
 }
-
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -647,7 +575,6 @@ class _InfoRow extends StatelessWidget {
   final Color? valueColor;
   final bool bold;
   final int maxLines;
-
   const _InfoRow({
     required this.icon,
     required this.label,
@@ -657,7 +584,6 @@ class _InfoRow extends StatelessWidget {
     this.bold = false,
     this.maxLines = 1,
   });
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -695,11 +621,9 @@ class _InfoRow extends StatelessWidget {
     );
   }
 }
-
 class _ErrorBody extends StatelessWidget {
   final String error;
   const _ErrorBody({required this.error});
-
   @override
   Widget build(BuildContext context) {
     return Padding(

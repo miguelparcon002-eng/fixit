@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
-
   @override
   State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
 }
-
 class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-
   @override
   void initState() {
     super.initState();
@@ -30,13 +26,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,7 +62,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Spacer(flex: 2),
-                        // Logo
                         Container(
                           width: 120,
                           height: 120,
@@ -102,7 +95,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           ),
                         ),
                         const SizedBox(height: 24),
-                        // App name
                         ShaderMask(
                           shaderCallback: (bounds) => const LinearGradient(
                             colors: [Colors.white, Color(0xFFE0E7FF)],
@@ -144,12 +136,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                       ],
                     ),
                   ),
-                  // Bottom buttons
                   Padding(
                     padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
                     child: Column(
                       children: [
-                        // Login button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -181,7 +171,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                           ),
                         ),
                         const SizedBox(height: 14),
-                        // Sign Up button
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(

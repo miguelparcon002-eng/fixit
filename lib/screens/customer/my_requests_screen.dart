@@ -2,19 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../models/job_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_request_provider.dart';
-
 class MyRequestsScreen extends ConsumerWidget {
   const MyRequestsScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
-
     return userAsync.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
@@ -27,15 +23,12 @@ class MyRequestsScreen extends ConsumerWidget {
     );
   }
 }
-
 class _RequestsList extends ConsumerWidget {
   final String customerId;
   const _RequestsList({required this.customerId});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final requestsAsync = ref.watch(customerJobRequestsProvider(customerId));
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -103,7 +96,6 @@ class _RequestsList extends ConsumerWidget {
               ),
             );
           }
-
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: requests.length,
@@ -123,20 +115,15 @@ class _RequestsList extends ConsumerWidget {
     );
   }
 }
-
 class _RequestCard extends StatelessWidget {
   final JobRequestModel request;
   final WidgetRef ref;
-
   const _RequestCard({required this.request, required this.ref});
-
-  /// Cancel is allowed while no technician has started travelling yet.
   bool get _isCancellable => const {
         'open',
         'pending_customer_approval',
         'accepted',
       }.contains(request.status);
-
   (Color, IconData, String) get _statusStyle {
     return switch (request.status) {
       'open'                       => (Colors.orange,             Icons.hourglass_top_rounded,    'Open'),
@@ -147,12 +134,10 @@ class _RequestCard extends StatelessWidget {
       _                            => (Colors.grey,              Icons.circle,                   request.status),
     };
   }
-
   @override
   Widget build(BuildContext context) {
     final (color, icon, label) = _statusStyle;
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -169,7 +154,6 @@ class _RequestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Container(
@@ -200,7 +184,6 @@ class _RequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Status chip
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -226,8 +209,6 @@ class _RequestCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-
-          // Problem
           Text(
             request.problemDescription,
             style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
@@ -235,8 +216,6 @@ class _RequestCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 10),
-
-          // Location
           Row(
             children: [
               Icon(Icons.location_on_outlined,
@@ -253,8 +232,6 @@ class _RequestCard extends StatelessWidget {
               ),
             ],
           ),
-
-          // Cancel button — open, pending approval, or accepted
           if (_isCancellable) ...[
             const SizedBox(height: 12),
             Divider(color: Colors.grey.shade100, height: 1),
@@ -280,7 +257,6 @@ class _RequestCard extends StatelessWidget {
       ),
     );
   }
-
   Future<void> _confirmCancel(BuildContext context) async {
     final hasTech = request.technicianId != null;
     final bodyText = switch (request.status) {
@@ -290,7 +266,6 @@ class _RequestCard extends StatelessWidget {
         'A technician has been assigned to this job. Cancelling will notify them.',
       _ => 'Are you sure you want to cancel this request?',
     };
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -311,11 +286,8 @@ class _RequestCard extends StatelessWidget {
         ],
       ),
     );
-
     if (confirmed != true || !context.mounted) return;
     try {
-      // Use cancelRequestByCustomer so the technician gets notified when one
-      // is assigned (pending_customer_approval or accepted).
       await ref
           .read(jobRequestServiceProvider)
           .cancelRequestByCustomer(request);

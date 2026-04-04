@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../providers/notification_settings_provider.dart';
 import '../../services/notification_settings_service.dart';
-
 class TechNotificationSettingsScreen extends ConsumerWidget {
   const TechNotificationSettingsScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsAsync = ref.watch(notificationSettingsProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.primaryCyan,
       appBar: AppBar(
@@ -55,26 +51,20 @@ class TechNotificationSettingsScreen extends ConsumerWidget {
     );
   }
 }
-
 class _TechSettingsBody extends ConsumerWidget {
   final NotificationSettings settings;
-
   const _TechSettingsBody({required this.settings});
-
   void _toggle(WidgetRef ref, NotificationSettings updated) {
     ref.read(notificationSettingsProvider.notifier).save(updated);
   }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(notificationSettingsProvider).valueOrNull ?? settings;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── General ──────────────────────────────────────────
           _SectionHeader(
             icon: Icons.notifications_rounded,
             iconColor: AppTheme.primaryCyan,
@@ -107,10 +97,7 @@ class _TechSettingsBody extends ConsumerWidget {
             value: s.smsNotifications,
             onChanged: (v) => _toggle(ref, s.copyWith(smsNotifications: v)),
           ),
-
           const SizedBox(height: 24),
-
-          // ── Job & Customer Updates ────────────────────────────
           _SectionHeader(
             icon: Icons.work_rounded,
             iconColor: AppTheme.successColor,
@@ -143,10 +130,7 @@ class _TechSettingsBody extends ConsumerWidget {
             value: s.paymentReminders,
             onChanged: (v) => _toggle(ref, s.copyWith(paymentReminders: v)),
           ),
-
           const SizedBox(height: 24),
-
-          // ── Promotions & Offers ───────────────────────────────
           _SectionHeader(
             icon: Icons.local_offer_rounded,
             iconColor: AppTheme.accentPurple,
@@ -170,9 +154,7 @@ class _TechSettingsBody extends ConsumerWidget {
             value: s.newOffers,
             onChanged: (v) => _toggle(ref, s.copyWith(newOffers: v)),
           ),
-
           const SizedBox(height: 28),
-
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -217,18 +199,15 @@ class _TechSettingsBody extends ConsumerWidget {
     );
   }
 }
-
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
-
   const _SectionHeader({
     required this.icon,
     required this.iconColor,
     required this.title,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -255,7 +234,6 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 }
-
 class _NotifTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -263,7 +241,6 @@ class _NotifTile extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
-
   const _NotifTile({
     required this.icon,
     required this.iconColor,
@@ -272,7 +249,6 @@ class _NotifTile extends StatelessWidget {
     required this.value,
     required this.onChanged,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
-
-/// Ordered stages of a job from acceptance through payment.
 const List<({String status, String label, IconData icon})> kJobStatusSteps = [
   (status: 'accepted',    label: 'Accepted',  icon: Icons.check_circle_outline),
   (status: 'en_route',    label: 'En Route',  icon: Icons.directions_car_outlined),
@@ -10,35 +8,20 @@ const List<({String status, String label, IconData icon})> kJobStatusSteps = [
   (status: 'completed',   label: 'Done',      icon: Icons.task_alt),
   (status: 'paid',        label: 'Paid',      icon: Icons.payments_outlined),
 ];
-
-/// Returns the 0-based index of [status] in the tracker, or -1 if not in flow.
 int jobStatusIndex(String status) =>
     kJobStatusSteps.indexWhere((s) => s.status == status);
-
-/// Horizontal step tracker showing progress from Accepted → Paid.
-///
-/// [currentStatus] drives which steps are done/current/future.
-/// [onNextStepTap] — when provided, the immediately-next step becomes tappable
-/// (shows a dashed blue border + ripple). Used on the technician screen so the
-/// technician can advance the status by tapping the next step on the tracker.
 class JobStatusTracker extends StatelessWidget {
   final String currentStatus;
-
-  /// Optional callback fired with the next step's status string when tapped.
-  /// Only the single next step is made interactive — future steps are ignored.
   final void Function(String nextStatus)? onNextStepTap;
-
   const JobStatusTracker({
     super.key,
     required this.currentStatus,
     this.onNextStepTap,
   });
-
   @override
   Widget build(BuildContext context) {
     final currentIdx = jobStatusIndex(currentStatus);
     final nextIdx    = currentIdx + 1;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(kJobStatusSteps.length, (i) {
@@ -48,7 +31,6 @@ class JobStatusTracker extends StatelessWidget {
         final isNext    = onNextStepTap != null &&
                           i == nextIdx &&
                           nextIdx < kJobStatusSteps.length;
-
         final Color circleColor = isDone
             ? AppTheme.primaryCyan
             : isCurrent
@@ -63,15 +45,12 @@ class JobStatusTracker extends StatelessWidget {
                 : isNext
                     ? AppTheme.deepBlue
                     : Colors.grey.shade400;
-
-        // Step circle widget
         Widget circle = Container(
           width: 28,
           height: 28,
           decoration: BoxDecoration(
             color: circleColor,
             shape: BoxShape.circle,
-            // Dashed-style border on the next step to hint it's tappable
             border: isNext
                 ? Border.all(color: AppTheme.deepBlue, width: 1.5)
                 : null,
@@ -91,8 +70,6 @@ class JobStatusTracker extends StatelessWidget {
             color: iconColor,
           ),
         );
-
-        // Wrap the next step in an InkWell so it shows a ripple on tap
         if (isNext) {
           circle = Material(
             color: Colors.transparent,
@@ -104,14 +81,12 @@ class JobStatusTracker extends StatelessWidget {
             ),
           );
         }
-
         return Expanded(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
-                  // Left connector
                   if (i > 0)
                     Expanded(
                       child: Container(
@@ -122,7 +97,6 @@ class JobStatusTracker extends StatelessWidget {
                       ),
                     ),
                   circle,
-                  // Right connector
                   if (i < kJobStatusSteps.length - 1)
                     Expanded(
                       child: Container(

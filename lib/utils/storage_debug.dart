@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/utils/app_logger.dart';
-
 class StorageDebug {
   static Future<void> printAllKeys() async {
     final prefs = await SharedPreferences.getInstance();
@@ -12,7 +11,6 @@ class StorageDebug {
     }
     AppLogger.p('==================================');
   }
-
   static Future<void> printBookings() async {
     final prefs = await SharedPreferences.getInstance();
     final bookings = prefs.getString('local_bookings');
@@ -20,7 +18,6 @@ class StorageDebug {
     AppLogger.p(bookings ?? 'NULL');
     AppLogger.p('=====================');
   }
-
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

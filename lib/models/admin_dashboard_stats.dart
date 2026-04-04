@@ -6,7 +6,6 @@ class AdminDashboardStats {
   final int totalCustomers;
   final int totalTechnicians;
   final int pendingPayments;
-
   const AdminDashboardStats({
     required this.pendingVerifications,
     required this.openSupportTickets,

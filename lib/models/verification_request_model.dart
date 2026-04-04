@@ -7,8 +7,6 @@ class VerificationRequestModel {
   final DateTime submittedAt;
   final DateTime? reviewedAt;
   final String? reviewedBy;
-  
-  // Technician information fields
   final String? fullName;
   final String? contactNumber;
   final String? address;
@@ -16,7 +14,6 @@ class VerificationRequestModel {
   final String? shopName;
   final String? bio;
   final List<String>? specialties;
-
   VerificationRequestModel({
     required this.id,
     required this.userId,
@@ -34,7 +31,6 @@ class VerificationRequestModel {
     this.bio,
     this.specialties,
   });
-
   factory VerificationRequestModel.fromJson(Map<String, dynamic> json) {
     return VerificationRequestModel(
       id: json['id'] as String,
@@ -58,7 +54,6 @@ class VerificationRequestModel {
           : null,
     );
   }
-
   Map<String, dynamic> toJson() {
     return {
       'id': id,

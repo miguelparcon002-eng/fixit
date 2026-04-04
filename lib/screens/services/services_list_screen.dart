@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
-
 class ServicesListScreen extends ConsumerWidget {
   const ServicesListScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
@@ -33,7 +31,6 @@ class ServicesListScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Mobile Repairs Section
               const Text(
                 'Mobile Repairs',
                 style: TextStyle(
@@ -79,8 +76,6 @@ class ServicesListScreen extends ConsumerWidget {
                 onTap: () => _showBookingDialog(context),
               ),
               const SizedBox(height: 24),
-
-              // Laptop Repairs Section
               const Text(
                 'Laptop Repairs',
                 style: TextStyle(
@@ -126,8 +121,6 @@ class ServicesListScreen extends ConsumerWidget {
                 onTap: () => _showBookingDialog(context),
               ),
               const SizedBox(height: 24),
-
-              // Other Services Section
               const Text(
                 'Other Services',
                 style: TextStyle(
@@ -179,13 +172,10 @@ class ServicesListScreen extends ConsumerWidget {
       ),
     );
   }
-
   void _showBookingDialog(BuildContext context) {
-    // Full-screen booking flow
     context.push('/create-booking');
   }
 }
-
 class _ServiceCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -193,7 +183,6 @@ class _ServiceCard extends StatelessWidget {
   final String description;
   final String price;
   final VoidCallback onTap;
-
   const _ServiceCard({
     required this.icon,
     required this.iconColor,
@@ -202,7 +191,6 @@ class _ServiceCard extends StatelessWidget {
     required this.price,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(

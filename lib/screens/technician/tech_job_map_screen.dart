@@ -6,32 +6,26 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../../core/config/supabase_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/job_request_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_request_provider.dart';
 import '../../services/notification_service.dart';
-
 class TechJobMapScreen extends ConsumerStatefulWidget {
   const TechJobMapScreen({super.key});
-
   @override
   ConsumerState<TechJobMapScreen> createState() => _TechJobMapScreenState();
 }
-
 class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
   final MapController _mapController = MapController();
   LatLng? _techLocation;
   bool _locating = true;
-
   @override
   void initState() {
     super.initState();
     _getTechLocation();
   }
-
   Future<void> _getTechLocation() async {
     try {
       LocationPermission perm = await Geolocator.checkPermission();
@@ -56,7 +50,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
       if (mounted) setState(() => _locating = false);
     }
   }
-
   double? _distanceTo(JobRequestModel r) {
     if (_techLocation == null) return null;
     final meters = Geolocator.distanceBetween(
@@ -67,7 +60,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
     );
     return meters / 1000;
   }
-
   void _showJobSheet(BuildContext context, JobRequestModel request,
       {bool isPending = false}) {
     final dist = _distanceTo(request);
@@ -84,7 +76,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
             ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final requestsAsync = ref.watch(openJobRequestsProvider);
@@ -92,7 +83,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
     final proposalsAsync = techId != null
         ? ref.watch(techProposalsProvider(techId))
         : const AsyncData<List<JobRequestModel>>([]);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -154,7 +144,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
                   ),
                   MarkerLayer(
                     markers: [
-                      // Tech's own location (blue)
                       if (_techLocation != null)
                         Marker(
                           point: _techLocation!,
@@ -176,8 +165,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
                                 color: Colors.white, size: 22),
                           ),
                         ),
-
-                      // Open job pins (red)
                       ...requests.map((r) => Marker(
                             point: LatLng(r.latitude, r.longitude),
                             width: 44,
@@ -187,8 +174,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
                               child: _buildPin(Colors.red.shade600),
                             ),
                           )),
-
-                      // Pending proposal pins (amber — waiting for customer)
                       ...proposals.map((r) => Marker(
                             point: LatLng(r.latitude, r.longitude),
                             width: 44,
@@ -203,8 +188,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
                   ),
                 ],
               ),
-
-              // Badge row
               Positioned(
                 top: 12,
                 left: 12,
@@ -227,8 +210,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
                   ],
                 ),
               ),
-
-              // Empty state
               if (requests.isEmpty && proposals.isEmpty)
                 Positioned(
                   bottom: 40,
@@ -287,7 +268,6 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
       ],
     );
   }
-
   Widget _buildBadge({required Color color, required String label}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -317,15 +297,10 @@ class _TechJobMapScreenState extends ConsumerState<TechJobMapScreen> {
     );
   }
 }
-
-// ── Waiting sheet (tech's pending proposal) ────────────────────────────────────
-
 class _WaitingSheet extends StatelessWidget {
   final JobRequestModel request;
   final double? distanceKm;
-
   const _WaitingSheet({required this.request, required this.distanceKm});
-
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
@@ -354,7 +329,6 @@ class _WaitingSheet extends StatelessWidget {
                 ),
               ),
             ),
-            // Waiting banner
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -397,7 +371,6 @@ class _WaitingSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Request details
             Row(
               children: [
                 Container(
@@ -463,34 +436,26 @@ class _WaitingSheet extends StatelessWidget {
     );
   }
 }
-
-// ── Job detail bottom sheet ────────────────────────────────────────────────────
-
 class _JobDetailSheet extends ConsumerStatefulWidget {
   final JobRequestModel request;
   final double? distanceKm;
   final VoidCallback onAccepted;
-
   const _JobDetailSheet({
     required this.request,
     required this.distanceKm,
     required this.onAccepted,
   });
-
   @override
   ConsumerState<_JobDetailSheet> createState() => _JobDetailSheetState();
 }
-
 class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
   bool _accepting = false;
   String? _customerName;
-
   @override
   void initState() {
     super.initState();
     _loadCustomerName();
   }
-
   Future<void> _loadCustomerName() async {
     try {
       final data = await SupabaseConfig.client
@@ -503,7 +468,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
       }
     } catch (_) {}
   }
-
   Future<void> _accept() async {
     setState(() => _accepting = true);
     try {
@@ -512,8 +476,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
       await ref
           .read(jobRequestServiceProvider)
           .proposeRequest(widget.request.id, user.id);
-
-      // Notify the customer that a technician is interested
       await NotificationService().sendNotification(
         userId: widget.request.customerId,
         type: 'tech_proposed',
@@ -521,7 +483,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
         message: 'A technician is interested in your ${widget.request.deviceType} repair request. Tap to review.',
         data: {'route': '/my-requests'},
       );
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -539,7 +500,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
       if (mounted) setState(() => _accepting = false);
     }
   }
-
   Future<void> _navigate() async {
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1'
@@ -550,12 +510,10 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
     final fmt = DateFormat('MMM d, yyyy · h:mm a');
-
     return DraggableScrollableSheet(
       initialChildSize: 0.52,
       minChildSize: 0.35,
@@ -570,7 +528,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
           controller: ctrl,
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           children: [
-            // Handle
             Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 12),
@@ -582,8 +539,6 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
                 ),
               ),
             ),
-
-            // Title row
             Row(
               children: [
                 Container(
@@ -635,32 +590,24 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Problem description
             _InfoTile(
               icon: Icons.report_problem_outlined,
               label: 'Problem',
               value: r.problemDescription,
             ),
             const SizedBox(height: 10),
-
-            // Location
             _InfoTile(
               icon: Icons.location_on_outlined,
               label: 'Location',
               value: r.address,
             ),
             const SizedBox(height: 10),
-
-            // Customer
             _InfoTile(
               icon: Icons.person_outline,
               label: 'Customer',
               value: _customerName ?? 'Loading…',
             ),
             const SizedBox(height: 20),
-
-            // Action buttons
             Row(
               children: [
                 Expanded(
@@ -707,18 +654,15 @@ class _JobDetailSheetState extends ConsumerState<_JobDetailSheet> {
     );
   }
 }
-
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-
   const _InfoTile({
     required this.icon,
     required this.label,
     required this.value,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(

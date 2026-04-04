@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
 import '../theme/app_theme.dart';
-
 ({IconData icon, Color color}) mapNotificationIcon(String type) {
   switch (type) {
     case 'job_request':

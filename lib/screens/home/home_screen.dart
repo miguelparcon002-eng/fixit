@@ -18,74 +18,49 @@ import '../../models/booking_model.dart';
 import '../../services/voucher_service.dart';
 import '../profile/rewards_screen.dart';
 import 'profile_setup_dialog.dart';
-
-// Provider to track if setup dialog has been shown this session
 final setupDialogShownProvider = StateProvider<bool>((ref) => false);
-
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
-
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
-
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Check for profile setup after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkProfileSetup();
-      // Reward points are automatically calculated from Supabase bookings
     });
   }
-
-  // Reward points are now automatically calculated from Supabase bookings
-  // No need to manually sync
-
   Future<void> _checkProfileSetup() async {
     final user = ref.read(currentUserProvider).value;
     if (user == null) return;
-
-    // Don't show dialog if already shown for THIS user in this session
     final shownForUser = ref.read(setupDialogShownProvider);
     if (shownForUser) return;
-
     final voucherService = VoucherService();
     final isSetupComplete = await voucherService.isProfileSetupComplete(user.id);
-
-    // If not marked complete in DB, check if profile is actually complete
     if (!isSetupComplete) {
       final hasName = user.fullName.isNotEmpty;
       final hasPhone = (user.contactNumber ?? '').isNotEmpty;
       final addresses = ref.read(userAddressesProvider).valueOrNull ?? [];
       final hasAddress = addresses.isNotEmpty;
-
       if (hasName && hasPhone && hasAddress) {
-        // Core profile fields are complete — mark it and skip dialog
         await voucherService.markProfileSetupComplete(user.id);
         return;
       }
-
-      // Also skip for existing accounts older than 1 day
       final hoursSinceCreation = DateTime.now().difference(user.createdAt).inHours;
       if (hoursSinceCreation >= 24) {
         await voucherService.markProfileSetupComplete(user.id);
         return;
       }
     }
-
     if (!isSetupComplete && mounted) {
-      // Mark as shown for this session
       ref.read(setupDialogShownProvider.notifier).state = true;
-
-      // Show the profile setup dialog
       showDialog(
         context: context,
         barrierDismissible: true,
         builder: (context) => ProfileSetupDialog(
           onComplete: () {
-            // Refresh providers after setup
             ref.invalidate(validVouchersProvider);
             ref.invalidate(currentUserProvider);
           },
@@ -93,7 +68,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
   }
-
   void _showRepairTypeDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -160,7 +134,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-
   void _showSupportOptionsDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -271,7 +244,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final savedAddressCount = ref.watch(savedAddressCountProvider);
@@ -280,7 +252,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: const Color(0xFFF5F7FA),
       body: CustomScrollView(
         slivers: [
-          // Enhanced Gradient header section
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
@@ -304,15 +275,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top Row: Logo/Brand + Location + Notifications
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Logo and Brand
                           Expanded(
                             child: Row(
                               children: [
-                                // Logo with white background circle
                                 Container(
                                   width: 56,
                                   height: 56,
@@ -343,7 +311,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // Brand Name
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,7 +341,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ],
                             ),
                           ),
-                          // Notification Bell
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
@@ -425,8 +391,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      
-                      // Welcome Message
                       Consumer(
                         builder: (context, ref, child) {
                           final user = ref.watch(currentUserProvider).valueOrNull;
@@ -457,12 +421,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
-          // Main content section
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                        // Stats Cards Row - Addresses and Rewards
                         Row(
                           children: [
                             Expanded(
@@ -588,8 +550,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
-
-                        // Service Category Cards
                         Row(
                           children: [
                             Expanded(
@@ -616,8 +576,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
-
-                        // Featured Shops
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -684,8 +642,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
-
-                        // Featured Shop Cards (Horizontal Scroll)
                         SizedBox(
                           height: 270,
                           child: ListView(
@@ -783,8 +739,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        // Quick Actions
                         Row(
                           children: [
                             Container(
@@ -863,8 +817,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 24),
-
-                        // Service Information Card
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -914,8 +866,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        // Recent Orders
                         const Text(
                           'Recent Orders',
                           style: TextStyle(
@@ -925,7 +875,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Recent Orders List
                         ConstrainedBox(
                           constraints: const BoxConstraints(
                             minHeight: 100,
@@ -941,7 +890,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             );
   }
-
   Widget _buildServiceFeature(IconData icon, String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -974,7 +922,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ],
     );
   }
-
   void _showComingSoonSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1073,11 +1020,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-
   Widget _buildRecentOrders(WidgetRef ref) {
-    // Use proper Supabase bookings table
     final bookingsAsync = ref.watch(customerBookingsProvider);
-
     return bookingsAsync.when(
       loading: () => const Center(
         child: Padding(
@@ -1102,15 +1046,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       data: (allBookings) => _buildRecentOrdersContent(allBookings),
     );
   }
-
   Widget _buildRecentOrdersContent(List<BookingModel> allBookings) {
     String getDeviceInfo(BookingModel booking) {
       if (booking.diagnosticNotes == null) return 'No details';
-
       final notes = booking.diagnosticNotes!;
       final deviceMatch = RegExp(r'Device: (.+)').firstMatch(notes);
       final modelMatch = RegExp(r'Model: (.+)').firstMatch(notes);
-
       if (deviceMatch != null && modelMatch != null) {
         final device = deviceMatch.group(1)?.trim() ?? '';
         final model = modelMatch.group(1)?.trim() ?? '';
@@ -1118,10 +1059,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       } else if (deviceMatch != null) {
         return deviceMatch.group(1)!.trim();
       }
-
       return 'No details';
     }
-
     if (allBookings.isEmpty) {
       return SizedBox(
         height: 200,
@@ -1147,10 +1086,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       );
     }
-
-    // Show only the 3 most recent bookings
     final recentBookings = allBookings.take(3).toList();
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: recentBookings.map((booking) {
@@ -1173,7 +1109,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           default:
             statusColor = Colors.grey;
         }
-
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -1184,7 +1119,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           child: Row(
             children: [
-              // Icon with status color
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -1194,7 +1128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Icon(Icons.build, color: statusColor, size: 20),
               ),
               const SizedBox(width: 12),
-              // Device info and short ID
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,7 +1153,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              // Status badge and price
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -1256,7 +1188,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }).toList(),
     );
   }
-
   void _showCustomerNotificationsSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
@@ -1266,16 +1197,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
-
 class _CustomerNotificationsSheet extends ConsumerWidget {
   const _CustomerNotificationsSheet();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = AsyncData<List<AppNotification>>(
         ref.watch(filteredNotificationsProvider));
     final unreadCount = ref.watch(unreadNotificationsCountProvider);
-
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.4,
@@ -1396,22 +1324,18 @@ class _CustomerNotificationsSheet extends ConsumerWidget {
     );
   }
 }
-
 class _CustomerNotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
-
   const _CustomerNotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
   });
-
   @override
   Widget build(BuildContext context) {
     final mapped = mapNotificationIcon(notification.type);
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1514,15 +1438,12 @@ class _CustomerNotificationCard extends StatelessWidget {
     );
   }
 }
-
-// Category Card Widget
 class _CategoryCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
-
   const _CategoryCard({
     required this.icon,
     required this.title,
@@ -1530,7 +1451,6 @@ class _CategoryCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -1598,8 +1518,6 @@ class _CategoryCard extends StatelessWidget {
     );
   }
 }
-
-// Featured Shop Card Widget
 class _FeaturedShopCard extends StatelessWidget {
   final String shopName;
   final String ownerName;
@@ -1620,7 +1538,6 @@ class _FeaturedShopCard extends StatelessWidget {
   final String instagram;
   final double latitude;
   final double longitude;
-
   const _FeaturedShopCard({
     required this.shopName,
     required this.ownerName,
@@ -1642,7 +1559,6 @@ class _FeaturedShopCard extends StatelessWidget {
     required this.latitude,
     required this.longitude,
   });
-
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now().hour;
@@ -1661,7 +1577,6 @@ class _FeaturedShopCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       children: [
                         Container(
@@ -1727,8 +1642,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // Description
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -1765,8 +1678,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Rating and Distance
                     Row(
                       children: [
                         Expanded(
@@ -1827,8 +1738,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // Location (tappable — shows map)
                     GestureDetector(
                       onTap: () {
                         showModalBottomSheet(
@@ -1947,8 +1856,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Contact Information
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -2017,8 +1924,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Operating Hours
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -2064,8 +1969,6 @@ class _FeaturedShopCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Services Offered
                     const Text(
                       'Services Offered',
                       style: TextStyle(
@@ -2100,8 +2003,6 @@ class _FeaturedShopCard extends StatelessWidget {
                           .toList(),
                     ),
                     const SizedBox(height: 20),
-
-                    // Action Buttons
                     Row(
                       children: [
                         Expanded(
@@ -2160,7 +2061,6 @@ class _FeaturedShopCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header with gradient
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -2180,7 +2080,6 @@ class _FeaturedShopCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Shop icon
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -2193,7 +2092,6 @@ class _FeaturedShopCard extends StatelessWidget {
                         size: 20,
                       ),
                     ),
-                    // Status badge
                     Row(
                       children: [
                         if (isFeatured) ...[
@@ -2272,13 +2170,11 @@ class _FeaturedShopCard extends StatelessWidget {
               ],
             ),
           ),
-          // Content section
           Padding(
             padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Rating and reviews
                 Row(
                   children: [
                     Container(
@@ -2324,7 +2220,6 @@ class _FeaturedShopCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Services tags
                 Wrap(
                   spacing: 4,
                   runSpacing: 4,
@@ -2350,7 +2245,6 @@ class _FeaturedShopCard extends StatelessWidget {
                   }).toList(),
                 ),
                 const SizedBox(height: 6),
-                // Operating hours
                 Row(
                   children: [
                     Icon(
@@ -2376,7 +2270,6 @@ class _FeaturedShopCard extends StatelessWidget {
     ),
     );
   }
-
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       children: [
@@ -2395,15 +2288,12 @@ class _FeaturedShopCard extends StatelessWidget {
     );
   }
 }
-
-// Modern Quick Action Card Widget
 class _RepairTypeOption extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
-
   const _RepairTypeOption({
     required this.icon,
     required this.title,
@@ -2411,7 +2301,6 @@ class _RepairTypeOption extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -2465,14 +2354,12 @@ class _RepairTypeOption extends StatelessWidget {
     );
   }
 }
-
 class _ModernQuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
   final List<Color> gradientColors;
   final VoidCallback onTap;
-
   const _ModernQuickActionCard({
     required this.icon,
     required this.label,
@@ -2480,7 +2367,6 @@ class _ModernQuickActionCard extends StatelessWidget {
     required this.gradientColors,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -2539,18 +2425,15 @@ class _ModernQuickActionCard extends StatelessWidget {
     );
   }
 }
-
 class _ComingSoonCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-
   const _ComingSoonCard({
     required this.icon,
     required this.label,
     required this.color,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -2622,14 +2505,12 @@ class _ComingSoonCard extends StatelessWidget {
     );
   }
 }
-
 class _SupportOption extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
-
   const _SupportOption({
     required this.icon,
     required this.title,
@@ -2637,7 +2518,6 @@ class _SupportOption extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(

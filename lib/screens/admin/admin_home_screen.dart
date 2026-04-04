@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/notification_icon_mapper.dart';
 import '../../core/utils/time_ago.dart';
@@ -10,16 +9,13 @@ import '../../models/notification_model.dart';
 import '../../providers/admin_dashboard_provider.dart';
 import '../../providers/admin_notifications_provider.dart';
 import '../../providers/pending_verifications_count_provider.dart';
-
 class AdminHomeScreen extends ConsumerWidget {
   const AdminHomeScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminDashboardStatsProvider);
     final pendingVerificationsStream = ref.watch(pendingVerificationsPollingProvider);
     final unreadCount = ref.watch(adminUnreadNotificationsCountProvider);
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -103,7 +99,6 @@ class AdminHomeScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Quick stats
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
@@ -160,7 +155,6 @@ class AdminHomeScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-
                 _SectionTitle('Management'),
                 const SizedBox(height: 10),
                 _ActionTile(
@@ -249,7 +243,6 @@ class AdminHomeScreen extends ConsumerWidget {
     );
   }
 }
-
 void _showNotificationsSheet(BuildContext context, WidgetRef ref) {
   showModalBottomSheet(
     context: context,
@@ -258,15 +251,12 @@ void _showNotificationsSheet(BuildContext context, WidgetRef ref) {
     builder: (_) => const _AdminNotificationsSheet(),
   );
 }
-
 class _AdminNotificationsSheet extends ConsumerWidget {
   const _AdminNotificationsSheet();
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feedAsync = ref.watch(adminNotificationsFeedProvider);
     final unreadCount = ref.watch(adminUnreadNotificationsCountProvider);
-
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.4,
@@ -278,7 +268,6 @@ class _AdminNotificationsSheet extends ConsumerWidget {
         ),
         child: Column(
           children: [
-            // Handle
             Container(
               margin: const EdgeInsets.only(top: 12, bottom: 8),
               width: 40,
@@ -288,7 +277,6 @@ class _AdminNotificationsSheet extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
@@ -331,7 +319,6 @@ class _AdminNotificationsSheet extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: 8),
-            // List
             Expanded(
               child: feedAsync.when(
                 data: (items) {
@@ -390,22 +377,18 @@ class _AdminNotificationsSheet extends ConsumerWidget {
     );
   }
 }
-
 class _AdminNotificationCard extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
-
   const _AdminNotificationCard({
     required this.notification,
     required this.onTap,
     required this.onDismiss,
   });
-
   @override
   Widget build(BuildContext context) {
     final mapped = mapNotificationIcon(notification.type);
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -508,11 +491,9 @@ class _AdminNotificationCard extends StatelessWidget {
     );
   }
 }
-
 class _SectionTitle extends StatelessWidget {
   final String text;
   const _SectionTitle(this.text);
-
   @override
   Widget build(BuildContext context) {
     return Text(
@@ -525,14 +506,12 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
-
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-
   const _StatCard({
     required this.title,
     required this.value,
@@ -540,7 +519,6 @@ class _StatCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -599,14 +577,12 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _ActionTile({
     required this.icon,
     required this.color,
@@ -614,7 +590,6 @@ class _ActionTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return InkWell(

@@ -1,5 +1,4 @@
 import '../models/technician_profile_model.dart';
-
 class AdminTechnicianListItem {
   final String userId;
   final String fullName;
@@ -13,7 +12,6 @@ class AdminTechnicianListItem {
   final int completedBookings;
   final String? profilePicture;
   final TechnicianProfileModel? profile;
-
   const AdminTechnicianListItem({
     required this.userId,
     required this.fullName,

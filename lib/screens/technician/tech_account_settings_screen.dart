@@ -7,33 +7,27 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/privacy_policy_screen.dart';
 import '../auth/terms_conditions_screen.dart';
-
 class TechAccountSettingsScreen extends ConsumerStatefulWidget {
   const TechAccountSettingsScreen({super.key});
-
   @override
   ConsumerState<TechAccountSettingsScreen> createState() =>
       _TechAccountSettingsScreenState();
 }
-
 class _TechAccountSettingsScreenState
     extends ConsumerState<TechAccountSettingsScreen> {
   bool _twoFactorAuth = false;
   bool _biometricLogin = true;
   bool _shareData = true;
   bool _allowLocation = true;
-
   static const _k2FA = 'tech_priv_2fa';
   static const _kBio = 'tech_priv_biometric';
   static const _kShare = 'tech_priv_share_data';
   static const _kLocation = 'tech_priv_location';
-
   @override
   void initState() {
     super.initState();
     _loadPrefs();
   }
-
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -44,12 +38,10 @@ class _TechAccountSettingsScreenState
       _allowLocation = prefs.getBool(_kLocation) ?? true;
     });
   }
-
   Future<void> _saveToggle(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
   }
-
   void _changePassword() {
     final email = ref.read(currentUserProvider).value?.email ?? '';
     showModalBottomSheet(
@@ -59,7 +51,6 @@ class _TechAccountSettingsScreenState
       builder: (context) => _ChangePasswordSheet(email: email),
     );
   }
-
   void _deleteAccount() {
     showDialog(
       context: context,
@@ -135,7 +126,6 @@ class _TechAccountSettingsScreenState
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,7 +164,6 @@ class _TechAccountSettingsScreenState
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           children: [
-            // ── Security ─────────────────────────────────────────
             _SectionHeader(
               icon: Icons.shield_rounded,
               iconColor: AppTheme.deepBlue,
@@ -235,10 +224,7 @@ class _TechAccountSettingsScreenState
               ),
               onTap: null,
             ),
-
             const SizedBox(height: 24),
-
-            // ── Privacy ───────────────────────────────────────────
             _SectionHeader(
               icon: Icons.privacy_tip_rounded,
               iconColor: AppTheme.accentPurple,
@@ -323,10 +309,7 @@ class _TechAccountSettingsScreenState
                     builder: (_) => const TermsConditionsScreen()),
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // ── Account Management ────────────────────────────────
             _SectionHeader(
               icon: Icons.manage_accounts_rounded,
               iconColor: AppTheme.errorColor,
@@ -400,22 +383,15 @@ class _TechAccountSettingsScreenState
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
-
   const _SectionHeader({
     required this.icon,
     required this.iconColor,
     required this.title,
   });
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -442,7 +418,6 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 }
-
 class _ModernTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -450,7 +425,6 @@ class _ModernTile extends StatelessWidget {
   final String subtitle;
   final Widget trailing;
   final VoidCallback? onTap;
-
   const _ModernTile({
     required this.icon,
     required this.iconColor,
@@ -459,7 +433,6 @@ class _ModernTile extends StatelessWidget {
     required this.trailing,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -523,19 +496,12 @@ class _ModernTile extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Change Password bottom sheet
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _ChangePasswordSheet extends StatefulWidget {
   final String email;
   const _ChangePasswordSheet({required this.email});
-
   @override
   State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
 }
-
 class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   final _currentCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
@@ -544,7 +510,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _loading = false;
-
   @override
   void dispose() {
     _currentCtrl.dispose();
@@ -552,12 +517,10 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     _confirmCtrl.dispose();
     super.dispose();
   }
-
   Future<void> _submit() async {
     final current = _currentCtrl.text.trim();
     final newPass = _newCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
-
     if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
       _snack('Please fill all fields');
       return;
@@ -570,7 +533,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       _snack('Password must be at least 6 characters');
       return;
     }
-
     setState(() => _loading = true);
     try {
       final supabase = Supabase.instance.client;
@@ -579,7 +541,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
         password: current,
       );
       await supabase.auth.updateUser(UserAttributes(password: newPass));
-
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -598,12 +559,10 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       _snack('Something went wrong. Please try again.');
     }
   }
-
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
-
   InputDecoration _inputDec(
       String hint, bool obscure, VoidCallback toggle, IconData prefixIcon) {
     return InputDecoration(
@@ -636,7 +595,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -711,7 +669,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ],
               ),
               const SizedBox(height: 28),
-
               _FieldLabel('Current Password'),
               const SizedBox(height: 8),
               TextField(
@@ -725,7 +682,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
               _FieldLabel('New Password'),
               const SizedBox(height: 8),
               TextField(
@@ -739,7 +695,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
               _FieldLabel('Confirm New Password'),
               const SizedBox(height: 8),
               TextField(
@@ -753,7 +708,6 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ),
               ),
               const SizedBox(height: 28),
-
               Row(
                 children: [
                   Expanded(
@@ -805,11 +759,9 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     );
   }
 }
-
 class _FieldLabel extends StatelessWidget {
   final String text;
   const _FieldLabel(this.text);
-
   @override
   Widget build(BuildContext context) {
     return Text(

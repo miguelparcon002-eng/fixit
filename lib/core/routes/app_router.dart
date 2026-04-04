@@ -69,7 +69,6 @@ import '../../screens/customer/post_problem_screen.dart';
 import '../../screens/customer/my_requests_screen.dart';
 import '../../screens/technician/tech_job_map_screen.dart';
 import '../../screens/admin/admin_job_requests_screen.dart';
-
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/onboarding',
@@ -78,13 +77,9 @@ class AppRouter {
         final prefs = await SharedPreferences.getInstance();
         final completed = prefs.getBool('onboarding_completed') ?? false;
         if (!completed) return null; // show onboarding
-
-        // Onboarding done — check for an active session
         final supabase = Supabase.instance.client;
         final session = supabase.auth.currentSession;
         if (session == null) return '/welcome'; // not logged in
-
-        // Session exists — fetch role and suspension status
         try {
           final response = await supabase
               .from('users')
@@ -107,20 +102,15 @@ class AppRouter {
       return null;
     },
     routes: [
-      // Root fallback
       GoRoute(
         path: '/',
         redirect: (context, state) => '/home',
       ),
-
-      // Onboarding route
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) => const OnboardingScreen(),
       ),
-
-      // Auth routes
       GoRoute(
         path: '/welcome',
         name: 'welcome',
@@ -146,8 +136,6 @@ class AppRouter {
         name: 'forgotPassword',
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-
-      // Main navigation with bottom nav
       ShellRoute(
         builder: (context, state, child) => MainNavigation(child: child),
         routes: [
@@ -166,7 +154,6 @@ class AppRouter {
             name: 'support',
             builder: (context, state) => const HelpSupportScreen(),
           ),
-          // Keep chats accessible, but not as a bottom-nav tab
           GoRoute(
             path: '/chats',
             name: 'chats',
@@ -179,8 +166,6 @@ class AppRouter {
           ),
         ],
       ),
-
-      // Booking routes
       GoRoute(
         path: '/booking/:id',
         name: 'bookingDetail',
@@ -199,7 +184,6 @@ class AppRouter {
           ),
         ],
       ),
-      // Full-screen customer booking flow
       GoRoute(
         path: '/create-booking',
         name: 'createBooking',
@@ -211,7 +195,6 @@ class AppRouter {
           );
         },
       ),
-      // Backwards-compatible route (if something still navigates with a serviceId)
       GoRoute(
         path: '/create-booking/:serviceId',
         name: 'createBookingWithService',
@@ -220,7 +203,6 @@ class AppRouter {
           return CreateBookingScreen(serviceId: serviceId);
         },
       ),
-      // Shop booking — ShopInfo passed via GoRouter extra
       GoRoute(
         path: '/shop-booking',
         name: 'shopBooking',
@@ -229,8 +211,6 @@ class AppRouter {
           return ShopBookingScreen(shop: shop);
         },
       ),
-
-      // Chat routes
       GoRoute(
         path: '/chat/:id',
         name: 'chatDetail',
@@ -239,8 +219,6 @@ class AppRouter {
           return ChatDetailScreen(chatId: chatId);
         },
       ),
-
-      // Profile routes
       GoRoute(
         path: '/edit-profile',
         name: 'editProfile',
@@ -271,8 +249,6 @@ class AppRouter {
         name: 'privacySecurity',
         builder: (context, state) => const PrivacySecurityScreen(),
       ),
-      // NOTE: Help/Support is now under the MainNavigation ShellRoute at /help-support
-
       GoRoute(
         path: '/live-chat',
         name: 'liveChat',
@@ -283,8 +259,6 @@ class AppRouter {
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
       ),
-
-      // Technician navigation with bottom nav
       ShellRoute(
         builder: (context, state, child) => TechNavigation(child: child),
         routes: [
@@ -308,7 +282,6 @@ class AppRouter {
             name: 'techProfile',
             builder: (context, state) => const TechProfileScreen(),
           ),
-          // Full page ratings inside technician navigation
           GoRoute(
             path: '/tech-ratings',
             name: 'techRatings',
@@ -316,8 +289,6 @@ class AppRouter {
           ),
         ],
       ),
-
-      // Admin navigation with bottom nav
       ShellRoute(
         builder: (context, state, child) => AdminNavigation(child: child),
         routes: [
@@ -370,8 +341,6 @@ class AppRouter {
           ),
         ],
       ),
-
-      // Technician routes
       GoRoute(
         path: '/tech-edit-profile',
         name: 'techEditProfile',
@@ -425,8 +394,6 @@ class AppRouter {
         name: 'verificationSubmission',
         builder: (context, state) => const VerificationSubmissionScreen(),
       ),
-
-      // Admin routes
       GoRoute(
         path: '/admin',
         name: 'adminDashboard',
@@ -445,8 +412,6 @@ class AppRouter {
           return AdminTicketDetailScreen(ticketId: ticketId);
         },
       ),
-
-      // Customer Support routes
       GoRoute(
         path: '/submit-ticket',
         name: 'submitTicket',
@@ -460,8 +425,6 @@ class AppRouter {
           return SubmitSupportTicketScreen(bookingId: bookingId);
         },
       ),
-
-      // Customer Ticket routes
       GoRoute(
         path: '/my-tickets',
         name: 'myTickets',
@@ -475,8 +438,6 @@ class AppRouter {
           return CustomerTicketDetailScreen(ticketId: ticketId);
         },
       ),
-
-      // Payment route
       GoRoute(
         path: '/payment/:bookingId',
         name: 'payment',
@@ -494,36 +455,26 @@ class AppRouter {
           );
         },
       ),
-
-      // Admin Payment Settings
       GoRoute(
         path: '/admin-payment-settings',
         name: 'adminPaymentSettings',
         builder: (context, state) => const AdminPaymentSettingsScreen(),
       ),
-
-      // Admin Transactions (job payments + cancellation fees)
       GoRoute(
         path: '/admin-transactions',
         name: 'adminTransactions',
         builder: (context, state) => const AdminTransactionsScreen(),
       ),
-
-      // Admin Feedback & Bug Reports
       GoRoute(
         path: '/admin-feedback',
         name: 'adminFeedback',
         builder: (context, state) => const AdminFeedbackScreen(),
       ),
-
-      // Admin Distance Fee Settings
       GoRoute(
         path: '/admin-distance-fee',
         name: 'adminDistanceFee',
         builder: (context, state) => const AdminDistanceFeeScreen(),
       ),
-
-      // Admin Earnings Management routes
       GoRoute(
         path: '/admin-technician-earnings/:technicianId',
         name: 'adminTechnicianEarnings',
@@ -532,8 +483,6 @@ class AppRouter {
           return AdminTechnicianEarningsDetailScreen(technicianId: technicianId);
         },
       ),
-
-      // Job Request routes
       GoRoute(
         path: '/post-problem',
         name: 'postProblem',
@@ -554,8 +503,6 @@ class AppRouter {
         name: 'adminJobRequests',
         builder: (context, state) => const AdminJobRequestsScreen(),
       ),
-
-      // Admin Customer Management routes
       GoRoute(
         path: '/admin-customers',
         name: 'adminCustomers',

@@ -3,19 +3,14 @@ import '../models/booking_model.dart';
 import '../services/booking_service.dart';
 import 'auth_provider.dart';
 import '../core/utils/app_logger.dart';
-
 final bookingServiceProvider = Provider((ref) => BookingService(ref: ref));
-
 final bookingByIdProvider = StreamProvider.family<BookingModel?, String>((ref, bookingId) {
   final bookingService = ref.watch(bookingServiceProvider);
   return bookingService.watchBookingById(bookingId);
 });
-
 final customerBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
   final userAsync = ref.watch(currentUserProvider);
-
-  // Wait for user to load
   return userAsync.when(
     data: (user) {
       if (user == null) return Stream.value([]);
@@ -26,21 +21,16 @@ final customerBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
     error: (_, _) => Stream.value([]),
   );
 });
-
 final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   final bookingService = ref.watch(bookingServiceProvider);
   final userAsync = ref.watch(currentUserProvider);
-
-  // Wait for user to load
   return userAsync.when(
     data: (user) {
       AppLogger.p('🔍 TECHNICIAN BOOKINGS PROVIDER: User = ${user?.id ?? "null"}');
-      
       if (user == null) {
         AppLogger.p('⚠️ TECHNICIAN BOOKINGS PROVIDER: No user, returning empty stream');
         return Stream.value([]);
       }
-
       AppLogger.p('✅ TECHNICIAN BOOKINGS PROVIDER: Watching bookings for ${user.id}');
       return bookingService.watchTechnicianBookings(user.id);
     },
@@ -54,26 +44,18 @@ final technicianBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
     },
   );
 });
-
-/// All post-problem bookings — used by the admin job-request map to derive
-/// accurate active/completed status without relying on job_requests.status.
 final allPostProblemBookingsProvider = StreamProvider<List<BookingModel>>((ref) {
   return ref.watch(bookingServiceProvider).watchPostProblemBookings();
 });
-
 class BookingsByStatusParams {
   final String status;
   final bool isTechnician;
-
   BookingsByStatusParams({required this.status, required this.isTechnician});
 }
-
 final bookingsByStatusProvider = FutureProvider.family<List<BookingModel>, BookingsByStatusParams>((ref, params) async {
   final bookingService = ref.watch(bookingServiceProvider);
   final user = await ref.watch(currentUserProvider.future);
-
   if (user == null) return [];
-
   return await bookingService.getBookingsByStatus(
     userId: user.id,
     status: params.status,

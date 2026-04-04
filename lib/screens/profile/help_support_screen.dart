@@ -6,14 +6,11 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../services/feedback_service.dart';
-
 class HelpSupportScreen extends ConsumerWidget {
   const HelpSupportScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ticketCount = ref.watch(customerTicketsProvider).valueOrNull?.length ?? 0;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -41,8 +38,6 @@ class HelpSupportScreen extends ConsumerWidget {
             trailing: _TicketCountBadge(count: ticketCount),
           ),
           const SizedBox(height: 16),
-
-          // Quick actions
           Row(
             children: [
               Expanded(
@@ -66,7 +61,6 @@ class HelpSupportScreen extends ConsumerWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 22),
           const _SectionTitle('FAQs & Resources'),
           const SizedBox(height: 10),
@@ -105,7 +99,6 @@ class HelpSupportScreen extends ConsumerWidget {
               );
             },
           ),
-
           const SizedBox(height: 22),
           const _SectionTitle('Other'),
           const SizedBox(height: 10),
@@ -148,7 +141,6 @@ class HelpSupportScreen extends ConsumerWidget {
       ),
     );
   }
-
   void _showFeedbackDialog(BuildContext context, WidgetRef ref) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -159,7 +151,6 @@ class HelpSupportScreen extends ConsumerWidget {
       ),
     );
   }
-
   void _showBugReportDialog(BuildContext context, WidgetRef ref) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -171,12 +162,9 @@ class HelpSupportScreen extends ConsumerWidget {
     );
   }
 }
-
 class _SectionTitle extends StatelessWidget {
   final String text;
-
   const _SectionTitle(this.text);
-
   @override
   Widget build(BuildContext context) {
     return Text(
@@ -189,16 +177,12 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
-
 class _TicketCountBadge extends StatelessWidget {
   final int count;
-
   const _TicketCountBadge({required this.count});
-
   @override
   Widget build(BuildContext context) {
     if (count <= 0) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -217,18 +201,15 @@ class _TicketCountBadge extends StatelessWidget {
     );
   }
 }
-
 class _SupportHeroCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget? trailing;
-
   const _SupportHeroCard({
     required this.title,
     required this.subtitle,
     this.trailing,
   });
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -302,14 +283,12 @@ class _SupportHeroCard extends StatelessWidget {
     );
   }
 }
-
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
-
   const _QuickActionCard({
     required this.icon,
     required this.title,
@@ -317,7 +296,6 @@ class _QuickActionCard extends StatelessWidget {
     required this.color,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -380,14 +358,12 @@ class _QuickActionCard extends StatelessWidget {
     );
   }
 }
-
 class _SupportOptionTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _SupportOptionTile({
     required this.icon,
     required this.iconColor,
@@ -395,7 +371,6 @@ class _SupportOptionTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -453,10 +428,8 @@ class _SupportOptionTile extends StatelessWidget {
     );
   }
 }
-
 class _FAQScreen extends StatelessWidget {
   const _FAQScreen();
-
   @override
   Widget build(BuildContext context) {
     final faqs = [
@@ -491,7 +464,6 @@ class _FAQScreen extends StatelessWidget {
             'If you\'re not satisfied with the service, please contact our support team within 24 hours. We offer a satisfaction guarantee and will work to resolve any issues.',
       },
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -549,10 +521,8 @@ class _FAQScreen extends StatelessWidget {
     );
   }
 }
-
 class _UserGuideScreen extends StatelessWidget {
   const _UserGuideScreen();
-
   @override
   Widget build(BuildContext context) {
     final sections = [
@@ -620,7 +590,6 @@ class _UserGuideScreen extends StatelessWidget {
         ],
       ),
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -718,22 +687,18 @@ class _UserGuideScreen extends StatelessWidget {
     );
   }
 }
-
 class _GuideSection {
   final IconData icon;
   final String title;
   final List<String> steps;
-
   const _GuideSection({
     required this.icon,
     required this.title,
     required this.steps,
   });
 }
-
 class _VideoTutorialsScreen extends StatelessWidget {
   const _VideoTutorialsScreen();
-
   @override
   Widget build(BuildContext context) {
     final tutorials = [
@@ -780,7 +745,6 @@ class _VideoTutorialsScreen extends StatelessWidget {
         color: AppTheme.errorColor,
       ),
     ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -892,14 +856,12 @@ class _VideoTutorialsScreen extends StatelessWidget {
     );
   }
 }
-
 class _VideoTutorial {
   final IconData icon;
   final String title;
   final String duration;
   final String description;
   final Color color;
-
   const _VideoTutorial({
     required this.icon,
     required this.title,
@@ -908,37 +870,29 @@ class _VideoTutorial {
     required this.color,
   });
 }
-
 class _FeedbackFormScreen extends StatefulWidget {
   final String type; // 'feedback' or 'bug_report'
   final WidgetRef ref;
-
   const _FeedbackFormScreen({required this.type, required this.ref});
-
   @override
   State<_FeedbackFormScreen> createState() => _FeedbackFormScreenState();
 }
-
 class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
   final _messageController = TextEditingController();
   int _selectedRating = 0;
   bool _submitting = false;
-
   bool get _isFeedback => widget.type == 'feedback';
-
   String get _title => _isFeedback ? 'Send Feedback' : 'Report a Bug';
   String get _subtitle => _isFeedback
       ? 'Help us improve FixIt by sharing your experience'
       : 'Let us know what went wrong so we can fix it';
   IconData get _icon => _isFeedback ? Icons.feedback : Icons.bug_report;
   Color get _accentColor => _isFeedback ? AppTheme.primaryCyan : AppTheme.errorColor;
-
   @override
   void dispose() {
     _messageController.dispose();
     super.dispose();
   }
-
   Future<void> _submit() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) {
@@ -952,14 +906,11 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
       );
       return;
     }
-
     setState(() => _submitting = true);
-
     try {
       final user = widget.ref.read(currentUserProvider).valueOrNull;
       final userId = SupabaseConfig.client.auth.currentUser?.id ?? '';
       final userName = user?.fullName ?? user?.email ?? 'Unknown';
-
       await FeedbackService.submitFeedback(
         userId: userId,
         userName: userName,
@@ -967,7 +918,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
         message: message,
         rating: _isFeedback && _selectedRating > 0 ? _selectedRating : null,
       );
-
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -989,7 +939,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1015,7 +964,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -1070,8 +1018,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Rating section (only for feedback)
             if (_isFeedback) ...[
               Container(
                 width: double.infinity,
@@ -1152,8 +1098,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
               ),
               const SizedBox(height: 16),
             ],
-
-            // Message section
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -1217,7 +1161,6 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
                 ],
               ),
             ),
-
             if (!_isFeedback) ...[
               const SizedBox(height: 16),
               Container(
@@ -1246,10 +1189,7 @@ class _FeedbackFormScreenState extends State<_FeedbackFormScreen> {
                 ),
               ),
             ],
-
             const SizedBox(height: 24),
-
-            // Submit button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

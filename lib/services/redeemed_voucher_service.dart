@@ -2,11 +2,8 @@ import '../core/config/supabase_config.dart';
 import '../models/redeemed_voucher.dart';
 import '../models/reward.dart';
 import '../core/utils/app_logger.dart';
-
 class RedeemedVoucherService {
   final _supabase = SupabaseConfig.client;
-
-  /// Get all redeemed vouchers for the current user
   Future<List<RedeemedVoucher>> getUserRedeemedVouchers(String userId) async {
     try {
       final response = await _supabase
@@ -14,7 +11,6 @@ class RedeemedVoucherService {
           .select()
           .eq('user_id', userId)
           .order('redeemed_at', ascending: false);
-
       return (response as List)
           .map((json) => RedeemedVoucher.fromJson(json))
           .toList();
@@ -23,8 +19,6 @@ class RedeemedVoucherService {
       return [];
     }
   }
-
-  /// Redeem a voucher
   Future<RedeemedVoucher?> redeemVoucher({
     required String userId,
     required RewardVoucher voucher,
@@ -46,7 +40,6 @@ class RedeemedVoucherService {
           })
           .select()
           .single();
-
       AppLogger.p('RedeemedVoucherService: Voucher redeemed successfully');
       return RedeemedVoucher.fromJson(response);
     } catch (e) {
@@ -54,8 +47,6 @@ class RedeemedVoucherService {
       return null;
     }
   }
-
-  /// Mark a voucher as used (when applied to a booking)
   Future<bool> markVoucherAsUsed({
     required String voucherId,
     String? bookingId,
@@ -69,7 +60,6 @@ class RedeemedVoucherService {
             if (bookingId != null) 'booking_id': bookingId,
           })
           .eq('id', voucherId);
-
       AppLogger.p('RedeemedVoucherService: Voucher marked as used');
       return true;
     } catch (e) {
@@ -77,18 +67,14 @@ class RedeemedVoucherService {
       return false;
     }
   }
-
-  /// Get unused vouchers for a user
   Future<List<RedeemedVoucher>> getUnusedVouchers(String userId) async {
     try {
       final response = await _supabase
           .from('user_redeemed_vouchers')
           .select()
           .eq('user_id', userId)
-          // Treat NULL as "not used" for legacy rows created before `is_used` was reliably populated.
           .or('is_used.is.null,is_used.eq.false')
           .order('redeemed_at', ascending: false);
-
       return (response as List)
           .map((json) => RedeemedVoucher.fromJson(json))
           .toList();
@@ -97,15 +83,12 @@ class RedeemedVoucherService {
       return [];
     }
   }
-
-  /// Delete a redeemed voucher (if allowed)
   Future<bool> deleteRedeemedVoucher(String voucherId) async {
     try {
       await _supabase
           .from('user_redeemed_vouchers')
           .delete()
           .eq('id', voucherId);
-
       AppLogger.p('RedeemedVoucherService: Redeemed voucher deleted');
       return true;
     } catch (e) {
@@ -113,8 +96,6 @@ class RedeemedVoucherService {
       return false;
     }
   }
-
-  /// Stream redeemed vouchers for real-time updates
   Stream<List<RedeemedVoucher>> watchUserRedeemedVouchers(String userId) {
     return _supabase
         .from('user_redeemed_vouchers')

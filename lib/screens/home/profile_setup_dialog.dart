@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
-
 class ProfileSetupDialog extends StatelessWidget {
   final VoidCallback onComplete;
-
   const ProfileSetupDialog({
     super.key,
     required this.onComplete,
   });
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -31,7 +28,6 @@ class ProfileSetupDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Top gradient banner
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
@@ -82,13 +78,10 @@ class ProfileSetupDialog extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Body
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // Voucher highlight
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -139,8 +132,6 @@ class ProfileSetupDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Description
                   const Text(
                     'Just add your phone number and address to unlock this reward. It only takes a minute!',
                     style: TextStyle(
@@ -151,8 +142,6 @@ class ProfileSetupDialog extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-
-                  // Setup Profile button
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -179,8 +168,6 @@ class ProfileSetupDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Dismiss button
                   SizedBox(
                     width: double.infinity,
                     height: 48,

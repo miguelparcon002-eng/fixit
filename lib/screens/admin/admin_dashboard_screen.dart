@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_logo.dart';
-
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

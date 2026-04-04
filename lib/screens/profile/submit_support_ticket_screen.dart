@@ -6,26 +6,21 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/support_ticket_provider.dart';
 import '../../models/support_ticket_model.dart';
-
 class SubmitSupportTicketScreen extends ConsumerStatefulWidget {
   final String? bookingId;
   const SubmitSupportTicketScreen({super.key, this.bookingId});
-
   @override
   ConsumerState<SubmitSupportTicketScreen> createState() =>
       _SubmitSupportTicketScreenState();
 }
-
 class _SubmitSupportTicketScreenState
     extends ConsumerState<SubmitSupportTicketScreen> {
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _descriptionController = TextEditingController();
-
   String _selectedCategory = 'booking_issue';
   String _selectedPriority = 'medium';
   bool _isLoading = false;
-
   static const _categories = [
     {
       'value': 'booking_issue',
@@ -58,7 +53,6 @@ class _SubmitSupportTicketScreenState
       'description': 'General inquiries or other issues',
     },
   ];
-
   static const _priorities = [
     {
       'value': 'low',
@@ -89,7 +83,6 @@ class _SubmitSupportTicketScreenState
       'description': 'Immediate attention needed',
     },
   ];
-
   @override
   void initState() {
     super.initState();
@@ -97,17 +90,14 @@ class _SubmitSupportTicketScreenState
       _subjectController.text = 'Issue with booking ${widget.bookingId}';
     }
   }
-
   @override
   void dispose() {
     _subjectController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
-
   Future<void> _submitTicket() async {
     if (!_formKey.currentState!.validate()) return;
-
     final user = ref.read(currentUserProvider).value;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -118,9 +108,7 @@ class _SubmitSupportTicketScreenState
       );
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
       final ticketId = 'TKT-${const Uuid().v4().substring(0, 8).toUpperCase()}';
       final ticket = SupportTicket(
@@ -148,15 +136,10 @@ class _SubmitSupportTicketScreenState
           ),
         ],
       );
-
       final service = ref.read(supportTicketServiceProvider);
       final created = await service.createTicket(ticket);
-
       if (created == null) throw Exception('Failed to save ticket');
-
-      // Refresh the customer's ticket list
       ref.invalidate(customerTicketsProvider);
-
       if (mounted) {
         _showSuccessDialog(ticketId);
       }
@@ -173,7 +156,6 @@ class _SubmitSupportTicketScreenState
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   void _showSuccessDialog(String ticketId) {
     showDialog(
       context: context,
@@ -252,11 +234,9 @@ class _SubmitSupportTicketScreenState
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider).value;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -282,11 +262,8 @@ class _SubmitSupportTicketScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // User card
               _UserInfoCard(user: user),
               const SizedBox(height: 20),
-
-              // Category section
               _SectionLabel(label: 'What type of issue?'),
               const SizedBox(height: 10),
               ..._categories.map((c) => Padding(
@@ -300,8 +277,6 @@ class _SubmitSupportTicketScreenState
                     ),
                   )),
               const SizedBox(height: 20),
-
-              // Priority section
               _SectionLabel(label: 'How urgent is this?'),
               const SizedBox(height: 10),
               Row(
@@ -352,8 +327,6 @@ class _SubmitSupportTicketScreenState
                 }).toList(),
               ),
               const SizedBox(height: 20),
-
-              // Subject field
               _SectionLabel(label: 'Subject'),
               const SizedBox(height: 10),
               _ModernField(
@@ -363,8 +336,6 @@ class _SubmitSupportTicketScreenState
                 validator: (v) => (v == null || v.isEmpty) ? 'Please enter a subject' : null,
               ),
               const SizedBox(height: 16),
-
-              // Description field
               _SectionLabel(label: 'Description'),
               const SizedBox(height: 10),
               _ModernField(
@@ -378,8 +349,6 @@ class _SubmitSupportTicketScreenState
                   return null;
                 },
               ),
-
-              // Booking ID tag
               if (widget.bookingId != null) ...[
                 const SizedBox(height: 14),
                 Container(
@@ -405,10 +374,7 @@ class _SubmitSupportTicketScreenState
                   ),
                 ),
               ],
-
               const SizedBox(height: 20),
-
-              // Info banner
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -434,10 +400,7 @@ class _SubmitSupportTicketScreenState
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // Submit button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -467,13 +430,9 @@ class _SubmitSupportTicketScreenState
     );
   }
 }
-
-// ─── Section Label ─────────────────────────────────────────────────────────
-
 class _SectionLabel extends StatelessWidget {
   final String label;
   const _SectionLabel({required this.label});
-
   @override
   Widget build(BuildContext context) {
     return Text(
@@ -486,19 +445,14 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
-// ─── User Info Card ─────────────────────────────────────────────────────────
-
 class _UserInfoCard extends StatelessWidget {
   final dynamic user;
   const _UserInfoCard({required this.user});
-
   @override
   Widget build(BuildContext context) {
     final name = user?.fullName ?? 'Customer';
     final email = user?.email ?? '';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -580,16 +534,12 @@ class _UserInfoCard extends StatelessWidget {
     );
   }
 }
-
-// ─── Modern Text Field ───────────────────────────────────────────────────────
-
 class _ModernField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final IconData icon;
   final int maxLines;
   final String? Function(String?)? validator;
-
   const _ModernField({
     required this.controller,
     required this.hint,
@@ -597,7 +547,6 @@ class _ModernField extends StatelessWidget {
     this.maxLines = 1,
     this.validator,
   });
-
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -637,16 +586,12 @@ class _ModernField extends StatelessWidget {
     );
   }
 }
-
-// ─── Category Option ─────────────────────────────────────────────────────────
-
 class _CategoryOption extends StatelessWidget {
   final IconData icon;
   final String label;
   final String description;
   final bool isSelected;
   final VoidCallback onTap;
-
   const _CategoryOption({
     required this.icon,
     required this.label,
@@ -654,7 +599,6 @@ class _CategoryOption extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
